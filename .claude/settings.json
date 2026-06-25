@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(pkill -f \"batch_v2\")",
+      "Bash(sleep 90 && tail -8 /tmp/v2_batch.log)",
+      "Read(//tmp/**)",
+      "Bash(pip install *)"
+    ]
+  }
+}

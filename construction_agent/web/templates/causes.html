@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>致因分析 - Construction Agent</title>
+    <style>
+        :root {
+  --primary: #1E3A5F; --primary-hover: #162D4A;
+  --accent: #2E6B9E; --accent-hover: #255A87;
+  --bg: #F7F8FA; --card: #FFFFFF;
+  --text: #2C3E50; --text-secondary: #8B95A5;
+  --border: #E4E9F0; --muted: #F0F2F5;
+  --success: #2E7D5E; --error: #B55A5A; --warning: #A67C3E;
+  --ring: #2E6B9E; --radius: 8px;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.04);
+  --font-sans: 'Inter','Noto Sans SC','SF Pro',system-ui,sans-serif;
+  --font-mono: 'JetBrains Mono','Fira Code',monospace;
+}
+.dark { --bg: #0F172A; --card: #1E293B; --text: #E2E8F0;
+  --text-secondary: #94A3B8; --border: #334155; --muted: #1A2537;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3); --primary: #6B9FC7;
+  --accent: #60A5FA; --accent-hover: #3B82F6;
+  --success: #34D399; --error: #F87171; --warning: #FBBF24; }
+.dark { --bg: #0F172A; --card: #1E293B; --text: #F1F5F9;
+  --text-secondary: #94A3B8; --border: #334155; --muted: #1E293B; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg); color: var(--text); line-height: 1.6;
+        }
+.header { background:linear-gradient(135deg,#1E293B,#334155); color:white; padding:0 24px;
+  display:flex; align-items:center; justify-content:space-between; height:56px;
+  border-bottom:2px solid #2E6B9E; }
+.header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.header-nav { display:flex; gap:4px; }
+.header-nav a { color:rgba(255,255,255,0.7); text-decoration:none; font-size:13px;
+  padding:6px 14px; border-radius:6px; transition:all 0.2s; font-weight:500; }
+.header-nav a:hover { background:rgba(255,255,255,0.1); color:white; }
+.header-nav a.active { background:rgba(255,255,255,0.12); color:white; }
+.theme-toggle { background:none; border:none; color:rgba(255,255,255,0.7);
+  cursor:pointer; padding:6px; border-radius:6px; display:flex; }
+.theme-toggle:hover { background:rgba(255,255,255,0.1); color:white; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+        .card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px; border:1px solid var(--border); }
+        .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+
+        /* ── HFACS 层级概览卡片 ── */
+        .level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .level-card { border-radius: 8px; padding: 16px; border: 1px solid var(--border); background: var(--card); }
+        .level-card .level-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .level-card .level-name { font-weight: 600; font-size: 14px; }
+        .level-card .level-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+        .level-card .level-count { font-size: 24px; font-weight: 700; color: var(--primary); }
+        .level-bar { height: 6px; border-radius: 3px; background: #e8eaed; margin-top: 8px; overflow: hidden; }
+        .level-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+        .level-bar-fill.l1 { background: #9334e6; }
+        .level-bar-fill.l2 { background: #ea4335; }
+        .level-bar-fill.l3 { background: #f9ab00; }
+        .level-bar-fill.l4 { background: #1a73e8; }
+        .level-bar-fill.l5 { background: #34a853; }
+        .level-bar-fill.l6 { background: #00acc1; }
+        .rich-badge { background: #e6f4ea; color: #1e8e3e; }
+        .moderate-badge { background: #e8f0fe; color: #1a73e8; }
+        .sparse-badge { background: #fef7e0; color: #e37400; }
+
+        /* ── V1 维度 ── */
+        .dim-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+        .dim-card { text-align: center; padding: 16px 8px; background: var(--bg); border-radius: 8px; }
+        .dim-card .dim-name { font-size: 13px; color: var(--text-secondary); }
+        .dim-card .dim-rate { font-size: 28px; font-weight: 700; color: var(--primary); margin: 4px 0; }
+        .dim-card .dim-bar { height: 4px; border-radius: 2px; background: #e8eaed; max-width: 80%; margin: 4px auto; overflow: hidden; }
+        .dim-card .dim-bar-fill { height: 100%; border-radius: 2px; background: var(--primary); transition: width 0.6s; }
+        .dim-card .dim-count { font-size: 12px; color: var(--text-secondary); }
+
+        /* ── 完整框架 ── */
+        .framework-level { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .framework-level .lvl-header { padding: 14px 20px; color: white; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .framework-level .lvl-header .lvl-tag { font-size: 12px; opacity: 0.9; }
+        .framework-level .lvl-header .lvl-title { font-size: 16px; font-weight: 600; }
+        .framework-level .lvl-header .lvl-sub { font-size: 12px; opacity: 0.85; }
+        .lvl1 { background: #9334e6; }
+        .lvl2 { background: #ea4335; }
+        .lvl3 { background: #f9ab00; }
+        .lvl4 { background: #1a73e8; }
+        .lvl5 { background: #34a853; }
+        .lvl6 { background: #00acc1; }
+        .framework-level .lvl-body { padding: 16px 20px; background: var(--card); }
+
+        .subcat-card { margin-bottom: 12px; padding: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+        .subcat-card:last-child { margin-bottom: 0; }
+        .subcat-card .sc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .subcat-card .sc-code { font-weight: 700; font-size: 14px; font-family: monospace; color: var(--primary); }
+        .subcat-card .sc-name { font-weight: 600; font-size: 14px; margin-left: 8px; }
+        .subcat-card .sc-count { font-size: 13px; color: var(--text-secondary); }
+        .subcat-card .sc-bar { height: 4px; border-radius: 2px; background: #e8eaed; margin: 6px 0; max-width: 200px; overflow: hidden; }
+        .subcat-card .sc-bar-fill { height: 100%; border-radius: 2px; background: var(--primary); transition: width 0.5s; }
+        .subcat-card .sc-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .subcat-card .sc-keywords { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+        .subcat-card .kw-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #e8f0fe; color: var(--primary); font-size: 11px; }
+        .subcat-card .sc-examples { margin-top: 6px; }
+        .subcat-card .sc-example { font-size: 12px; color: var(--text-secondary); padding: 4px 8px; background: var(--card); border-radius: 4px; margin-bottom: 4px; border-left: 3px solid var(--border); }
+        .subcat-card .sc-example .ex-title { font-weight: 500; color: var(--text); }
+        .subcat-card .sc-example .ex-desc { color: var(--text-secondary); }
+
+        /* ── Tabs ── */
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .tab:hover { color: var(--primary); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── Detail table ── */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 10px 12px; background: var(--bg); border-bottom: 2px solid var(--border); font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        tr:hover { background: #f1f3f4; }
+        .cause-dim { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin: 1px; }
+        .cd-human { background: #fce8e6; color: #c5221f; }
+        .cd-machine { background: #e8f0fe; color: #1a73e8; }
+        .cd-mgmt { background: #fef7e0; color: #e37400; }
+        .cd-env { background: #e6f4ea; color: #1e8e3e; }
+        .hfacs-code { display: inline-block; padding: 1px 6px; border-radius: 3px; background: #f1f3f4; font-size: 11px; font-family: monospace; margin: 1px; }
+
+        .pagination { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 16px; }
+        .pagination button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); cursor: pointer; font-size: 13px; }
+        .pagination button:hover { background: var(--bg); }
+        .pagination button:disabled { opacity: 0.5; cursor: default; }
+        .pagination .page-info { font-size: 13px; color: var(--text-secondary); }
+
+        @media (max-width: 768px) {
+            .dim-grid { grid-template-columns: repeat(2, 1fr); }
+            .level-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+  <h1>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20L12 4l10 16"/><path d="M4 18h16"/><circle cx="12" cy="9" r="1"/></svg>
+    Construction Agent
+  </h1>
+  <div class="header-nav">
+    <a href="/">分析</a>
+    <a href="/dataset">数据集</a>
+    <a href="/causes" class="active">致因分析</a>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+</div>
+<div class="container">
+
+    <!-- 页面标题 -->
+    <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+                <h2 style="font-size:18px; margin-bottom:4px;">🔍 HFACS-CS 事故致因分析体系</h2>
+                <p style="font-size:13px; color:var(--text-secondary);">
+                    基于 <span id="totalRecords">-</span> 条施工事故数据构建 ·
+                    Human Factors Analysis and Classification System for Construction Safety
+                </p>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary); white-space:nowrap;">
+                <span style="display:inline-block; background:#9334e6; width:12px; height:12px; border-radius:2px; vertical-align:middle;"></span> L1组织
+                <span style="display:inline-block; background:#ea4335; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-left:6px;"></span> L2监督
+                <span style="display:inline-block; background:#f9ab00; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-left:6px;"></span> L3前提
+                <span style="display:inline-block; background:#1a73e8; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-left:6px;"></span> L4行为
+                <span style="display:inline-block; background:#34a853; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-left:6px;"></span> L5现场
+                <span style="display:inline-block; background:#00acc1; width:12px; height:12px; border-radius:2px; vertical-align:middle; margin-left:6px;"></span> L6环境
+            </div>
+        </div>
+    </div>
+
+    <!-- HFACS 六层级总览 -->
+    <div class="card">
+        <div class="card-title">🏛️ HFACS-CS 六层级数据覆盖</div>
+        <div class="level-grid" id="levelGrid"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('5m')">🔄 5M 归一化</div>
+            <div class="tab" onclick="switchTab('framework')">📖 HFACS框架</div>
+            <div class="tab" onclick="switchTab('categories')">📋 子类别统计</div>
+            <div class="tab" onclick="switchTab('details')">📄 逐条映射</div>
+        </div>
+
+        <!-- Tab 1: 5M 归一化 -->
+        <div class="tab-content active" id="tab5m">
+            <div style="margin-bottom:16px;">
+                <p style="font-size:13px;color:var(--text-secondary);">
+                    基于 <span id="totalNormalized">-</span> 条事故数据，按 <strong>Man(人员)/Machine(设备)/Material(物料)/Method(方法管理)/Environment(环境)</strong> 五维度归一化
+                </p>
+            </div>
+            <div class="level-grid" id="fiveMDimGrid"></div>
+            <div style="margin-top:20px;">
+                <div class="card-title">📋 标准类别分布</div>
+                <div id="fiveMCats"></div>
+            </div>
+        </div>
+
+        <!-- Tab 2: HFACS 框架 -->
+        <div class="tab-content" id="tabFramework">
+            <div id="frameworkContainer"></div>
+            <p style="font-size:12px; color:var(--text-secondary); text-align:center; padding:12px;">
+                ⚠️ Level 1(组织) 和 Level 3(前提条件) 数据稀疏是新闻报道的信息偏差所致——
+                V2/V3 将通过官方调查报告补充。<br>
+                橙色柱条表示匹配频次，下方为真实事故示例。
+            </p>
+        </div>
+
+        <!-- Tab 2: 子类别统计 -->
+        <div class="tab-content" id="tabCategories">
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">所有 HFACS-CS 子类别按匹配频次排序</p>
+            <div class="cat-list" id="catList"></div>
+        </div>
+
+        <!-- Tab 3: 逐条映射 -->
+        <div class="tab-content" id="tabDetails">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:28%;">事故</th>
+                        <th style="width:8%;">类型</th>
+                        <th style="width:12%;">维度</th>
+                        <th style="width:18%;">V1 类别</th>
+                        <th style="width:18%;">HFACS 编码</th>
+                        <th style="width:16%;">描述</th>
+                    </tr>
+                </thead>
+                <tbody id="detailBody"></tbody>
+            </table>
+            <div class="pagination" id="pagination">
+                <button onclick="changePage(-1)" id="prevBtn">← 上一页</button>
+                <span class="page-info" id="pageInfo">第 1 页</span>
+                <button onclick="changePage(1)" id="nextBtn">下一页 →</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let currentPage = 1;
+let totalDetailItems = 0;
+
+// ── 加载统计数据 ──
+async function loadStats() {
+    const resp = await fetch('/api/causes/stats');
+    const data = await resp.json();
+    document.getElementById('totalRecords').textContent = data.total_records;
+
+    // HFACS 六层级
+    const levelGrid = document.getElementById('levelGrid');
+    const maxCount = Math.max(...data.level_stats.map(l => l.count), 1);
+    const coverageText = {1:'稀疏',2:'丰富',3:'稀疏',4:'中等',5:'中等',6:'丰富'};
+    const coverageBadge = {1:'sparse-badge',2:'rich-badge',3:'sparse-badge',4:'moderate-badge',5:'moderate-badge',6:'rich-badge'};
+    levelGrid.innerHTML = '';
+    data.level_stats.forEach(l => {
+        const pct = Math.max(3, l.count / maxCount * 100);
+        levelGrid.innerHTML += `
+            <div class="level-card">
+                <div class="level-header">
+                    <span class="level-name">L${l.level} ${l.name_cn}</span>
+                    <span class="level-badge ${coverageBadge[l.level] || 'sparse-badge'}">${coverageText[l.level] || '稀疏'}</span>
+                </div>
+                <div class="level-count">${l.count} <span style="font-size:13px;font-weight:400;color:var(--text-secondary);">次匹配</span></div>
+                <div class="level-bar"><div class="level-bar-fill l${l.level}" style="width:${pct}%"></div></div>
+            </div>`;
+    });
+}
+
+// ── 加载完整框架 ──
+async function loadFramework() {
+    const resp = await fetch('/api/causes/framework');
+    const data = await resp.json();
+    const container = document.getElementById('frameworkContainer');
+    container.innerHTML = '';
+
+    data.levels.forEach(lvl => {
+        const maxSubCount = Math.max(...lvl.subcategories.map(s => s.count), 1);
+        let subsHtml = '';
+        lvl.subcategories.forEach(sc => {
+            const pct = sc.count / maxSubCount * 100;
+            const examplesHtml = sc.examples.map(ex => `
+                <div class="sc-example">
+                    <span class="ex-title">${ex.title}</span>
+                    <span style="color:var(--text-secondary);"> → V1:${ex.v1_category}</span><br>
+                    <span class="ex-desc">${ex.description}</span>
+                </div>`).join('');
+
+            subsHtml += `
+                <div class="subcat-card">
+                    <div class="sc-header">
+                        <div>
+                            <span class="sc-code">${sc.code}</span>
+                            <span class="sc-name">${sc.name_cn}</span>
+                        </div>
+                        <span class="sc-count">${sc.count}次</span>
+                    </div>
+                    <div class="sc-bar"><div class="sc-bar-fill" style="width:${pct}%"></div></div>
+                    <div class="sc-keywords">${sc.keywords.map(k => `<span class="kw-tag">${k}</span>`).join('')}</div>
+                    ${examplesHtml ? `<div class="sc-examples">${examplesHtml}</div>` : '<div style="font-size:12px;color:#bbb;">暂无数据示例</div>'}
+                </div>`;
+        });
+
+        const div = document.createElement('div');
+        div.className = 'framework-level';
+        div.innerHTML = `
+            <div class="lvl-header lvl${lvl.level}">
+                <div>
+                    <span class="lvl-title">Level ${lvl.level}: ${lvl.name_cn}</span>
+                    <div class="lvl-sub">${lvl.description}</div>
+                </div>
+                <span class="lvl-tag">${lvl.subcategories.length} 个子类</span>
+            </div>
+            <div class="lvl-body">${subsHtml}</div>`;
+        container.appendChild(div);
+    });
+}
+
+// ── 加载分类统计 ──
+async function loadCategories() {
+    const resp = await fetch('/api/causes/stats');
+    const data = await resp.json();
+    const catList = document.getElementById('catList');
+    const maxCat = Math.max(...data.category_stats.map(c => c.count), 1);
+    catList.innerHTML = '';
+    data.category_stats.forEach(c => {
+        const pct = c.count / maxCat * 100;
+        catList.innerHTML += `
+            <div class="cat-item" style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;">
+                <span class="cat-code" style="font-size:11px;font-weight:600;color:var(--primary);min-width:32px;">${c.code}</span>
+                <span class="cat-name" style="flex:1;">${c.name}</span>
+                <div class="cat-bar" style="height:16px;border-radius:8px;background:#e8eaed;min-width:80px;overflow:hidden;position:relative;">
+                    <div class="cat-bar-fill" style="height:100%;border-radius:8px;background:var(--primary);opacity:0.7;width:${pct}%;"></div>
+                </div>
+                <span class="cat-count" style="font-size:12px;color:var(--text-secondary);min-width:32px;text-align:right;">${c.count}</span>
+            </div>`;
+    });
+}
+
+// ── 加载详情 ──
+async function loadDetails(page) {
+    const resp = await fetch(`/api/causes/detail?page=${page}&per_page=20`);
+    const data = await resp.json();
+    totalDetailItems = data.total;
+    currentPage = data.page;
+    const tbody = document.getElementById('detailBody');
+    tbody.innerHTML = '';
+    const dimClass = { '人的因素':'cd-human','设备因素':'cd-machine','管理因素':'cd-mgmt','环境因素':'cd-env' };
+
+    data.items.forEach(item => {
+        item.causes.forEach((cause, i) => {
+            const dclass = dimClass[cause.dimension] || '';
+            tbody.innerHTML += `<tr>
+                <td>${i === 0 ? `<strong>${item.title}</strong><br><span style="font-size:11px;color:var(--text-secondary);">${item.date || '-'}</span>` : ''}</td>
+                <td>${i === 0 ? `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;background:#e8f0fe;color:#1a73e8;">${item.accident_type}</span>` : ''}</td>
+                <td><span class="cause-dim ${dclass}">${cause.dimension}</span></td>
+                <td>${cause.v1_category}</td>
+                <td>${cause.hfacs_codes.map(c => `<span class="hfacs-code">${c}</span>`).join(' ')}</td>
+                <td style="font-size:12px;color:var(--text-secondary);">${cause.description.slice(0,60)}${cause.description.length > 60 ? '...' : ''}</td>
+            </tr>`;
+        });
+    });
+
+    const totalPages = Math.ceil(totalDetailItems / 20);
+    document.getElementById('pageInfo').textContent = `第 ${page}/${totalPages} 页 (${totalDetailItems} 条)`;
+    document.getElementById('prevBtn').disabled = page <= 1;
+    document.getElementById('nextBtn').disabled = page >= totalPages;
+}
+
+// ── 5M 归一化 ──
+async function load5M() {
+    const resp = await fetch('/api/causes/5m');
+    const data = await resp.json();
+    document.getElementById('totalNormalized').textContent = data.total_normalized;
+    const dimGrid = document.getElementById('fiveMDimGrid');
+    dimGrid.innerHTML = '';
+    const dimColors = {Man:'#1a73e8', Machine:'#34a853', Material:'#f9ab00', Method:'#ea4335', Environment:'#00acc1'};
+    const maxCount = Math.max(...data.dimension_stats.map(d => d.cause_count), 1);
+    data.dimension_stats.forEach(d => {
+        const pct = Math.max(3, d.cause_count / maxCount * 100);
+        dimGrid.innerHTML += '<div class="level-card"><div class="level-header"><span class="level-name">'+d.dim+' '+d.name_cn+'</span><span class="level-badge moderate-badge">'+d.record_count+'条记录</span></div><div class="level-count">'+d.cause_count+' <span style="font-size:13px;font-weight:400;color:var(--text-secondary);">条致因</span></div><div class="level-bar"><div class="level-bar-fill" style="width:'+pct+'%;background:'+dimColors[d.dim]+'"></div></div></div>';
+    });
+    const catContainer = document.getElementById('fiveMCats');
+    catContainer.innerHTML = '';
+    ['Man','Machine','Material','Method','Environment'].forEach(dim => {
+        const items = data.category_stats.filter(c => c.dim === dim);
+        if (!items.length) return;
+        const maxCat = Math.max(...items.map(c => c.count), 1);
+        let html = '<div style="margin-bottom:12px;"><strong>'+dim+'</strong><div class="cat-list">';
+        items.forEach(c => {
+            const pct = c.count / maxCat * 100;
+            html += '<div class="cat-item"><span class="cat-name">'+c.category+'</span><div class="cat-bar"><div class="cat-bar-fill" style="width:'+pct+'%"></div></div><span class="cat-count">'+c.count+'</span></div>';
+        });
+        html += '</div></div>';
+        catContainer.innerHTML += html;
+    });
+}
+
+function changePage(d) { loadDetails(currentPage + d); }
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab[onclick*="${name}"]`).classList.add('active');
+    document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+}
+
+loadStats();
+load5M();
+loadFramework();
+loadCategories();
+loadDetails(1);
+</script>
+<script>
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme:dark)').matches)) {
+  document.documentElement.classList.add('dark');
+}
+</script>
+</body>
+</html>

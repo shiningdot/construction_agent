@@ -1,0 +1,216 @@
+{
+  "version": "v1",
+  "timestamp": "2026-06-18 10:10:40",
+  "summary": {
+    "version": "v1",
+    "total_records": 440,
+    "success_rate": "100.0%",
+    "overall_fill_rate": "65.4%",
+    "avg_time": "0.0s",
+    "top_types": {
+      "坍塌": 310,
+      "土方坍塌": 55,
+      "高处坠落": 26,
+      "起重伤害": 24,
+      "其他": 10
+    }
+  },
+  "batch": {
+    "version": "v1",
+    "total": 440,
+    "success_count": 0,
+    "failure_count": 0,
+    "success_rate": 0.0,
+    "avg_processing_time": 0.0,
+    "failures": []
+  },
+  "metrics": {
+    "overall_fill_rate": 65.42,
+    "avg_time_per_record": 0.0,
+    "total_processing_time": 0.0,
+    "success_rate": 100.0,
+    "error_rate": 0.0,
+    "total_records": 440,
+    "field_stats": [
+      {
+        "field": "title",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 433
+      },
+      {
+        "field": "date",
+        "fill_rate": 99.55,
+        "filled": 438,
+        "total": 440,
+        "distinct_values": 352
+      },
+      {
+        "field": "accident_time",
+        "fill_rate": 86.82,
+        "filled": 382,
+        "total": 440,
+        "distinct_values": 169
+      },
+      {
+        "field": "location",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 32
+      },
+      {
+        "field": "city",
+        "fill_rate": 91.82,
+        "filled": 404,
+        "total": 440,
+        "distinct_values": 185
+      },
+      {
+        "field": "accident_location_detail",
+        "fill_rate": 90.23,
+        "filled": 397,
+        "total": 440,
+        "distinct_values": 389
+      },
+      {
+        "field": "project_name",
+        "fill_rate": 82.95,
+        "filled": 365,
+        "total": 440,
+        "distinct_values": 349
+      },
+      {
+        "field": "project_type",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 8
+      },
+      {
+        "field": "building_structure",
+        "fill_rate": 10.0,
+        "filled": 44,
+        "total": 440,
+        "distinct_values": 19
+      },
+      {
+        "field": "accident_type",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 9
+      },
+      {
+        "field": "severity",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 4
+      },
+      {
+        "field": "deaths",
+        "fill_rate": 82.27,
+        "filled": 362,
+        "total": 440,
+        "distinct_values": 13
+      },
+      {
+        "field": "injuries",
+        "fill_rate": 73.18,
+        "filled": 322,
+        "total": 440,
+        "distinct_values": 21
+      },
+      {
+        "field": "direct_economic_loss",
+        "fill_rate": 0.0,
+        "filled": 0,
+        "total": 440,
+        "distinct_values": 0
+      },
+      {
+        "field": "weather",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 8
+      },
+      {
+        "field": "direct_cause",
+        "fill_rate": 56.36,
+        "filled": 248,
+        "total": 440,
+        "distinct_values": 242
+      },
+      {
+        "field": "contractor",
+        "fill_rate": 12.5,
+        "filled": 55,
+        "total": 440,
+        "distinct_values": 50
+      },
+      {
+        "field": "trapped_count",
+        "fill_rate": 41.14,
+        "filled": 181,
+        "total": 440,
+        "distinct_values": 22
+      },
+      {
+        "field": "summary",
+        "fill_rate": 100.0,
+        "filled": 440,
+        "total": 440,
+        "distinct_values": 438
+      },
+      {
+        "field": "human_factors",
+        "fill_rate": 14.32,
+        "filled": 63,
+        "total": 440,
+        "distinct_values": 63
+      },
+      {
+        "field": "machine_factors",
+        "fill_rate": 24.77,
+        "filled": 109,
+        "total": 440,
+        "distinct_values": 109
+      },
+      {
+        "field": "management_factors",
+        "fill_rate": 25.45,
+        "filled": 112,
+        "total": 440,
+        "distinct_values": 112
+      },
+      {
+        "field": "environmental_factors",
+        "fill_rate": 13.41,
+        "filled": 59,
+        "total": 440,
+        "distinct_values": 59
+      }
+    ],
+    "accident_type_distribution": {
+      "坍塌": 310,
+      "土方坍塌": 55,
+      "高处坠落": 26,
+      "起重伤害": 24,
+      "其他": 10,
+      "物体打击": 8,
+      "机械伤害": 3,
+      "火灾爆炸": 3,
+      "淹溺": 1
+    },
+    "severity_distribution": {
+      "一般事故": 282,
+      "较大事故": 151,
+      "重大事故": 5,
+      "特别重大事故": 2
+    },
+    "classification": null
+  }
+}

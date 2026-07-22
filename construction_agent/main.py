@@ -295,6 +295,142 @@ def cmd_hfacs_encode(args: argparse.Namespace):
     console.print(f"[green]✅ 编码完成: {encoded}/{len(batch)} 条")
 
 
+def cmd_pdf(args: argparse.Namespace):
+    """处理单个 PDF 事故文档。"""
+    from pathlib import Path
+    from construction_agent.input.pdf_processor import PDFProcessor
+    from construction_agent.extraction import ExtractionPipeline
+    from construction_agent.output.json_formatter import JSONFormatter
+    from construction_agent.output.csv_formatter import CSVFormatter
+    from construction_agent.database import DatasetManager
+
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        console.print(f"[bold red]❌ PDF 文件不存在: {pdf_path}[/]")
+        sys.exit(1)
+
+    token = settings.MINERU_API_TOKEN or None
+    processor = PDFProcessor(token=token)
+
+    with console.status(f"[bold cyan]🔍 正在解析 PDF（{args.mode} 模式）...[/]"):
+        try:
+            segments = processor.process(pdf_path, mode=args.mode, language=args.language)
+        except Exception as e:
+            console.print(f"[bold red]❌ PDF 解析失败: {e}[/]")
+            sys.exit(1)
+
+    console.print(f"[green]✅ 解析完成，提取到 {len(segments)} 个事故文本片段[/]\n")
+
+    # 预览片段
+    for i, seg in enumerate(segments):
+        preview = seg.text[:200] + ("..." if len(seg.text) > 200 else "")
+        console.print(f"[bold cyan]── 片段 {i+1}/{len(segments)} (源: {seg.source})[/]")
+        console.print(preview)
+        console.print()
+
+    # 可选：执行提取
+    if args.extract:
+        console.print("[bold]🔬 开始信息提取...[/]")
+        pipeline = ExtractionPipeline()
+        db = DatasetManager()
+        accidents = []
+        for i, seg in enumerate(segments):
+            with console.status(f"[cyan]提取中 {i+1}/{len(segments)}...[/]"):
+                try:
+                    acc = pipeline.process(seg.text)
+                    if acc:
+                        accidents.append(acc)
+                        console.print(f"  [green]✓[/] 片段 {i+1}: {acc.title[:40]}")
+                    else:
+                        console.print(f"  [yellow]⚠[/] 片段 {i+1}: 提取失败")
+                except Exception as e:
+                    console.print(f"  [red]✗[/] 片段 {i+1}: {e}")
+
+        console.print(f"\n[green]✅ 成功提取 {len(accidents)}/{len(segments)} 条事故[/]")
+
+        if accidents:
+            db.add_batch(accidents)
+            console.print(f"[dim]已保存到数据集 ({db.stats()['total']} 条)[/dim]")
+
+        # 导出
+        if args.json:
+            JSONFormatter.save_batch(accidents, Path(args.json))
+            console.print(f"[green]✓ JSON 已导出: {args.json}[/]")
+        if args.csv:
+            CSVFormatter.save_batch(accidents, Path(args.csv))
+            console.print(f"[green]✓ CSV 已导出: {args.csv}[/]")
+
+
+def cmd_pdf_batch(args: argparse.Namespace):
+    """批量处理 PDF 事故文档。"""
+    from pathlib import Path
+    from construction_agent.input.pdf_processor import PDFProcessor
+    from construction_agent.extraction import ExtractionPipeline
+    from construction_agent.output.json_formatter import JSONFormatter
+    from construction_agent.database import DatasetManager
+
+    # 收集 PDF 文件
+    pdf_files = []
+    for f in args.files:
+        p = Path(f)
+        if p.is_dir():
+            pdf_files.extend(sorted(p.glob("*.pdf")))
+            pdf_files.extend(sorted(p.glob("*.PDF")))
+        elif p.is_file():
+            pdf_files.append(p)
+        else:
+            console.print(f"[yellow]⚠ 跳过不存在的路径: {f}[/]")
+
+    if not pdf_files:
+        console.print("[bold red]❌ 未找到任何 PDF 文件[/]")
+        sys.exit(1)
+
+    console.print(f"[bold]📂 找到 {len(pdf_files)} 个 PDF 文件[/]")
+
+    token = settings.MINERU_API_TOKEN or None
+    processor = PDFProcessor(token=token)
+
+    all_segments = []
+    for i, pdf_path in enumerate(pdf_files):
+        console.print(f"\n[bold cyan][{i+1}/{len(pdf_files)}] 解析: {pdf_path.name}[/]")
+        try:
+            segments = processor.process(pdf_path, mode=args.mode, language=args.language)
+            console.print(f"  [green]✓[/] 提取 {len(segments)} 个片段")
+            all_segments.extend(segments)
+        except Exception as e:
+            console.print(f"  [red]✗[/] 失败: {e}")
+
+    console.print(f"\n[green]✅ 批量解析完成: {len(all_segments)} 个文本片段[/]")
+
+    # 可选：执行提取
+    if args.extract:
+        console.print(f"\n[bold]🔬 开始批量信息提取（{len(all_segments)} 个片段）...[/]")
+        pipeline = ExtractionPipeline()
+        db = DatasetManager()
+        accidents = []
+        for i, seg in enumerate(all_segments):
+            with console.status(f"[cyan]提取中 {i+1}/{len(all_segments)}...[/]"):
+                try:
+                    acc = pipeline.process(seg.text)
+                    if acc:
+                        accidents.append(acc)
+                except Exception as e:
+                    console.print(f"  [red]✗[/] 片段 {i+1}: {e}")
+
+        console.print(f"[green]✅ 成功提取 {len(accidents)}/{len(all_segments)} 条事故[/]")
+
+        if accidents:
+            db.add_batch(accidents)
+            console.print(f"[dim]已保存到数据集 ({db.stats()['total']} 条)[/dim]")
+
+        # 导出
+        output_dir = Path(args.output_dir) if args.output_dir else Path("data")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = output_dir / "pdf_extracted.json"
+        JSONFormatter.save_batch(accidents, json_path)
+        console.print(f"[green]✓ 已导出到 {json_path}[/]")
+
+
 def _show_accident_table(accident):
     """显示事故信息的表格。"""
     table = Table(title="事故概要")
@@ -341,18 +477,14 @@ def _show_accident_table(accident):
     if accident.images:
         table.add_row("现场图片", f"📷 {len(accident.images)} 张 (data/images/)")
 
-    # 致因总览
-    causes = []
-    if accident.human_factors:
-        causes.append(f"[red]👤 人: {len(accident.human_factors)}项[/]")
-    if accident.machine_factors:
-        causes.append(f"[yellow]⚙️ 机: {len(accident.machine_factors)}项[/]")
-    if accident.management_factors:
-        causes.append(f"[blue]📋 管: {len(accident.management_factors)}项[/]")
-    if accident.environmental_factors:
-        causes.append(f"[green]🌤️ 环: {len(accident.environmental_factors)}项[/]")
-
-    table.add_row("致因维度", " | ".join(causes) if causes else "[dim]无[dim]")
+    # CAICS 致因链
+    if accident.causes:
+        chain = " → ".join(f"[{c['code']}]{c['name']}" for c in accident.causes[:8])
+        table.add_row("CAICS致因链", chain)
+        if len(accident.causes) > 8:
+            table.add_row("", f"...等{len(accident.causes)}项")
+    else:
+        table.add_row("CAICS致因链", "[dim]无[/dim]")
 
     if accident.summary:
         table.add_row("事故摘要", accident.summary[:100] + ("..." if len(accident.summary) > 100 else ""))
@@ -440,6 +572,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
   python -m construction_agent.main batch accidents.txt --json output.json --csv output.csv
   python -m construction_agent.main interactive
   python -m construction_agent.main web
+  python -m construction_agent.main collect                        # 从所有数据源采集
+  python -m construction_agent.main collect --source safehoo      # 指定采集器
+  python -m construction_agent.main collect --list                # 列出可用采集器
   python -m construction_agent.main dataset stats
   python -m construction_agent.main dataset search "坍塌"
   python -m construction_agent.main dataset export --format csv data.csv
@@ -486,11 +621,41 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_hfacs = subparsers.add_parser("hfacs-encode", help="对数据集进行 HFACS-CS 编码")
     p_hfacs.add_argument("--method", choices=["llm", "keyword"], default="llm",
                          help="编码方法：llm（API）或 keyword（零成本）")
-    p_hfacs.add_argument("--input", default="data/accidents_merged.json", help="输入数据集")
+    p_hfacs.add_argument("--input", default="data/datasets/accidents_merged.json", help="输入数据集")
     p_hfacs.add_argument("--output", default=None, help="输出文件（默认覆盖输入）")
     p_hfacs.add_argument("--start", type=int, default=0, help="起始索引")
     p_hfacs.add_argument("--count", type=int, default=None, help="处理条数")
     p_hfacs.add_argument("--resume", action="store_true", help="断点续传")
+
+    # pdf: 处理单个 PDF
+    p_pdf = subparsers.add_parser("pdf", help="处理单个 PDF 事故文档（MinerU 解析）")
+    p_pdf.add_argument("file", help="PDF 文件路径")
+    p_pdf.add_argument("--mode", choices=["auto", "flash", "precision"], default="auto",
+                       help="解析模式: auto=自动选择 / flash=免认证轻量 / precision=高精度（需Token）")
+    p_pdf.add_argument("--language", default="ch", help="文档语言，默认 ch（中文）")
+    p_pdf.add_argument("--extract", action="store_true", help="解析后自动执行信息提取")
+    p_pdf.add_argument("--json", help="提取后导出 JSON 文件路径")
+    p_pdf.add_argument("--csv", help="提取后导出 CSV 文件路径")
+
+    # pdf-batch: 批量处理 PDF
+    p_pdf_batch = subparsers.add_parser("pdf-batch", help="批量处理 PDF 事故文档")
+    p_pdf_batch.add_argument("files", nargs="+", help="PDF 文件路径或目录（支持通配符）")
+    p_pdf_batch.add_argument("--mode", choices=["auto", "flash", "precision"], default="auto",
+                             help="解析模式: auto=自动选择 / flash=免认证轻量 / precision=高精度（需Token）")
+    p_pdf_batch.add_argument("--language", default="ch", help="文档语言，默认 ch（中文）")
+    p_pdf_batch.add_argument("--extract", action="store_true", help="解析后自动执行信息提取")
+    p_pdf_batch.add_argument("--output-dir", default=None, help="提取结果输出目录")
+
+    # collect: 数据采集
+    p_collect = subparsers.add_parser("collect", help="从多个数据源主动采集建筑施工事故数据")
+    p_collect.add_argument("--source", "-s", default=None,
+                          help="指定采集器（逗号分隔多个），默认全部")
+    p_collect.add_argument("--llm", action="store_true", default=False,
+                          help="启用 LLM 增强提取（默认禁用，节省 API 成本）")
+    p_collect.add_argument("--list", action="store_true",
+                          help="列出所有可用采集器")
+    p_collect.add_argument("--output", "-o", default=None,
+                          help="统计报告输出路径")
 
     args = parser.parse_args(argv)
     if args.command is None:
@@ -498,6 +663,81 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         sys.exit(0)
 
     return args
+
+
+def cmd_collect(args: argparse.Namespace):
+    """数据采集命令：从多个数据源主动采集事故数据。"""
+    from construction_agent.collector.scripts.run_collect import _register, COLLECTOR_REGISTRY
+
+    _register()
+
+    # 列出可用采集器
+    if args.list:
+        table = Table(title="可用数据源采集器")
+        table.add_column("名称", style="cyan")
+        table.add_column("描述")
+        for name, (desc, _) in COLLECTOR_REGISTRY.items():
+            table.add_row(name, desc)
+        console.print(table)
+        console.print("\n[dim]用法: python -m construction_agent.main collect --source <名称>[/]")
+        return
+
+    # 构建采集器列表
+    if args.source:
+        source_names = [s.strip() for s in args.source.split(",")]
+    else:
+        source_names = list(COLLECTOR_REGISTRY.keys())
+
+    # 验证
+    invalid = [n for n in source_names if n not in COLLECTOR_REGISTRY]
+    if invalid:
+        console.print(f"[red]未知采集器: {invalid}[/]")
+        console.print(f"可用: {list(COLLECTOR_REGISTRY.keys())}")
+        sys.exit(1)
+
+    # 实例化
+    collectors = []
+    for name in source_names:
+        _, factory = COLLECTOR_REGISTRY[name]
+        instance = factory()
+        if instance:
+            collectors.append(instance)
+        else:
+            console.print(f"[red]✗ {name} 初始化失败，跳过[/]")
+
+    if not collectors:
+        console.print("[red]没有可用的采集器[/]")
+        sys.exit(1)
+
+    # 创建流水线并注册采集器
+    from construction_agent.collector.pipeline import CollectorPipeline
+    pipeline = CollectorPipeline(enable_llm=args.llm)
+    for c in collectors:
+        pipeline.register_collector(c)
+
+    console.print(Panel(
+        f"[bold]启动 {len(collectors)} 个采集器[/]\n"
+        f"LLM 增强: {'[green]启用[/]' if args.llm else '[yellow]禁用（省钱模式）[/]'}\n"
+        f"数据存储: {settings.DATASET_FILE}",
+        title="🚀 数据采集",
+        border_style="blue",
+    ))
+
+    stats = pipeline.run()
+    pipeline.save_stats()
+
+    # 显示汇总
+    table = Table(title="📊 采集汇总")
+    table.add_column("指标", style="cyan")
+    table.add_column("数值", style="green")
+    table.add_row("总采集数", str(stats.get("total_collected", 0)))
+    table.add_row("清洗后有效", str(stats.get("total_after_clean", 0)))
+    table.add_row("去重过滤", str(stats.get("duplicates_filtered", 0)))
+    table.add_row("新增入库", str(stats.get("added", 0)))
+    table.add_row("合并已有", str(stats.get("merged", 0)))
+    table.add_row("LLM增强", str(stats.get("llm_enhanced", 0)))
+    table.add_row("耗时", f"{stats.get('duration_seconds', 0)}s")
+    console.print(table)
 
 
 def main(argv: list[str] | None = None):
@@ -511,7 +751,9 @@ def main(argv: list[str] | None = None):
         "interactive": cmd_interactive,
         "web": cmd_web,
         "dataset": cmd_dataset,
-        "hfacs-encode": cmd_hfacs_encode,
+        "collect": cmd_collect,
+        "pdf": cmd_pdf,
+        "pdf-batch": cmd_pdf_batch,
     }
 
     cmd_fn = commands.get(args.command)

@@ -1,0 +1,11 @@
+{
+    "article": {
+        "description": "参考文献"
+    },
+    "data/ground_truth": {
+        "description": "你好 测试"
+    },
+    "experiments/experiment_kappa/groundtruth/gt_samples_100.json": {
+        "description": "帅选的100条事故"
+    }
+}

@@ -224,22 +224,24 @@ tbody tr:hover { background:var(--accent-light); }
 </style>
 </head>
 <body>
-<div class="header">
-  <h1>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20L12 4l10 16"/><path d="M4 18h16"/><circle cx="12" cy="9" r="1"/></svg>
-    Construction Agent
-  </h1>
-  <div class="header-nav">
-    <a href="/">分析</a>
-    <a href="/dataset" class="active">数据集</a>
-    <a href="/causes">致因分析</a>
+<header class="topbar" style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:50px;background:var(--card);border-bottom:1px solid var(--border);gap:24px;flex-shrink:0;">
+  <div style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap;">🏗️ Construction <span style="color:#0D7C6B;">Agent</span></div>
+  <div style="display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px;">
+    <a href="/collect" style="padding:6px 18px;border-radius:6px;border:none;font-size:13px;font-weight:500;font-family:var(--font-sans);background:transparent;color:var(--text-secondary);text-decoration:none;display:flex;align-items:center;gap:6px;transition:all 0.15s;">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--warning);"></span> 数据采集
+    </a>
+    <a href="/" style="padding:6px 18px;border-radius:6px;font-size:13px;font-weight:600;font-family:var(--font-sans);background:var(--card);color:#0D7C6B;text-decoration:none;display:flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">
+      <span style="width:6px;height:6px;border-radius:50%;background:#0D7C6B;"></span> 事故处理
+    </a>
   </div>
-  <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" aria-label="切换主题">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-  </button>
-</div>
+  <div style="display:flex;gap:4px;">
+    <a href="/" id="nav-analysis" style="color:#0D7C6B;text-decoration:none;font-size:12px;padding:5px 10px;border-radius:4px;font-weight:500;">分析</a>
+    <a href="/dataset" id="nav-dataset" style="background:rgba(13,124,107,0.08);color:#0D7C6B;font-weight:600;" style="color:var(--text-secondary);text-decoration:none;font-size:12px;padding:5px 10px;border-radius:4px;font-weight:500;">数据集</a>
+    <a href="/causes" id="nav-causes" style="color:var(--text-secondary);text-decoration:none;font-size:12px;padding:5px 10px;border-radius:4px;font-weight:500;">致因分析</a>
+  </div>
+  <button onclick="toggleTheme()" style="background:none;border:1px solid var(--border);color:var(--text-secondary);width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;">🌓</button>
+</header>
+
 
 <div class="container">
   <div class="card">

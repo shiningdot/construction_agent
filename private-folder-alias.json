@@ -1,0 +1,89 @@
+{
+    "article": {
+        "description": "参考文献"
+    },
+    "data/taxonomy/hfacs_cs_taxonomy.json": {
+        "description": "HFACS V1版本"
+    },
+    ".claude": {
+        "description": "claude项目配置"
+    },
+    "data/datasets/accident_book_raw.md": {
+        "description": "建筑施工安全事故 案例分析"
+    },
+    "data/taxonomy/normalization_rules.json": {
+        "description": "人机管环V1"
+    },
+    "data/ground_truth": {
+        "description": "人工标注"
+    },
+    "data/ground_truth/caics_reasoning_report.md": {
+        "description": "100条LLM标注理由"
+    },
+    "data/ground_truth/expertA.json": {
+        "description": "专家A标注"
+    },
+    "data/ground_truth/expertB.json": {
+        "description": "专家B标注"
+    },
+    "data/ground_truth/expertC.json": {
+        "description": "专家C标注"
+    },
+    "data/ground_truth/gt_labelstudio_config.xml": {
+        "description": "labelstudio标注模板"
+    },
+    "data/ground_truth/gt_llm_labels_100.json": {
+        "description": "LLM标注"
+    },
+    "experiments/experiment1": {
+        "description": "多模型的基础性能对比"
+    },
+    "experiments/experiment1/figures": {
+        "description": "国内模型对比图表"
+    },
+    "experiments/figures": {
+        "description": "Kappa图表"
+    },
+    "data/images": {
+        "description": "事故图片"
+    },
+    "data/taxonomy/taxonomy.json": {
+        "description": "HFACS MFTHC五层级别"
+    },
+    "experiments/experiment_kappa": {
+        "description": "LLM和专家Kappa"
+    },
+    "experiments/experiment_6strategies": {
+        "description": "6策略的实验文件"
+    },
+    "construction_agent": {
+        "description": "项目代码文件夹"
+    },
+    "data/taxonomy": {
+        "description": "致因字典"
+    },
+    "construction_agent/evaluation/experiment3": {
+        "description": "六策略实验代码文件"
+    },
+    "experiments/experiment_kappa/groundtruth/gt_samples_100.json": {
+        "description": "抽选的100条事故"
+    },
+    "library.bib": {
+        "description": "文献"
+    },
+    "docs/superpowers/specs/2026-07-03-caics-design.md": {
+        "description": "Tem_HFACS字典"
+    },
+    "data/Input-PDF": {
+        "description": "原始pdf文件"
+    },
+    "construction_agent/collector": {
+        "description": "爬虫文件"
+    },
+    "data/collector_sources.json": {
+        "description": "爬虫来源网站"
+    },
+    "data/academic_import": {
+        "description": "571事故学术数据集"
+    }
+}

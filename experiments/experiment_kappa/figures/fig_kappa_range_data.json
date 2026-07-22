@@ -1,0 +1,85 @@
+{
+  "n_samples": 100,
+  "dimensions": [
+    {
+      "dim": "Overall",
+      "label": "Overall",
+      "expert_range": [
+        0.7621,
+        0.8934
+      ],
+      "llm_consensus_kappa": 0.8946,
+      "within_range": true
+    },
+    {
+      "dim": "C",
+      "label": "Consequence",
+      "expert_range": [
+        0.7286,
+        0.8288
+      ],
+      "llm_consensus_kappa": 0.8282,
+      "within_range": true
+    },
+    {
+      "dim": "H",
+      "label": "Human",
+      "expert_range": [
+        0.7594,
+        0.9177
+      ],
+      "llm_consensus_kappa": 0.9035,
+      "within_range": true
+    },
+    {
+      "dim": "T",
+      "label": "Trigger",
+      "expert_range": [
+        0.7294,
+        0.9059
+      ],
+      "llm_consensus_kappa": 0.9046,
+      "within_range": true
+    },
+    {
+      "dim": "F",
+      "label": "Fortification",
+      "expert_range": [
+        0.776,
+        0.9015
+      ],
+      "llm_consensus_kappa": 0.9011,
+      "within_range": true
+    },
+    {
+      "dim": "M",
+      "label": "Management",
+      "expert_range": [
+        0.6172,
+        0.7968
+      ],
+      "llm_consensus_kappa": 0.7951,
+      "within_range": true
+    },
+    {
+      "dim": "severity",
+      "label": "Severity",
+      "expert_range": [
+        0.8656,
+        0.9653
+      ],
+      "llm_consensus_kappa": 0.9653,
+      "within_range": true
+    },
+    {
+      "dim": "accident_type",
+      "label": "Type",
+      "expert_range": [
+        0.8584,
+        0.9642
+      ],
+      "llm_consensus_kappa": 0.9642,
+      "within_range": true
+    }
+  ]
+}

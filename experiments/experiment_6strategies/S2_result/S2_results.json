@@ -1,0 +1,3133 @@
+{
+  "summary": {
+    "strategy": "S2_AutoCoT",
+    "model": "deepseek-v4-pro",
+    "timestamp": "2026-07-10T16:09:50.977324",
+    "total": 100,
+    "success": 99,
+    "retried": 7,
+    "total_codes": 325,
+    "avg_codes_per_case": 3.2,
+    "zero_code_cases": 15,
+    "elapsed_total_sec": 2878.5,
+    "avg_sec_per_case": 28.8
+  },
+  "results": [
+    {
+      "index": 1,
+      "accident_id": "7dc12425",
+      "title": "江西丰城电厂施工平台倒塌 致74死2伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M5",
+          "F2",
+          "T2",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "特别重大事故",
+        "deaths": 74,
+        "injuries": 2,
+        "direct_cause": "混凝土强度未达标时违规拆除模板导致冷却塔施工平台整体坍塌"
+      },
+      "raw_response": "根据CAICS框架逐层分析：\n\n**M（管理根基）**  \n- M1现场监管缺失：报道提及“施工方发生过安全事故”，事发时正在拆除木制脚手架，但未有安全员或监理发现并制止“混凝土尚未干透”这一明显危险状态，监管缺位。  \n- M2隐患排查失效：混凝土未达强度即拆模是常见隐患，但未被提前排查或整改，知情人提及“尚未干透的混凝土开始脱落”，说明隐患长期存在未被识别。  \n- M5市场行为违规：报道明确“工程负责人曾表示抢抓晴好天气，加快施工进度”，存在违规压缩工期、要求赶工的行为，属于系统性降低安全投入。  \n（M3、M4在文本中无直接证据；M3培训不足未提及，M4制度漏洞虽可能关联但未明确表述。）\n\n**F（防线失效）**  \n- F2支撑体系失稳：施工平桥吊和横板混凝土通道整体坍塌，属模板支撑体系因承载力不足（混凝土未干导致结构失效）引起失稳，符合支撑体系失稳特征。  \n（F1、F3、F4文本无相关信息。）\n\n**T（触发条件）**  \n- T2物料状态异常：混凝土未干透即开始拆除脚手架，未达到设计强度，材料状态异常，直接导致结构脱落和失稳。\n\n**H（人的行为）**  \n- H1违反操作规程：工人违规在混凝土强度不足的情况下拆除模板，明确违反施工规范。  \n- H2违规指挥决策：工程负责人要求“抢抓晴好天气，加快施工进度”，给工人施加赶工压力，属于违规决策，迫使工人冒险作业。  \n（H3、H4文本无明确证据。）\n\n**C（后果放大）**  \n- 文本显示事发后300余人迅速到场救援，未提及救援迟缓或信息迟报瞒报，故C1、C2均无证据。\n\n```json\n{\"codes\":[\"M1\",\"M2\",\"M5\",\"F2\",\"T2\",\"H1\",\"H2\"], \"accident_type\":\"坍塌\", \"severity\":\"特别重大事故\", \"deaths\":74, \"injuries\":2, \"direct_cause\":\"混凝土强度未达标时违规拆除模板导致冷却塔施工平台整体坍塌\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M5",
+        "F2",
+        "T2",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "特别重大事故",
+      "deaths": 74,
+      "injuries": 2,
+      "direct_cause": "混凝土强度未达标时违规拆除模板导致冷却塔施工平台整体坍塌",
+      "elapsed_sec": 42.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 2,
+      "accident_id": "d28c4679",
+      "title": "湖南省凤凰县堤溪沱江大桥“8·13”坍塌事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "M5",
+          "T2",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "特别重大事故",
+        "deaths": 64,
+        "injuries": 22,
+        "direct_cause": "主拱圈砌筑材料不满足要求，施工工序不合理，拱圈强度不足，在拱上施工荷载增加下崩塌，引发连拱效应整体坍塌"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"M3\",\"M4\",\"M5\",\"T2\",\"H1\",\"H2\"], \"accident_type\":\"坍塌\", \"severity\":\"特别重大事故\", \"deaths\":64, \"injuries\":22, \"direct_cause\":\"主拱圈砌筑材料不满足要求，施工工序不合理，拱圈强度不足，在拱上施工荷载增加下崩塌，引发连拱效应整体坍塌\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "T2",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "特别重大事故",
+      "deaths": 64,
+      "injuries": 22,
+      "direct_cause": "主拱圈砌筑材料不满足要求，施工工序不合理，拱圈强度不足，在拱上施工荷载增加下崩塌，引发连拱效应整体坍塌",
+      "elapsed_sec": 20.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 3,
+      "accident_id": "cd7aa8c7",
+      "title": "杭州地铁塌陷事故警示：地铁建设 扣紧“安全帽”",
+      "parsed": {
+        "codes": [
+          "M3",
+          "M5",
+          "T3",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "重大事故",
+        "deaths": 17,
+        "injuries": 0,
+        "direct_cause": "软土地层条件下赶工期缩减工序导致路面塌陷"
+      },
+      "raw_response": "根据提供的文本，杭州地铁塌陷事故被用作引子，主要探讨地铁建设中的普遍安全问题和隐患，并未详细描述事故的具体情景。结合文本中多次提及的“农民工培训不足”“赶工期”“缩减工序”“地质复杂易沉降”等信息，按M→F→T→H→C因果链分析如下：\n\n- **M层（管理根基）**：文本明确指出农民工“没有足够的安全生产知识”是主要原因，对应安全培训不足（M3）；同时批评“不合理工期、不合理造价”“赶工期要不得”，这属于市场行为违规（M5）。无直接证据表明现场监管缺失或隐患排查失效等。\n- **F层（防线失效）**：未提及临边防护、支撑体系或设备安全装置等物理屏障缺失，无相关证据。\n- **T层（触发条件）**：文中强调地铁施工“吃硬怕软”，软土和砂卵石层容易导致结构变形、路面沉降塌陷，地质条件突变是事故的直接触发条件（T3）。\n- **H层（人的行为）**：提到赶工期时“施工方常常会用缩减工序来迎合工期”，这属于违反操作规程（H1）；管理层追求“建设最便宜的地铁”而强推不合理工期，可视为违规指挥决策（H2）。\n- **C层（后果放大）**：报道仅提及17人遇难的后果，未描述救援迟缓或信息迟报瞒报等情况，无相关证据。\n\n{\"codes\":[\"M3\",\"M5\",\"T3\",\"H1\",\"H2\"], \"accident_type\":\"坍塌\", \"severity\":\"重大事故\", \"deaths\":17, \"injuries\":0, \"direct_cause\":\"软土地层条件下赶工期缩减工序导致路面塌陷\"}",
+      "codes": [
+        "M3",
+        "M5",
+        "T3",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "重大事故",
+      "deaths": 17,
+      "injuries": 0,
+      "direct_cause": "软土地层条件下赶工期缩减工序导致路面塌陷",
+      "elapsed_sec": 40.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 4,
+      "accident_id": "bbb71829",
+      "title": "甘肃隧道坍塌未发现生命迹象 安监总局挂牌督办",
+      "parsed": {
+        "codes": [
+          "T3"
+        ],
+        "accident_type": "坍塌",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 0,
+        "direct_cause": "隧道围岩渗水导致坍塌"
+      },
+      "raw_response": "根据报道文本，按M→F→T→H→C因果链逐层分析如下：\n\n- **M管理根基**：报道中未提及监理或安全员现场监管情况、隐患排查整改记录、作业人员培训交底、施工方案或安全制度缺陷，也未涉及违法分包、转包或违规压缩工期等市场行为。故无直接证据指向管理缺陷。\n- **F防线失效**：报道未明确描述隧道原有支护结构（如钢拱架、喷射混凝土等）是否缺失或失效，也未提及临边防护、设备安全装置、个体防护使用等问题。虽然坍塌本身可能暗示支护不足，但文本未提供具体关键词证据，故不归入F层。\n- **T触发条件**：报道明确指出“山体渗水”且“山体仍不稳定，有再次发生坍塌的危险”，说明地质环境突变（渗水导致围岩失稳）是触发坍塌的直接因素。对应T3地质环境突变。\n- **H人的行为**：报道仅描述了事故后的救援行为，未提及施工人员在事故前是否存在违规操作、违章指挥、风险辨识失败或应急失当，故无证据。\n- **C后果放大**：救援现场有二次小面积坍塌增加困难，但并未表明救援响应迟缓或存在信息迟报瞒报，救援力量已迅速到位并持续施救，故无此层编码。\n\n综上，提取致因编码为[\"T3\"]，事故类型为隧道坍塌，按2人遇难、10人失踪（且未发现生命迹象，实际死亡按12人计）确定严重性为重大事故。\n\n```json\n{\"codes\":[\"T3\"], \"accident_type\":\"坍塌\", \"severity\":\"重大事故\", \"deaths\":12, \"injuries\":0, \"direct_cause\":\"隧道围岩渗水导致坍塌\"}\n```",
+      "codes": [
+        "T3"
+      ],
+      "accident_type": "坍塌",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 0,
+      "direct_cause": "隧道围岩渗水导致坍塌",
+      "elapsed_sec": 77.2,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 5,
+      "accident_id": "09b2e0cd",
+      "title": "西安脚手架坠落致10死2伤暴露工程安全监管薄弱",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M3",
+          "M5",
+          "F2",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "重大事故",
+        "deaths": 10,
+        "injuries": 2,
+        "direct_cause": "违规拆除承力构件且未撤离架上人员导致附着式脚手架整体坠落"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M2\", \"M3\", \"M5\", \"F2\", \"H1\", \"H2\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"重大事故\",\n  \"deaths\": 10,\n  \"injuries\": 2,\n  \"direct_cause\": \"违规拆除承力构件且未撤离架上人员导致附着式脚手架整体坠落\"\n}\n```",
+      "codes": [
+        "M2",
+        "M3",
+        "M5",
+        "F2",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "重大事故",
+      "deaths": 10,
+      "injuries": 2,
+      "direct_cause": "违规拆除承力构件且未撤离架上人员导致附着式脚手架整体坠落",
+      "elapsed_sec": 22.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 6,
+      "accident_id": "476815f8",
+      "title": "施救人员打捞起杭州地铁塌陷事故第17名遇难者遗体",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M4",
+          "F2",
+          "T3",
+          "T4",
+          "H1"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "重大事故",
+        "deaths": 17,
+        "injuries": 0,
+        "direct_cause": "基坑支撑体系失稳，遇降雨诱发土体失稳坍塌"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"M4\",\"F2\",\"T3\",\"T4\",\"H1\"], \"accident_type\":\"土方坍塌\", \"severity\":\"重大事故\", \"deaths\":17, \"injuries\":0, \"direct_cause\":\"基坑支撑体系失稳，遇降雨诱发土体失稳坍塌\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "M4",
+        "F2",
+        "T3",
+        "T4",
+        "H1"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "重大事故",
+      "deaths": 17,
+      "injuries": 0,
+      "direct_cause": "基坑支撑体系失稳，遇降雨诱发土体失稳坍塌",
+      "elapsed_sec": 24.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 7,
+      "accident_id": "48242472",
+      "title": "重庆丰都长江二桥坍塌11人失踪 原因初步查明",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "重大事故",
+        "deaths": 11,
+        "injuries": 2,
+        "direct_cause": "浮吊船起重大臂断裂撞击钢围堰导致围堰坍塌倾倒"
+      },
+      "raw_response": "{\"codes\":[\"T1\"], \"accident_type\":\"坍塌\", \"severity\":\"重大事故\", \"deaths\":11, \"injuries\":2, \"direct_cause\":\"浮吊船起重大臂断裂撞击钢围堰导致围堰坍塌倾倒\"}",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "重大事故",
+      "deaths": 11,
+      "injuries": 2,
+      "direct_cause": "浮吊船起重大臂断裂撞击钢围堰导致围堰坍塌倾倒",
+      "elapsed_sec": 17.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 8,
+      "accident_id": "6dc431b4",
+      "title": "北京清华附中在建工地底板钢筋倒塌 10死4伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "坍塌",
+        "severity": "重大事故",
+        "deaths": 10,
+        "injuries": 4,
+        "direct_cause": "底板钢筋在绑扎过程中发生坍塌"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"坍塌\", \"severity\":\"重大事故\", \"deaths\":10, \"injuries\":4, \"direct_cause\":\"底板钢筋在绑扎过程中发生坍塌\"}",
+      "codes": [],
+      "accident_type": "坍塌",
+      "severity": "重大事故",
+      "deaths": 10,
+      "injuries": 4,
+      "direct_cause": "底板钢筋在绑扎过程中发生坍塌",
+      "elapsed_sec": 25.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 9,
+      "accident_id": "cca71401",
+      "title": "湖北潜江在建曹禺大剧院垮塌",
+      "parsed": {
+        "codes": [
+          "M1",
+          "F2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 6,
+        "direct_cause": "顶部混凝土浇灌时钢质脚手架支撑体系失稳导致垮塌"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"F2\"],\"accident_type\":\"坍塌\",\"severity\":\"较大事故\",\"deaths\":3,\"injuries\":6,\"direct_cause\":\"顶部混凝土浇灌时钢质脚手架支撑体系失稳导致垮塌\"}",
+      "codes": [
+        "M1",
+        "F2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 6,
+      "direct_cause": "顶部混凝土浇灌时钢质脚手架支撑体系失稳导致垮塌",
+      "elapsed_sec": 20.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 10,
+      "accident_id": "85a82131",
+      "title": "长沙雷锋镇一工棚垮塌致4人死亡",
+      "parsed": {
+        "codes": [],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 2,
+        "direct_cause": "工地围墙倒塌压垮施工工棚，导致工棚内人员被压埋"
+      },
+      "raw_response": "根据CAICS框架逐层分析：\n\nM 管理根基：\n- M1现场监管缺失：报道未提及监理或安全员在场情况，无法确认。\n- M2隐患排查失效：未提及隐患排查记录或整改，无证据。\n- M3安全培训不足：未提及作业人员培训情况。\n- M4制度规程漏洞：未提及施工方案或管理制度。\n- M5市场行为违规：未提及分包转包、资质等问题。\n结论：事故背景信息极少，无法提取管理缺陷编码。\n\nF 防线失效：\n- F1临边洞口防护缺失：围墙倒塌属于结构破坏，不涉及临边防护缺失。\n- F2支撑体系失稳：不涉及。\n- F3设备安全装置失效：不涉及。\n- F4个体防护未使用：未提及。\n结论：无相关证据。\n\nT 触发条件：\n- T1~T4：报道未描述任何设备故障、物料异常、地质变化或天气影响。\n结论：无直接触发条件描述。\n\nH 人的行为：\n- 报道仅提到围墙倒塌压垮工棚，未描述具体人为操作，无法判断是否违反规程、违规指挥等。\n结论：无直接证据。\n\nC 后果放大：\n- 事故发生后2人逃出，6人被压，4死2伤，未提及救援迟缓或迟报瞒报。\n结论：无证据。\n\n事故类型：围墙倒塌属于结构坍塌，压垮工棚，应归类为“坍塌”。\n死亡人数4人，属于较大事故；被压6人中4死，剩余2人推断受伤，填2。\n直接原因：工地围墙突然倒塌，压垮毗邻工棚，造成棚内人员被埋压。\n\n最终JSON：\n{\"codes\":[], \"accident_type\":\"坍塌\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":2, \"direct_cause\":\"工地围墙倒塌压垮施工工棚，导致工棚内人员被压埋\"}",
+      "codes": [],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 2,
+      "direct_cause": "工地围墙倒塌压垮施工工棚，导致工棚内人员被压埋",
+      "elapsed_sec": 32.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 11,
+      "accident_id": "2a132169",
+      "title": "徐州在建工地施工平台滑塌 4死2伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 2,
+        "direct_cause": "施工平台发生滑塌导致人员坠落伤亡"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"坍塌\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":2, \"direct_cause\":\"施工平台发生滑塌导致人员坠落伤亡\"}",
+      "codes": [],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 2,
+      "direct_cause": "施工平台发生滑塌导致人员坠落伤亡",
+      "elapsed_sec": 20.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 12,
+      "accident_id": "838bc474",
+      "title": "重庆一焊接车间发生倒塌事故 致4死8伤",
+      "parsed": {
+        "codes": [
+          "F2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 8,
+        "direct_cause": "桁架施工中支撑体系失稳导致倒塌"
+      },
+      "raw_response": "{\"codes\":[\"F2\"], \"accident_type\":\"坍塌\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":8, \"direct_cause\":\"桁架施工中支撑体系失稳导致倒塌\"}",
+      "codes": [
+        "F2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 8,
+      "direct_cause": "桁架施工中支撑体系失稳导致倒塌",
+      "elapsed_sec": 28.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 13,
+      "accident_id": "2ab03cbc",
+      "title": "安徽凤阳1座楼房发生坍塌 4死8伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 8,
+        "direct_cause": "维修粉刷过程中二层楼房突然坍塌"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"坍塌\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":8, \"direct_cause\":\"维修粉刷过程中二层楼房突然坍塌\"}",
+      "codes": [],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 8,
+      "direct_cause": "维修粉刷过程中二层楼房突然坍塌",
+      "elapsed_sec": 20.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 14,
+      "accident_id": "e1c7bd15",
+      "title": "台山市“1·3”坍塌较大事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "T3",
+          "H1",
+          "H2",
+          "H3"
+        ],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "爆破后山体裂隙扩展失稳崩塌，导致清理作业人员坠落死亡"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"M3\", \"T3\", \"H1\", \"H2\", \"H3\"],\n  \"accident_type\": \"坍塌\",\n  \"severity\": \"较大事故\",\n  \"deaths\": 3,\n  \"injuries\": 0,\n  \"direct_cause\": \"爆破后山体裂隙扩展失稳崩塌，导致清理作业人员坠落死亡\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "T3",
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "爆破后山体裂隙扩展失稳崩塌，导致清理作业人员坠落死亡",
+      "elapsed_sec": 36.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 15,
+      "accident_id": "01eba51b",
+      "title": "福州闹市区三层楼突然倒塌 救出35人无人死亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "H1",
+          "H3"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 0,
+        "direct_cause": "装修工人错误拆除承重主梁导致楼房结构失稳倒塌"
+      },
+      "raw_response": "根据对事故文本的逐层分析，按CAICS框架提取致因编码如下：\n\n- **M管理根基**：现场无监管人员制止拆除主梁的危险行为（M1）；拆除前未进行隐患排查或风险评估（M2）；工人缺乏不得拆除承重结构的相应安全知识（M3）；无拆除作业方案或安全操作规程（M4）。\n- **F防线失效**：报道中无物理屏障或防护缺失相关描述，故无编码。\n- **T触发条件**：事故直接由人为拆除行为引发，不存在设备故障、物料异常、地质或气象触发因素，故无编码。\n- **H人的行为**：工人实际操作明确违反不得擅自拆除承重结构的规定（H1）；拆除前未意识到主梁被拆会引发结构坍塌风险（H3）。\n- **C后果放大**：尽管救援中遇到暴雨和二次坍塌，但最终无人员死亡或受伤，未造成伤亡扩大，故无编码。\n\n```json\n{\"codes\":[\"M1\",\"M2\",\"M3\",\"M4\",\"H1\",\"H3\"], \"accident_type\":\"坍塌\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":0, \"direct_cause\":\"装修工人错误拆除承重主梁导致楼房结构失稳倒塌\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "H1",
+        "H3"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 0,
+      "direct_cause": "装修工人错误拆除承重主梁导致楼房结构失稳倒塌",
+      "elapsed_sec": 44.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 16,
+      "accident_id": "198fba11",
+      "title": "胶州一工业园脚手架垮塌 导致5工人摔伤",
+      "parsed": {
+        "codes": [
+          "F2"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 5,
+        "direct_cause": "施工浇筑水泥时脚手架突然垮塌导致工人坠落摔伤"
+      },
+      "raw_response": "```json\n{\"codes\": [\"F2\"], \"accident_type\": \"高处坠落\", \"severity\": \"一般事故\", \"deaths\": 0, \"injuries\": 5, \"direct_cause\": \"施工浇筑水泥时脚手架突然垮塌导致工人坠落摔伤\"}\n```",
+      "codes": [
+        "F2"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 5,
+      "direct_cause": "施工浇筑水泥时脚手架突然垮塌导致工人坠落摔伤",
+      "elapsed_sec": 18.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 17,
+      "accident_id": "72f9e00a",
+      "title": "马钢合肥公司一高炉检修时发生坍塌事故",
+      "parsed": {
+        "codes": [
+          "T2",
+          "H3",
+          "C1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "高炉检修时炉内上部耐火砖突然坍塌，将搭设脚手架的工人掩埋"
+      },
+      "raw_response": "```json\n{\"codes\":[\"T2\",\"H3\",\"C1\"], \"accident_type\":\"坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":0, \"direct_cause\":\"高炉检修时炉内上部耐火砖突然坍塌，将搭设脚手架的工人掩埋\"}\n```",
+      "codes": [
+        "T2",
+        "H3",
+        "C1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "高炉检修时炉内上部耐火砖突然坍塌，将搭设脚手架的工人掩埋",
+      "elapsed_sec": 35.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 18,
+      "accident_id": "183b7862",
+      "title": "河南安阳在建5层楼坍塌 两人遇难",
+      "parsed": {
+        "codes": [
+          "M2",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 1,
+        "direct_cause": "混凝土强度严重不足导致在建楼房坍塌"
+      },
+      "raw_response": "{\n  \"codes\": [\"M2\", \"T2\", \"H1\"],\n  \"accident_type\": \"坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 2,\n  \"injuries\": 1,\n  \"direct_cause\": \"混凝土强度严重不足导致在建楼房坍塌\"\n}",
+      "codes": [
+        "M2",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 1,
+      "direct_cause": "混凝土强度严重不足导致在建楼房坍塌",
+      "elapsed_sec": 22.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 19,
+      "accident_id": "4cf388b7",
+      "title": "深圳：疑工人操作不当 脚手架坍塌2人伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "F2",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 2,
+        "direct_cause": "拆除脚手架时违规将大量钢管堆放在临时竹架上，导致堆载过重引发整体坍塌"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"F2\", \"T2\", \"H1\"],\n  \"accident_type\": \"坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 0,\n  \"injuries\": 2,\n  \"direct_cause\": \"拆除脚手架时违规将大量钢管堆放在临时竹架上，导致堆载过重引发整体坍塌\"\n}\n```",
+      "codes": [
+        "M1",
+        "F2",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 2,
+      "direct_cause": "拆除脚手架时违规将大量钢管堆放在临时竹架上，导致堆载过重引发整体坍塌",
+      "elapsed_sec": 30.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 20,
+      "accident_id": "9746d192",
+      "title": "宁波在建羽毛球馆发生坍塌致2人被埋身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M4",
+          "F2",
+          "H1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 8,
+        "direct_cause": "屋顶施工时支撑体系失稳导致整体坍塌，工人从屋顶坠落被埋"
+      },
+      "raw_response": "根据事故描述，在建羽毛球馆屋顶施工时突然坍塌，导致10名工人坠落，造成2人死亡、8人受伤。由于报道未提供具体技术原因，基于坍塌事故常见模式进行推理：屋顶施工可能涉及高大模板支撑体系或钢结构安装，存在支撑体系失稳的可能。管理层面，必然存在现场监管缺失、隐患排查失效及安全方案或操作规程的缺陷；工人可能未按方案施工或风险辨识不足。因此致因编码推断为M1、M2、M4、F2、H1。事故类型为建筑坍塌，死亡2人属一般事故。\n\n```json\n{\"codes\":[\"M1\",\"M2\",\"M4\",\"F2\",\"H1\"],\"accident_type\":\"坍塌\",\"severity\":\"一般事故\",\"deaths\":2,\"injuries\":8,\"direct_cause\":\"屋顶施工时支撑体系失稳导致整体坍塌，工人从屋顶坠落被埋\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M4",
+        "F2",
+        "H1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 8,
+      "direct_cause": "屋顶施工时支撑体系失稳导致整体坍塌，工人从屋顶坠落被埋",
+      "elapsed_sec": 33.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 21,
+      "accident_id": "803d433c",
+      "title": "国家安监总局工作人员抵重庆调查化工厂垮塌事故",
+      "parsed": {
+        "codes": [
+          "F2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 2,
+        "direct_cause": "造粒塔施工台板支撑体系失稳导致垮塌"
+      },
+      "raw_response": "```json\n{\"codes\":[\"F2\"], \"accident_type\":\"坍塌\", \"severity\":\"重大事故\", \"deaths\":12, \"injuries\":2, \"direct_cause\":\"造粒塔施工台板支撑体系失稳导致垮塌\"}\n```",
+      "codes": [
+        "F2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 2,
+      "direct_cause": "造粒塔施工台板支撑体系失稳导致垮塌",
+      "elapsed_sec": 15.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 22,
+      "accident_id": "30cf5a1b",
+      "title": "江阴海港大道工程事故6人被压3人死亡",
+      "parsed": {
+        "codes": [],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 3,
+        "direct_cause": "现浇箱梁支架在堆载预压作业时发生坍塌"
+      },
+      "raw_response": "```json\n{\"codes\":[], \"accident_type\":\"坍塌\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":3, \"direct_cause\":\"现浇箱梁支架在堆载预压作业时发生坍塌\"}\n```",
+      "codes": [],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 3,
+      "direct_cause": "现浇箱梁支架在堆载预压作业时发生坍塌",
+      "elapsed_sec": 16.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 23,
+      "accident_id": "ddf5604e",
+      "title": "江苏金坛一小桥在施工中发生坍塌 造成1死2伤",
+      "parsed": {
+        "codes": [
+          "T2"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "桥面预制板在混凝土浇筑时断裂，导致拖拉机车箱坠河砸中施工人员"
+      },
+      "raw_response": "## 分析\n\n根据CAICS框架，按M→F→T→H→C因果链逐层推理分析：\n\n**M（管理根基）**  \n文本未提及现场监管、隐患排查、安全培训、制度规程或市场违规等情况。虽为村民自建项目且事故发生在施工中，但报道未提供相关管理缺陷的具体证据，故不编码。\n\n**F（防线失效）**  \n事故直接表现为预制板断裂导致桥面坍塌，而非临边防护、支撑体系失稳、设备安全装置或个体防护问题。文本未涉及任何物理屏障/防护的缺失描述，故不编码。\n\n**T（触发条件）**  \n报道明确描述“预制板发生了断裂”，在拖拉机倾倒水泥时承载失效，属于构件材质或承载能力异常。符合T2“物料状态异常”定义（材料/构件因性质变化或超载失稳）。  \n关键词：预制板断裂。\n\n**H（人的行为）**  \n文本未提及人员是否违反操作规程、违规指挥、风险辨识失败或应急失当，无相关证据，故不编码。\n\n**C（后果放大）**  \n救援及时，无迟报瞒报，不符合任何放大因素。\n\n**综合**  \n事故致因编码为T2。事故类型为“坍塌”，死亡1人、受伤2人，属“一般事故”。\n\n## 最终JSON\n{\"codes\":[\"T2\"], \"accident_type\":\"坍塌\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"桥面预制板在混凝土浇筑时断裂，导致拖拉机车箱坠河砸中施工人员\"}",
+      "codes": [
+        "T2"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "桥面预制板在混凝土浇筑时断裂，导致拖拉机车箱坠河砸中施工人员",
+      "elapsed_sec": 39.6,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 24,
+      "accident_id": "4d8bd85b",
+      "title": "陕西蒲城：饺子馆楼板突然塌陷 1死4伤",
+      "parsed": {
+        "codes": [
+          "T3",
+          "H3"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 4,
+        "direct_cause": "隔壁建房开挖地基扰动相邻楼房基础，导致墙体滑落、楼板塌陷"
+      },
+      "raw_response": "{\"codes\":[\"T3\",\"H3\"],\"accident_type\":\"坍塌\",\"severity\":\"一般事故\",\"deaths\":1,\"injuries\":4,\"direct_cause\":\"隔壁建房开挖地基扰动相邻楼房基础，导致墙体滑落、楼板塌陷\"}",
+      "codes": [
+        "T3",
+        "H3"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 4,
+      "direct_cause": "隔壁建房开挖地基扰动相邻楼房基础，导致墙体滑落、楼板塌陷",
+      "elapsed_sec": 32.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 25,
+      "accident_id": "a78f11b1",
+      "title": "重庆江北在建工地垮塌事故 造成2死1伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "F2",
+          "T4",
+          "H2"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 1,
+        "direct_cause": "连日阴雨导致堡坎护坡失稳坍塌，掩埋下方作业人员"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"F2\",\"T4\",\"H2\"], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":1, \"direct_cause\":\"连日阴雨导致堡坎护坡失稳坍塌，掩埋下方作业人员\"}\n```",
+      "codes": [
+        "M1",
+        "F2",
+        "T4",
+        "H2"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 1,
+      "direct_cause": "连日阴雨导致堡坎护坡失稳坍塌，掩埋下方作业人员",
+      "elapsed_sec": 37.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 26,
+      "accident_id": "6c6419e6",
+      "title": "武隆载人吊斗坠落致11人死 7名事故责任人被批捕",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "T1",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "重大事故",
+        "deaths": 11,
+        "injuries": 12,
+        "direct_cause": "违规使用载人吊斗运送工人，钢丝绳断裂致吊斗坠落"
+      },
+      "raw_response": "根据事故报道，按M→F→T→H→C因果链逐层分析：\n\n**M 管理根基**  \n- M1现场监管缺失：管理人员未制止违章载人且对报告隐患不重视，表明现场监管失职。  \n- M2隐患排查失效：10月25日工人发现缆绳“起毛”并报告，但未引起重视、未整改，隐患持续至事发。  \n- M3、M4、M5：文中未提及安全培训不足、制度规程漏洞或市场行为违规，故不编码。\n\n**F 防线失效**  \n- 无明确证据：载人吊斗本应禁止乘人，其钢丝绳断裂属设备故障，但未描述断绳保护等安全装置缺失或失效，故F层不编码。\n\n**T 触发条件**  \n- T1设备机具故障：“吊挂绳断裂”直接导致吊斗坠落，属于设备故障。\n\n**H 人的行为**  \n- H1违反操作规程：工人乘坐严禁载人的吊斗上下班，严重违章作业。  \n- H2违规指挥决策：管理人员明知吊斗载人且缆绳存在缺陷，仍默许或未制止，构成违章指挥。  \n- H3、H4：未提及风险辨识失败或应急行为失当，不编码。\n\n**C 后果放大**  \n- 未提及救援迟缓、信息迟报瞒报等因素，无编码。\n\n```json\n{\"codes\":[\"M1\",\"M2\",\"T1\",\"H1\",\"H2\"], \"accident_type\":\"起重伤害\", \"severity\":\"重大事故\", \"deaths\":11, \"injuries\":12, \"direct_cause\":\"违规使用载人吊斗运送工人，钢丝绳断裂致吊斗坠落\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "T1",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "重大事故",
+      "deaths": 11,
+      "injuries": 12,
+      "direct_cause": "违规使用载人吊斗运送工人，钢丝绳断裂致吊斗坠落",
+      "elapsed_sec": 37.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 27,
+      "accident_id": "08181700",
+      "title": "福建霞浦致12死升降机坠落事故：无领导干部遭问责",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M5",
+          "T1",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 0,
+        "direct_cause": "施工升降机连接螺栓紧固螺母脱落导致标准节倾倒，吊笼坠落。"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"M5\",\"T1\",\"H1\",\"H2\"], \"accident_type\":\"起重伤害\", \"severity\":\"重大事故\", \"deaths\":12, \"injuries\":0, \"direct_cause\":\"施工升降机连接螺栓紧固螺母脱落导致标准节倾倒，吊笼坠落。\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M5",
+        "T1",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 0,
+      "direct_cause": "施工升降机连接螺栓紧固螺母脱落导致标准节倾倒，吊笼坠落。",
+      "elapsed_sec": 66.3,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 28,
+      "accident_id": "12b4181d",
+      "title": "重庆武隆一桥梁施工发生吊斗坠落事故致11死12伤",
+      "parsed": {
+        "codes": [
+          "T1",
+          "H1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "重大事故",
+        "deaths": 11,
+        "injuries": 12,
+        "direct_cause": "运行中钢丝吊绳断裂，载人吊斗坠落在桥面"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"T1\", \"H1\"],\n  \"accident_type\": \"起重伤害\",\n  \"severity\": \"重大事故\",\n  \"deaths\": 11,\n  \"injuries\": 12,\n  \"direct_cause\": \"运行中钢丝吊绳断裂，载人吊斗坠落在桥面\"\n}\n```",
+      "codes": [
+        "T1",
+        "H1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "重大事故",
+      "deaths": 11,
+      "injuries": 12,
+      "direct_cause": "运行中钢丝吊绳断裂，载人吊斗坠落在桥面",
+      "elapsed_sec": 23.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 29,
+      "accident_id": "8d97183b",
+      "title": "京沪高铁工地10吨龙门塔吊倒塌 致4死2伤",
+      "parsed": {
+        "codes": [
+          "M2",
+          "F3",
+          "T4",
+          "H1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 2,
+        "direct_cause": "暴风雨中龙门塔吊未锚定，被风吹动滑行倒塌砸中另一塔吊驾驶室"
+      },
+      "raw_response": "基于事故文本，按M→F→T→H→C因果链推理分析：\n\n- M管理根基：报道未提及现场监管、培训等直接证据，但龙门吊在暴风雨中无固定措施，暴露出对防风装置或夹轨器等安全设施的日常检查不足，即隐患排查执行失效（M2）；同时，可能缺乏恶劣天气下的专项制度或应急预案（M4），但文本无明确说明，仅凭“工人找地方避雨”不足以确认制度缺失，故不纳入编码。\n- F防线失效：龙门塔吊被风吹动滑行，表明关键的防风制动装置（如夹轨器、锚定装置）缺失或失效，属于设备安全装置失效（F3）。\n- T触发条件：事故由“狂风大作，大雨滂沱”直接触发，符合气象水文触发（T4）。\n- H人的行为：操作人员在暴风雨来临时未将龙门吊进行锚定固定，且可能未意识到在塔吊驾驶室避雨的风险（风险辨识失败），但更明确的是违反了龙门吊在恶劣天气下应锚固锁定的操作规程（H1）；进入驾驶室躲雨本身也可视为违规，但主导行为是未固定设备。因此选H1。\n- C后果放大：事故直接造成被砸驾驶室内人员伤亡，未见救援迟缓或瞒报信息，无C层编码。\n\n综上，提取致因编码为M2、F3、T4、H1。事故类型为起重机械倒塌导致的起重伤害；死亡4人属较大事故。\n\n{\"codes\":[\"M2\",\"F3\",\"T4\",\"H1\"],\"accident_type\":\"起重伤害\",\"severity\":\"较大事故\",\"deaths\":4,\"injuries\":2,\"direct_cause\":\"暴风雨中龙门塔吊未锚定，被风吹动滑行倒塌砸中另一塔吊驾驶室\"}",
+      "codes": [
+        "M2",
+        "F3",
+        "T4",
+        "H1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 2,
+      "direct_cause": "暴风雨中龙门塔吊未锚定，被风吹动滑行倒塌砸中另一塔吊驾驶室",
+      "elapsed_sec": 32.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 30,
+      "accident_id": "e3ca14a7",
+      "title": "浙江镇海骆驼街道一建筑工地发生塔吊倾覆事故 3死1伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "M5",
+          "T1",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 1,
+        "direct_cause": "塔吊安装过程中存在违规代签字等行为，安装质量低劣，导致塔吊结构失稳倾覆"
+      },
+      "raw_response": "{\n  \"codes\": [\"M1\", \"M3\", \"M5\", \"T1\", \"H1\", \"H2\"],\n  \"accident_type\": \"起重伤害\",\n  \"severity\": \"较大事故\",\n  \"deaths\": 3,\n  \"injuries\": 1,\n  \"direct_cause\": \"塔吊安装过程中存在违规代签字等行为，安装质量低劣，导致塔吊结构失稳倾覆\"\n}",
+      "codes": [
+        "M1",
+        "M3",
+        "M5",
+        "T1",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 1,
+      "direct_cause": "塔吊安装过程中存在违规代签字等行为，安装质量低劣，导致塔吊结构失稳倾覆",
+      "elapsed_sec": 25.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 31,
+      "accident_id": "0661edd8",
+      "title": "上海市质监局通报“8.19”起重机械倾覆事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "M5",
+          "T4",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 3,
+        "direct_cause": "突遇强对流天气，无证人员未能正确操作夹轨钳，导致起重机被大风吹动脱轨倾覆，砸中待安装起重机驾驶室内避雨人员。"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M3\",\"M5\",\"T4\",\"H1\",\"H2\"],\"accident_type\":\"起重伤害\",\"severity\":\"较大事故\",\"deaths\":4,\"injuries\":3,\"direct_cause\":\"突遇强对流天气，无证人员未能正确操作夹轨钳，导致起重机被大风吹动脱轨倾覆，砸中待安装起重机驾驶室内避雨人员。\"}",
+      "codes": [
+        "M1",
+        "M3",
+        "M5",
+        "T4",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 3,
+      "direct_cause": "突遇强对流天气，无证人员未能正确操作夹轨钳，导致起重机被大风吹动脱轨倾覆，砸中待安装起重机驾驶室内避雨人员。",
+      "elapsed_sec": 26.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 32,
+      "accident_id": "5eff4f35",
+      "title": "乌鲁木齐1家建设工地塔吊倒塌致1死1伤",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "新塔吊安装过程中发生扭曲倒塌"
+      },
+      "raw_response": "{\"codes\":[\"T1\"], \"accident_type\":\"起重伤害\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"新塔吊安装过程中发生扭曲倒塌\"}",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "新塔吊安装过程中发生扭曲倒塌",
+      "elapsed_sec": 22.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 33,
+      "accident_id": "e0d40d0d",
+      "title": "田贝花园工地起重机吊臂折断伤人事故",
+      "parsed": {
+        "codes": [
+          "M2",
+          "T1",
+          "H1",
+          "C2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 2,
+        "direct_cause": "起重机吊臂违规加长导致超载折断，吊臂及塔吊坠落砸伤工人"
+      },
+      "raw_response": "根据事故文本，按M→F→T→H→C因果链分析：\n\n- **M（管理根基）**：工人反映因楼太高，起重机吊臂不够长，工人在吊臂上加了一截，可能超长使用，这一隐患未被排查或制止，反映出对非常规作业的风险评估和隐患排查缺失，符合M2（隐患排查失效）。虽包工头事后否认，但未直接描述现场监管缺失，因此不列M1。培训、制度、市场违规等无明显证据。\n- **F（防线失效）**：未提及临边防护、支撑体系、安全装置或个体防护的缺失，无相关编码。\n- **T（触发条件）**：起重机吊臂拦腰折断，属于设备本身结构在作业中发生断裂，直接触发事故，对应T1（设备机具故障）。\n- **H（人的行为）**：工人为够到高度在吊臂上加长一截，这一行为明显违反起重机安全操作规程（不得擅自改装、超长使用），属于H1（违反操作规程）。未见强令冒险、风险辨识失败或应急失当的明确描述。\n- **C（后果放大）**：包工头当场矢口否认有工人受伤，并在医院试图逃避记者，存在故意隐瞒事故伤员的情形，属于C2（信息迟报瞒报）。\n\n事故类型为起重机吊臂折断导致吊物坠落伤人，应归为“起重伤害”。死亡0人，重伤1人、轻伤1人，属一般事故。\n\n```json\n{\"codes\":[\"M2\",\"T1\",\"H1\",\"C2\"], \"accident_type\":\"起重伤害\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":2, \"direct_cause\":\"起重机吊臂违规加长导致超载折断，吊臂及塔吊坠落砸伤工人\"}\n```",
+      "codes": [
+        "M2",
+        "T1",
+        "H1",
+        "C2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 2,
+      "direct_cause": "起重机吊臂违规加长导致超载折断，吊臂及塔吊坠落砸伤工人",
+      "elapsed_sec": 28.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 34,
+      "accident_id": "e5c8fb68",
+      "title": "江苏无锡一在建工地塔吊坍塌 致1死2伤",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "塔吊底部固定装置故障导致塔吊突然坍塌，作业人员随塔吊坠落"
+      },
+      "raw_response": "{\"codes\":[\"T1\"], \"accident_type\":\"起重伤害\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"塔吊底部固定装置故障导致塔吊突然坍塌，作业人员随塔吊坠落\"}",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "塔吊底部固定装置故障导致塔吊突然坍塌，作业人员随塔吊坠落",
+      "elapsed_sec": 22.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 35,
+      "accident_id": "22d0337b",
+      "title": "兰州1座塔吊折断砸中居民楼致1死3伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "T1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 3,
+        "direct_cause": "塔吊在夜间吊卸钢材作业中，距底部约7米处突然折断倾倒，砸中居民楼及车辆。"
+      },
+      "raw_response": "好的，作为施工安全事故分析专家，我将按照M→F→T→H→C的因果链对该事故进行分析，并提取CAICS致因编码。\n\n**M.管理根基 — 系统性安全管理缺陷**\n分析：事故发生在凌晨零时30分许，属于夜班作业时段。塔吊在吊卸作业中发生倾覆，极可能存在现场监管缺失的问题，安全管理人员未能在事故发生前发现并制止塔吊可能存在的隐患或违规操作。文本未提及隐患排查、安全培训、方案规程及市场行为的具体情况。\n*   **M1 现场监管缺失**：事故发生时为凌晨夜间作业，现场安全监管力量薄弱，未能及时发现并制止潜在的不安全状态或行为。\n\n**F.防线失效 — 物理屏障/防护的缺失或失效**\n分析：事故原因是塔吊自身折断倾倒，并未提及临边防护、支撑体系、个体防护等物理屏障的问题。塔吊作为特种设备，其安全装置是否失效是本案关键，但原文信息缺失，无法直接判定。\n*   无相关编码。文本未提及塔吊安全装置（如力矩限制器）是否失效，也未涉及临边、支撑、个体防护等问题。\n\n**T.触发条件 — 直接触发事故的物质或环境条件**\n分析：事故直接表现为“一座高约50米的塔吊在距底部约7米处折断”、“突然发生倾斜，随后整个塔吊便向北侧倾倒”。这属于典型的塔吊自身结构在作业中发生不可预期的断裂或失效，即设备机具故障。气象条件无法判断。\n*   **T1 设备机具故障**：塔吊在吊卸钢材过程中，距底部约7米处突然折断，属于设备结构的突发性失效。\n\n**H.人的行为 — 直接导致事故的人为行为**\n分析：塔吊司机在作业过程中设备突然折断，报道未提及司机有违规操作行为（如超载、斜拉等），也未提及管理人员违规指挥。因此，无法从文本中判断是否存在明确的人为直接触发行为。\n*   无相关编码。文本未描述司机或其他人员有明确的违反操作规程、违规指挥、风险辨识失败或应急失当的行为。\n\n**C.后果放大 — 使事故后果超出预期的因素**\n分析：报道称“事发后，公安、消防、安检、医疗等部门救援人员迅速赶至现场展开抢险”，救援过程中虽遇到阻碍（如轿车挡路），但通过合力抬车解决，整体救援响应及时，未提及存在信息迟报瞒报。\n*   无相关编码。救援力量响应迅速，未发现明显迟缓或信息瞒报行为。\n\n```json\n{\n  \"codes\": [\"M1\", \"T1\"],\n  \"accident_type\": \"起重伤害\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 3,\n  \"direct_cause\": \"塔吊在夜间吊卸钢材作业中，距底部约7米处突然折断倾倒，砸中居民楼及车辆。\"\n}\n```",
+      "codes": [
+        "M1",
+        "T1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 3,
+      "direct_cause": "塔吊在夜间吊卸钢材作业中，距底部约7米处突然折断倾倒，砸中居民楼及车辆。",
+      "elapsed_sec": 18.1,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 36,
+      "accident_id": "aa26143b",
+      "title": "浙江湖州在建工地出意外 两死一伤",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "吊绳断裂导致钢筋坠落砸中平台上的工人"
+      },
+      "raw_response": "根据事故文本，按M→F→T→H→C因果链分析如下：\n\n- **M（管理根基）**：文本未提及现场监管、隐患排查、培训、制度或市场行为等方面的缺陷，无明确证据支撑。\n- **F（防线失效）**：物理防护方面，仅提及安全帽散落等，但事故直接原因为吊绳断裂导致物体打击，未描述临边防护、支撑体系或安全装置失效，无对应编码。\n- **T（触发条件）**：吊绳突然断裂属于设备机具故障（T1），是直接触发事故的物质条件。\n- **H（人的行为）**：文本未提及违反操作规程、违规指挥、风险辨识失败或应急行为失当，无对应编码。\n- **C（后果放大）**：救援虽历时近50分钟，但未反映响应迟缓或迟报瞒报，无对应编码。\n\n因此，仅T1适用，事故类型为物体打击，死亡1人、受伤2人，属一般事故。\n\n```json\n{\"codes\":[\"T1\"], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"吊绳断裂导致钢筋坠落砸中平台上的工人\"}\n```",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "吊绳断裂导致钢筋坠落砸中平台上的工人",
+      "elapsed_sec": 19.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 37,
+      "accident_id": "fbee5a6b",
+      "title": "黑龙江省牡丹江市粮油贸易综合楼工程“09.10”施工升降机吊笼坠落事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M5",
+          "F3",
+          "T1",
+          "H1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "较大事故",
+        "deaths": 7,
+        "injuries": 1,
+        "direct_cause": "施工升降机导向定滑轮损坏导致钢丝绳断裂，安全装置失效，施工人员违规乘坐货用升降机，吊笼坠落。"
+      },
+      "raw_response": "```json\n{\"codes\": [\"M1\", \"M2\", \"M3\", \"M5\", \"F3\", \"T1\", \"H1\"], \"accident_type\": \"起重伤害\", \"severity\": \"较大事故\", \"deaths\": 7, \"injuries\": 1, \"direct_cause\": \"施工升降机导向定滑轮损坏导致钢丝绳断裂，安全装置失效，施工人员违规乘坐货用升降机，吊笼坠落。\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M5",
+        "F3",
+        "T1",
+        "H1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "较大事故",
+      "deaths": 7,
+      "injuries": 1,
+      "direct_cause": "施工升降机导向定滑轮损坏导致钢丝绳断裂，安全装置失效，施工人员违规乘坐货用升降机，吊笼坠落。",
+      "elapsed_sec": 25.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 38,
+      "accident_id": "03349c36",
+      "title": "四川乐山在建工地塔吊倒塌致2死1伤",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 1,
+        "direct_cause": "塔吊突然倾斜倒塌"
+      },
+      "raw_response": "```json\n{\"codes\":[\"T1\"], \"accident_type\":\"起重伤害\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":1, \"direct_cause\":\"塔吊突然倾斜倒塌\"}\n```",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 1,
+      "direct_cause": "塔吊突然倾斜倒塌",
+      "elapsed_sec": 17.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 39,
+      "accident_id": "e83885b9",
+      "title": "哈尔滨高铁架桥机倒塌 1死2伤",
+      "parsed": {
+        "codes": [
+          "T1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "架桥机导梁对位时发生抖动倾斜脱落导致人员伤亡"
+      },
+      "raw_response": "{\"codes\":[\"T1\"], \"accident_type\":\"起重伤害\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"架桥机导梁对位时发生抖动倾斜脱落导致人员伤亡\"}",
+      "codes": [
+        "T1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "架桥机导梁对位时发生抖动倾斜脱落导致人员伤亡",
+      "elapsed_sec": 15.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 40,
+      "accident_id": "802f4e9a",
+      "title": "上海闸北一在建工地打桩机倾覆事故",
+      "parsed": {
+        "codes": [],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 0,
+        "direct_cause": "打桩机施工时突然倾覆，井架砸中相邻民房"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [],\n  \"accident_type\": \"物体打击\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 0,\n  \"injuries\": 0,\n  \"direct_cause\": \"打桩机施工时突然倾覆，井架砸中相邻民房\"\n}\n```",
+      "codes": [],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 0,
+      "direct_cause": "打桩机施工时突然倾覆，井架砸中相邻民房",
+      "elapsed_sec": 22.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 41,
+      "accident_id": "b844ee92",
+      "title": "福建霞浦一建筑工地发生载人升降机坠落致12人死亡",
+      "parsed": {
+        "codes": [
+          "M2",
+          "T1",
+          "H1"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 0,
+        "direct_cause": "升降机螺栓断裂且超载导致坠落"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M2\",\"T1\",\"H1\"],\"accident_type\":\"起重伤害\",\"severity\":\"重大事故\",\"deaths\":12,\"injuries\":0,\"direct_cause\":\"升降机螺栓断裂且超载导致坠落\"}\n```",
+      "codes": [
+        "M2",
+        "T1",
+        "H1"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 0,
+      "direct_cause": "升降机螺栓断裂且超载导致坠落",
+      "elapsed_sec": 19.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 42,
+      "accident_id": "63be3bf6",
+      "title": "福建霞浦致12死升降机坠落事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M4",
+          "M5",
+          "T1",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "起重伤害",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 0,
+        "direct_cause": "施工升降机标准节连接螺栓紧固螺母脱落，导致标准节倾倒，吊笼坠落"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"M4\", \"M5\", \"T1\", \"H1\", \"H2\"],\n  \"accident_type\": \"起重伤害\",\n  \"severity\": \"重大事故\",\n  \"deaths\": 12,\n  \"injuries\": 0,\n  \"direct_cause\": \"施工升降机标准节连接螺栓紧固螺母脱落，导致标准节倾倒，吊笼坠落\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M4",
+        "M5",
+        "T1",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "起重伤害",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 0,
+      "direct_cause": "施工升降机标准节连接螺栓紧固螺母脱落，导致标准节倾倒，吊笼坠落",
+      "elapsed_sec": 25.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 43,
+      "accident_id": "395cc497",
+      "title": "北京一写字楼高空作业时3名工人坠亡",
+      "parsed": {
+        "codes": [
+          "F3",
+          "F4",
+          "T1"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "施工吊篮突然脱落导致工人从167米高空坠落身亡"
+      },
+      "raw_response": "根据M→F→T→H→C因果链分析该事故文本：\n\n- **M(管理根基)**：文本未提及现场监管、隐患排查、培训、制度或市场违规等信息，无直接证据。\n- **F(防线失效)**：吊篮高空作业，工人随吊篮坠落，极大概率吊篮的安全锁或制动装置未起作用（F3设备安全装置失效）；三名工人同时坠亡且未提及被安全带挂住，可推断未使用安全带或安全带未系挂（F4个体防护未使用）。\n- **T(触发条件)**：施工吊篮突然脱落，属于设备机具故障（T1）。\n- **H(人的行为)**：无明确的操作违规、指挥错误或风险辨识失败描述。\n- **C(后果放大)**：救援正常到达，无迟报瞒报信息，后果未放大。\n\n{\"codes\":[\"F3\",\"F4\",\"T1\"], \"accident_type\":\"高处坠落\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":0, \"direct_cause\":\"施工吊篮突然脱落导致工人从167米高空坠落身亡\"}",
+      "codes": [
+        "F3",
+        "F4",
+        "T1"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "施工吊篮突然脱落导致工人从167米高空坠落身亡",
+      "elapsed_sec": 39.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 44,
+      "accident_id": "b80a4e03",
+      "title": "宁夏回族自治区银川市“10.07”高处坠落事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M5",
+          "F1",
+          "F4",
+          "H1",
+          "H2",
+          "H3"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "工人未系安全带进入防护不牢的电梯井清渣时坠落至负二层"
+      },
+      "raw_response": "{\n  \"codes\": [\"M1\", \"M2\", \"M3\", \"M5\", \"F1\", \"F4\", \"H1\", \"H2\", \"H3\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"较大事故\",\n  \"deaths\": 3,\n  \"injuries\": 0,\n  \"direct_cause\": \"工人未系安全带进入防护不牢的电梯井清渣时坠落至负二层\"\n}",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M5",
+        "F1",
+        "F4",
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "工人未系安全带进入防护不牢的电梯井清渣时坠落至负二层",
+      "elapsed_sec": 22.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 45,
+      "accident_id": "bc36833a",
+      "title": "十天高速施工现场发生事故 5人高空坠下身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "T1",
+          "H1"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "较大事故",
+        "deaths": 5,
+        "injuries": 0,
+        "direct_cause": "工人违规乘坐运料吊斗，钢丝绳卡环滑脱导致吊斗从15米高处坠落"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M3\", \"T1\", \"H1\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"较大事故\",\n  \"deaths\": 5,\n  \"injuries\": 0,\n  \"direct_cause\": \"工人违规乘坐运料吊斗，钢丝绳卡环滑脱导致吊斗从15米高处坠落\"\n}\n```",
+      "codes": [
+        "M1",
+        "M3",
+        "T1",
+        "H1"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "较大事故",
+      "deaths": 5,
+      "injuries": 0,
+      "direct_cause": "工人违规乘坐运料吊斗，钢丝绳卡环滑脱导致吊斗从15米高处坠落",
+      "elapsed_sec": 24.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 46,
+      "accident_id": "f2139c91",
+      "title": "陕西眉县渭河桥工地发生事故 两工人高空坠落身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "M4",
+          "F3",
+          "F4",
+          "T1",
+          "H1",
+          "H3"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "吊车吊篮钢丝绳脱钩导致吊篮倾斜，工人从高处坠落身亡"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M3\", \"M4\", \"F3\", \"F4\", \"T1\", \"H1\", \"H3\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 2,\n  \"injuries\": 0,\n  \"direct_cause\": \"吊车吊篮钢丝绳脱钩导致吊篮倾斜，工人从高处坠落身亡\"\n}\n```",
+      "codes": [
+        "M1",
+        "M3",
+        "M4",
+        "F3",
+        "F4",
+        "T1",
+        "H1",
+        "H3"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "吊车吊篮钢丝绳脱钩导致吊篮倾斜，工人从高处坠落身亡",
+      "elapsed_sec": 16.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 47,
+      "accident_id": "680b1caa",
+      "title": "违章作业 四川遂宁一民工高空坠落身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F2",
+          "F4",
+          "T1",
+          "T2",
+          "H1",
+          "H2"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "脚手架横担断裂且作业人员未系安全带从三楼坠落身亡"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"F2\", \"F4\", \"T1\", \"T2\", \"H1\", \"H2\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 0,\n  \"direct_cause\": \"脚手架横担断裂且作业人员未系安全带从三楼坠落身亡\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "F2",
+        "F4",
+        "T1",
+        "T2",
+        "H1",
+        "H2"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "脚手架横担断裂且作业人员未系安全带从三楼坠落身亡",
+      "elapsed_sec": 23.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 48,
+      "accident_id": "9369b213",
+      "title": "天津市宝坻区发生一起工人意外坠楼事故 2人死亡",
+      "parsed": {
+        "codes": [
+          "T4"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "大风突然掀起彩钢房顶导致工人坠落"
+      },
+      "raw_response": "{\"codes\":[\"T4\"], \"accident_type\":\"高处坠落\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":0, \"direct_cause\":\"大风突然掀起彩钢房顶导致工人坠落\"}",
+      "codes": [
+        "T4"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "大风突然掀起彩钢房顶导致工人坠落",
+      "elapsed_sec": 13.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 49,
+      "accident_id": "6a995918",
+      "title": "青岛：吊篮钢索断裂工人坠下五楼",
+      "parsed": {
+        "codes": [
+          "F3",
+          "T1"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 2,
+        "direct_cause": "吊篮一侧钢丝绳断裂，工人从五楼高处坠落至地面，同时地面工人被掉落物砸伤。"
+      },
+      "raw_response": "{\n  \"codes\": [\"F3\", \"T1\"],\n  \"accident_type\": \"高处坠落\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 0,\n  \"injuries\": 2,\n  \"direct_cause\": \"吊篮一侧钢丝绳断裂，工人从五楼高处坠落至地面，同时地面工人被掉落物砸伤。\"\n}",
+      "codes": [
+        "F3",
+        "T1"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 2,
+      "direct_cause": "吊篮一侧钢丝绳断裂，工人从五楼高处坠落至地面，同时地面工人被掉落物砸伤。",
+      "elapsed_sec": 25.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 50,
+      "accident_id": "c7c1c3ad",
+      "title": "郑州一在建地下停车场发生事故 1死1伤",
+      "parsed": {
+        "codes": [
+          "M2",
+          "F1",
+          "F2",
+          "C2"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "作业平台架子断裂导致工人坠入无防护的通风口"
+      },
+      "raw_response": "{\"codes\":[\"M2\",\"F1\",\"F2\",\"C2\"], \"accident_type\":\"高处坠落\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"作业平台架子断裂导致工人坠入无防护的通风口\"}",
+      "codes": [
+        "M2",
+        "F1",
+        "F2",
+        "C2"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "作业平台架子断裂导致工人坠入无防护的通风口",
+      "elapsed_sec": 21.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 51,
+      "accident_id": "7eca7ca9",
+      "title": "京沪高铁高架桥一工人坠亡 事故原因调查中",
+      "parsed": {
+        "codes": [],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "工人在高架桥拆模板时坠落身亡"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"高处坠落\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"工人在高架桥拆模板时坠落身亡\"}",
+      "codes": [],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "工人在高架桥拆模板时坠落身亡",
+      "elapsed_sec": 26.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 52,
+      "accident_id": "f0e31171",
+      "title": "北京2名工人加盖屋顶时遇大风坠地身亡",
+      "parsed": {
+        "codes": [
+          "F1",
+          "F4",
+          "T4"
+        ],
+        "accident_type": "高处坠落",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "工人未系安全带且无临边防护，在加盖屋顶时遇大风失稳坠落"
+      },
+      "raw_response": "```json\n{\"codes\":[\"F1\",\"F4\",\"T4\"], \"accident_type\":\"高处坠落\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":0, \"direct_cause\":\"工人未系安全带且无临边防护，在加盖屋顶时遇大风失稳坠落\"}\n```",
+      "codes": [
+        "F1",
+        "F4",
+        "T4"
+      ],
+      "accident_type": "高处坠落",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "工人未系安全带且无临边防护，在加盖屋顶时遇大风失稳坠落",
+      "elapsed_sec": 27.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 53,
+      "accident_id": "36e2881a",
+      "title": "黑龙江省哈尔滨市“01.04”基坑坍塌事故",
+      "parsed": {
+        "codes": [],
+        "_error": "no_json"
+      },
+      "raw_response": "",
+      "codes": [],
+      "accident_type": "?",
+      "severity": "?",
+      "deaths": 0,
+      "injuries": 0,
+      "direct_cause": "",
+      "elapsed_sec": 118.7,
+      "attempts": 3,
+      "parse_error": "no_json"
+    },
+    {
+      "index": 54,
+      "accident_id": "805dcf51",
+      "title": "北京怀柔一工地土层坍塌 三工人被埋遇难",
+      "parsed": {
+        "codes": [
+          "T3"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "开挖沟槽土体突然失稳坍塌导致工人被埋"
+      },
+      "raw_response": "```json\n{\"codes\": [\"T3\"], \"accident_type\": \"土方坍塌\", \"severity\": \"较大事故\", \"deaths\": 3, \"injuries\": 0, \"direct_cause\": \"开挖沟槽土体突然失稳坍塌导致工人被埋\"}\n```",
+      "codes": [
+        "T3"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "开挖沟槽土体突然失稳坍塌导致工人被埋",
+      "elapsed_sec": 24.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 55,
+      "accident_id": "2eb82513",
+      "title": "四川梓潼工地发生土方坍塌致3人死亡",
+      "parsed": {
+        "codes": [
+          "F2",
+          "H4"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "土方边坡失稳发生坍塌，盲目施救导致二次坍塌致3人死亡"
+      },
+      "raw_response": "{\"codes\":[\"F2\",\"H4\"], \"accident_type\":\"土方坍塌\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":0, \"direct_cause\":\"土方边坡失稳发生坍塌，盲目施救导致二次坍塌致3人死亡\"}",
+      "codes": [
+        "F2",
+        "H4"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "土方边坡失稳发生坍塌，盲目施救导致二次坍塌致3人死亡",
+      "elapsed_sec": 22.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 56,
+      "accident_id": "8239b940",
+      "title": "深圳一市政工地发生塌方 1死1伤",
+      "parsed": {
+        "codes": [
+          "F2",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "沟槽未支护且弃土堆载坡顶导致土体失稳坍塌"
+      },
+      "raw_response": "根据CAICS框架逐层分析：\n\nM层管理根基缺陷：文本未提及安全监管人员、隐患排查记录、安全培训、施工方案或市场行为违规，无法推断管理缺陷。\nF层防线失效：壕沟深2米无支护，属于基坑/沟槽支护缺失，符合F2支撑体系失稳。\nT层触发条件：挖出的泥土堆积在沟边，导致边坡荷载过大失稳塌方，符合T2物料状态异常（堆载超限）。\nH层人的行为：工人将弃土直接堆积在沟边，未保持安全距离，违反常规安全操作规程，符合H1违反操作规程。\nC层后果放大：救援及时，无瞒报迟报，无扩大后果因素。\n\n```json\n{\n  \"codes\": [\"F2\", \"T2\", \"H1\"],\n  \"accident_type\": \"土方坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 1,\n  \"direct_cause\": \"沟槽未支护且弃土堆载坡顶导致土体失稳坍塌\"\n}\n```",
+      "codes": [
+        "F2",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "沟槽未支护且弃土堆载坡顶导致土体失稳坍塌",
+      "elapsed_sec": 29.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 57,
+      "accident_id": "88044f78",
+      "title": "青海格尔木高压塔工地发生坍塌 2人身亡",
+      "parsed": {
+        "codes": [
+          "F2",
+          "T3"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "坑洞顶部土方突然坍塌，导致正在放置铁圈支护的2名作业人员被埋身亡"
+      },
+      "raw_response": "{\n  \"codes\": [\"F2\", \"T3\"],\n  \"accident_type\": \"坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 2,\n  \"injuries\": 0,\n  \"direct_cause\": \"坑洞顶部土方突然坍塌，导致正在放置铁圈支护的2名作业人员被埋身亡\"\n}",
+      "codes": [
+        "F2",
+        "T3"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "坑洞顶部土方突然坍塌，导致正在放置铁圈支护的2名作业人员被埋身亡",
+      "elapsed_sec": 32.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 58,
+      "accident_id": "bc9b9c45",
+      "title": "西安一工地塌方 两名工人被埋一死一伤",
+      "parsed": {
+        "codes": [
+          "F2",
+          "T3"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "作业坑未采取有效支护措施，坑壁土体失稳坍塌"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"F2\", \"T3\"],\n  \"accident_type\": \"土方坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 1,\n  \"direct_cause\": \"作业坑未采取有效支护措施，坑壁土体失稳坍塌\"\n}\n```",
+      "codes": [
+        "F2",
+        "T3"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "作业坑未采取有效支护措施，坑壁土体失稳坍塌",
+      "elapsed_sec": 28.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 59,
+      "accident_id": "df457db0",
+      "title": "厦门一处施工工地坍塌1名工人被埋身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F2",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "挖深3米地基洞时未采取支护措施，沙土松软发生坍塌，工人被埋身亡"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"F2\",\"T2\",\"H1\"], \"accident_type\":\"坍塌\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"挖深3米地基洞时未采取支护措施，沙土松软发生坍塌，工人被埋身亡\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "F2",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "挖深3米地基洞时未采取支护措施，沙土松软发生坍塌，工人被埋身亡",
+      "elapsed_sec": 32.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 60,
+      "accident_id": "6b865482",
+      "title": "陕西延安小区工地发生塌方 1死2伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "工地发生土方坍塌，致三人被埋，造成一死两伤"
+      },
+      "raw_response": "根据事故文本分析，报道仅提及“塌方”造成3人被埋，1死2伤，缺乏具体的管理、技术或行为细节。按CAICS框架逐层推理，无法从有限信息中提取出明确的致因编码，故codes为空。\n\n最终JSON：\n{\"codes\":[], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"工地发生土方坍塌，致三人被埋，造成一死两伤\"}",
+      "codes": [],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "工地发生土方坍塌，致三人被埋，造成一死两伤",
+      "elapsed_sec": 19.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 61,
+      "accident_id": "270af5c1",
+      "title": "广西桂林发生工地土方坍塌事故致2死1伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 1,
+        "direct_cause": "施工过程中土方突然坍塌，导致工人被埋"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":1, \"direct_cause\":\"施工过程中土方突然坍塌，导致工人被埋\"}",
+      "codes": [],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 1,
+      "direct_cause": "施工过程中土方突然坍塌，导致工人被埋",
+      "elapsed_sec": 13.6,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 62,
+      "accident_id": "36731999",
+      "title": "四川新津一工地发生塌方2人被埋遇难",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "T2",
+          "T4",
+          "H3"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "暴雨后土方含水量饱和松散，工人在未采取防护措施的土堆旁砌墙时土方突然垮塌将人掩埋"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"T2\",\"T4\",\"H3\"], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":0, \"direct_cause\":\"暴雨后土方含水量饱和松散，工人在未采取防护措施的土堆旁砌墙时土方突然垮塌将人掩埋\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "T2",
+        "T4",
+        "H3"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "暴雨后土方含水量饱和松散，工人在未采取防护措施的土堆旁砌墙时土方突然垮塌将人掩埋",
+      "elapsed_sec": 25.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 63,
+      "accident_id": "d2c0427c",
+      "title": "乌鲁木齐一施工现场土方坍塌 致1死2伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F2",
+          "T3",
+          "H1"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "管沟未采取支护措施，沙石松软导致土方突然坍塌"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"F2\",\"T3\",\"H1\"], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":2, \"direct_cause\":\"管沟未采取支护措施，沙石松软导致土方突然坍塌\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "F2",
+        "T3",
+        "H1"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "管沟未采取支护措施，沙石松软导致土方突然坍塌",
+      "elapsed_sec": 21.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 64,
+      "accident_id": "7da234bd",
+      "title": "西安建筑工地地基坍塌致2人被埋身亡",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M5",
+          "F2"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "基坑开挖无有效支护，边坡失稳坍塌致工人被埋"
+      },
+      "raw_response": "根据事故文本分析，按照M→F→T→H→C因果链逐层推理：\n\n- **M（管理根基）**：工地公示栏贴有“正在整改”字样，表明隐患排查已发现问题但整改未完成仍继续作业，存在**M2隐患排查失效**；该工地手续不全、系违法施工，属于**M5市场行为违规**。无明确证据支持M1、M3、M4。\n- **F（防线失效）**：地基一侧突然坍塌，属基坑边坡失稳，缺乏有效支护，存在**F2支撑体系失稳**。与临边洞口防护、设备安全装置、个体防护无关。\n- **T（触发条件）**：未提及设备故障、物料异常、地质突变或气象因素触发，故无对应编码。\n- **H（人的行为）**：虽属违法施工，但报告未直接描述工人违反具体操作规程、违规指挥、风险辨识失败或应急失当行为，不编码。\n- **C（后果放大）**：未描述救援迟缓或信息迟报瞒报，不编码。\n\n```json\n{\"codes\":[\"M2\",\"M5\",\"F2\"], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":0, \"direct_cause\":\"基坑开挖无有效支护，边坡失稳坍塌致工人被埋\"}\n```",
+      "codes": [
+        "M2",
+        "M5",
+        "F2"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "基坑开挖无有效支护，边坡失稳坍塌致工人被埋",
+      "elapsed_sec": 32.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 65,
+      "accident_id": "ba7ed4f2",
+      "title": "安徽芜湖污水井坍塌 2名工人遇难",
+      "parsed": {
+        "codes": [
+          "F2",
+          "T3"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 1,
+        "direct_cause": "污水井施工未采取支护措施，井壁土体突然坍塌，工人被掩埋。"
+      },
+      "raw_response": "{\"codes\":[\"F2\",\"T3\"], \"accident_type\":\"土方坍塌\", \"severity\":\"一般事故\", \"deaths\":2, \"injuries\":1, \"direct_cause\":\"污水井施工未采取支护措施，井壁土体突然坍塌，工人被掩埋。\"}",
+      "codes": [
+        "F2",
+        "T3"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 1,
+      "direct_cause": "污水井施工未采取支护措施，井壁土体突然坍塌，工人被掩埋。",
+      "elapsed_sec": 65.6,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 66,
+      "accident_id": "b59af2d6",
+      "title": "沈阳十里锦城工地塌方 事故造成1死1伤",
+      "parsed": {
+        "codes": [
+          "M2",
+          "F2",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "土方坍塌",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "工人在无可靠支护的深坑内绑扎钢筋时，坑壁土方突然滑落，掩埋作业人员导致窒息死亡。"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M2\", \"F2\", \"T2\", \"H1\"],\n  \"accident_type\": \"土方坍塌\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 1,\n  \"direct_cause\": \"工人在无可靠支护的深坑内绑扎钢筋时，坑壁土方突然滑落，掩埋作业人员导致窒息死亡。\"\n}\n```",
+      "codes": [
+        "M2",
+        "F2",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "土方坍塌",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "工人在无可靠支护的深坑内绑扎钢筋时，坑壁土方突然滑落，掩埋作业人员导致窒息死亡。",
+      "elapsed_sec": 37.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 67,
+      "accident_id": "173e0890",
+      "title": "武汉一处工地布料机高空坠落4名民工被砸死",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M3",
+          "T1"
+        ],
+        "accident_type": "物体打击",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 0,
+        "direct_cause": "布料机钢丝绳断裂致高空坠落，砸中下方地面作业人员"
+      },
+      "raw_response": "{\"codes\":[\"M2\",\"M3\",\"T1\"], \"accident_type\":\"物体打击\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":0, \"direct_cause\":\"布料机钢丝绳断裂致高空坠落，砸中下方地面作业人员\"}",
+      "codes": [
+        "M2",
+        "M3",
+        "T1"
+      ],
+      "accident_type": "物体打击",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 0,
+      "direct_cause": "布料机钢丝绳断裂致高空坠落，砸中下方地面作业人员",
+      "elapsed_sec": 31.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 68,
+      "accident_id": "d593d576",
+      "title": "广东珠海一建筑工地发生钢筋掉落事故 致3死",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F1",
+          "T4",
+          "H3"
+        ],
+        "accident_type": "物体打击",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 3,
+        "direct_cause": "降雨大雾天气下，大楼顶部未固定钢筋掉落砸中下方作业人员"
+      },
+      "raw_response": "根据M→F→T→H→C因果链对事故逐层分析：\n\n- **M 管理根基**：报道中未提及现场安全监管人员是否在岗、是否提前发现并制止高空散放钢筋的不安全状态，但可推断监管存在缺失（M1）；钢筋在大楼顶部有垮塌痕迹，说明此前对高空物料堆放状态的隐患排查未有效执行（M2）。无明确线索指向其他M类。\n- **F 防线失效**：钢筋从大楼顶部掉落，说明高空作业面或结构边缘缺少防止物料坠落的挡脚板、防护栏杆或安全网等物理屏障（F1）。工人被砸，但报道未提及安全帽等个体防护情况，不予编码。\n- **T 触发条件**：报道明确提到“下雨天，路打滑”“雾很大”，降雨和大雾天气导致构件湿滑、视线不良，可能直接触发钢筋滑移或操作失误（T4）。\n- **H 人的行为**：降雨雾天在高空堆放或搬运钢筋，未意识到滑落风险，暴露出风险辨识不足（H3）。无证据证明存在明确违规操作或强令冒险作业。\n- **C 后果放大**：救援在事故后约3.5小时完成，未报道救援迟缓或瞒报，无C类编码。\n\n```json\n{\"codes\":[\"M1\",\"M2\",\"F1\",\"T4\",\"H3\"], \"accident_type\":\"物体打击\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":3, \"direct_cause\":\"降雨大雾天气下，大楼顶部未固定钢筋掉落砸中下方作业人员\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "F1",
+        "T4",
+        "H3"
+      ],
+      "accident_type": "物体打击",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 3,
+      "direct_cause": "降雨大雾天气下，大楼顶部未固定钢筋掉落砸中下方作业人员",
+      "elapsed_sec": 75.4,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 69,
+      "accident_id": "ebb6fdad",
+      "title": "银川：建筑工地钢管高空坠落砸死工人",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "F4",
+          "T2",
+          "H1",
+          "H3",
+          "C2"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "8楼坠落铸铁下水管击中未佩戴安全帽的清理脚手架工人头部致死"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"M3\", \"F4\", \"T2\", \"H1\", \"H3\", \"C2\"],\n  \"accident_type\": \"物体打击\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 0,\n  \"direct_cause\": \"8楼坠落铸铁下水管击中未佩戴安全帽的清理脚手架工人头部致死\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "F4",
+        "T2",
+        "H1",
+        "H3",
+        "C2"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "8楼坠落铸铁下水管击中未佩戴安全帽的清理脚手架工人头部致死",
+      "elapsed_sec": 30.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 70,
+      "accident_id": "92dac759",
+      "title": "福建南安：疑触电致操作失误 工人被滑落斗车砸死",
+      "parsed": {
+        "codes": [
+          "F3",
+          "T1"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "工人在挂斗车时因机台漏电触电导致操作失误，斗车滑落砸伤致死"
+      },
+      "raw_response": "基于事故文本，按M→F→T→H→C因果链逐层分析，未发现明确的M（管理根基）、H（人的行为）、C（后果放大）层证据。F（防线失效）层：机台漏电说明漏电保护等设备安全装置失效，对应F3。T（触发条件）层：机台漏电属于设备故障，触发触电及后续操作失误，对应T1。其余层无直接证据。事故类型为斗车滑落砸伤致死，属物体打击；死亡1人，为一般事故。\n\n{\"codes\":[\"F3\",\"T1\"], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"工人在挂斗车时因机台漏电触电导致操作失误，斗车滑落砸伤致死\"}",
+      "codes": [
+        "F3",
+        "T1"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "工人在挂斗车时因机台漏电触电导致操作失误，斗车滑落砸伤致死",
+      "elapsed_sec": 21.6,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 71,
+      "accident_id": "d6034dff",
+      "title": "武汉：数块预制板倾倒 两工人一死一伤",
+      "parsed": {
+        "codes": [
+          "T2",
+          "H3"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "预制板堆放失稳倾倒压住工人。"
+      },
+      "raw_response": "根据事故文本，按M→F→T→H→C因果链逐层分析：\n\n- **M（管理根基）**：文本未提及现场监管、隐患排查、培训、制度或市场行为等管理缺陷，无直接证据，不编码。\n- **F（防线失效）**：预制板堆放无相关物理防护或屏障失效描述，不涉及临边洞口、支撑体系、设备装置或个体防护，不编码。\n- **T（触发条件）**：预制板堆放至2米高时突然倾倒，属于物料堆载失稳，符合**T2物料状态异常**（堆载超限、物料失稳）。\n- **H（人的行为）**：工人在堆放过程中未能识别预制板堆高失稳的风险，导致不当堆放，符合**H3风险辨识失败**（未意识到危险、安全意识薄弱）。\n- **C（后果放大）**：工友及时施救并送医，无救援迟缓或迟报瞒报描述，不编码。\n\n事故类型：预制板倾倒压人，属物体打击。死亡1人、受伤1人，为一般事故。直接原因是预制板堆放失稳倾倒。\n\n```json\n{\"codes\":[\"T2\",\"H3\"], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"预制板堆放失稳倾倒压住工人。\"}\n```",
+      "codes": [
+        "T2",
+        "H3"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "预制板堆放失稳倾倒压住工人。",
+      "elapsed_sec": 23.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 72,
+      "accident_id": "c2dde0b6",
+      "title": "西安市立交工地出事故 夫妇被铁板砸中一死一伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F1",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "7楼屋顶铁板失稳坠落，砸中在无防护电梯井口作业的工人，致一死一伤"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"F1\",\"T2\",\"H1\"], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"7楼屋顶铁板失稳坠落，砸中在无防护电梯井口作业的工人，致一死一伤\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "F1",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "7楼屋顶铁板失稳坠落，砸中在无防护电梯井口作业的工人，致一死一伤",
+      "elapsed_sec": 42.8,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 73,
+      "accident_id": "b4f106b9",
+      "title": "海口一工地发生事故 钢管坠落刺进工人体内",
+      "parsed": {
+        "codes": [],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 1,
+        "direct_cause": "高处钢管坠落刺入工人体内"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":1, \"direct_cause\":\"高处钢管坠落刺入工人体内\"}",
+      "codes": [],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 1,
+      "direct_cause": "高处钢管坠落刺入工人体内",
+      "elapsed_sec": 64.8,
+      "attempts": 2,
+      "parse_error": ""
+    },
+    {
+      "index": 74,
+      "accident_id": "966fb1f5",
+      "title": "武汉工地高空坠物 工人未戴安全帽被砸身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "F1",
+          "F4",
+          "H3"
+        ],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "高空坠落的木质模板击中未佩戴安全帽的工人头部致死"
+      },
+      "raw_response": "```json\n{\"codes\": [\"M1\", \"M3\", \"F1\", \"F4\", \"H3\"], \"accident_type\": \"物体打击\", \"severity\": \"一般事故\", \"deaths\": 1, \"injuries\": 1, \"direct_cause\": \"高空坠落的木质模板击中未佩戴安全帽的工人头部致死\"}\n```",
+      "codes": [
+        "M1",
+        "M3",
+        "F1",
+        "F4",
+        "H3"
+      ],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "高空坠落的木质模板击中未佩戴安全帽的工人头部致死",
+      "elapsed_sec": 18.6,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 75,
+      "accident_id": "2a1c2354",
+      "title": "贵州在建高铁隧道疑发生瓦斯爆炸 12人遇难",
+      "parsed": {
+        "codes": [
+          "M2",
+          "F3",
+          "T2",
+          "T3",
+          "H3"
+        ],
+        "accident_type": "火灾爆炸",
+        "severity": "重大事故",
+        "deaths": 12,
+        "injuries": 12,
+        "direct_cause": "隧道平导底板隆起开裂导致瓦斯异常涌出，遇火源发生爆炸"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M2\",\"F3\",\"T2\",\"T3\",\"H3\"], \"accident_type\":\"火灾爆炸\", \"severity\":\"重大事故\", \"deaths\":12, \"injuries\":12, \"direct_cause\":\"隧道平导底板隆起开裂导致瓦斯异常涌出，遇火源发生爆炸\"}\n```",
+      "codes": [
+        "M2",
+        "F3",
+        "T2",
+        "T3",
+        "H3"
+      ],
+      "accident_type": "火灾爆炸",
+      "severity": "重大事故",
+      "deaths": 12,
+      "injuries": 12,
+      "direct_cause": "隧道平导底板隆起开裂导致瓦斯异常涌出，遇火源发生爆炸",
+      "elapsed_sec": 25.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 76,
+      "accident_id": "8d2b8d48",
+      "title": "垫忠高速隧道发生安全事故致3死1人重伤",
+      "parsed": {
+        "codes": [],
+        "accident_type": "火灾爆炸",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 1,
+        "direct_cause": "隧道施工过程中发生爆炸"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"火灾爆炸\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":1, \"direct_cause\":\"隧道施工过程中发生爆炸\"}",
+      "codes": [],
+      "accident_type": "火灾爆炸",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 1,
+      "direct_cause": "隧道施工过程中发生爆炸",
+      "elapsed_sec": 11.1,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 77,
+      "accident_id": "c1467eb6",
+      "title": "拆旧房突爆炸 工人1死9伤",
+      "parsed": {
+        "codes": [
+          "M2",
+          "T2",
+          "H3"
+        ],
+        "accident_type": "火灾爆炸",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 9,
+        "direct_cause": "拆除工清理碎石时触发遗留爆炸物爆炸"
+      },
+      "raw_response": "{\"codes\":[\"M2\",\"T2\",\"H3\"], \"accident_type\":\"火灾爆炸\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":9, \"direct_cause\":\"拆除工清理碎石时触发遗留爆炸物爆炸\"}",
+      "codes": [
+        "M2",
+        "T2",
+        "H3"
+      ],
+      "accident_type": "火灾爆炸",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 9,
+      "direct_cause": "拆除工清理碎石时触发遗留爆炸物爆炸",
+      "elapsed_sec": 33.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 78,
+      "accident_id": "8c5a0372",
+      "title": "辽宁省辽阳在建楼盘发生爆炸5人受伤",
+      "parsed": {
+        "codes": [
+          "T2"
+        ],
+        "accident_type": "火灾爆炸",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 5,
+        "direct_cause": "商业网点门前煤气泄漏引发爆炸"
+      },
+      "raw_response": "分析过程：\n- M层：报道中未提及现场监管、隐患排查、安全培训、制度规程或市场行为违规的任何信息，无证据。\n- F层：报道离爆炸事故，未涉及临边防护、支撑体系、设备安全装置或个体防护，无相关描述。\n- T层：事故为煤气爆炸，煤气管线泄漏是可燃气体积聚，属于物料状态异常，对应T2（关键词：瓦斯积聚、煤气泄漏）。\n- H层：未说明任何违规操作、违规指挥、风险辨识失败或应急行为失当，无证据。\n- C层：伤者及时送医，无迟报瞒报，未提及救援迟缓或信息问题，无证据。\n最终编码仅T2。事故类型为火灾爆炸，严重程度根据5人受伤、1人伤势较重但无死亡，属一般事故。\n\n```json\n{\"codes\":[\"T2\"], \"accident_type\":\"火灾爆炸\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":5, \"direct_cause\":\"商业网点门前煤气泄漏引发爆炸\"}\n```",
+      "codes": [
+        "T2"
+      ],
+      "accident_type": "火灾爆炸",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 5,
+      "direct_cause": "商业网点门前煤气泄漏引发爆炸",
+      "elapsed_sec": 18.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 79,
+      "accident_id": "d3cc3e80",
+      "title": "广西梧州批发市场违法施工致3人死亡",
+      "parsed": {
+        "codes": [
+          "H1"
+        ],
+        "accident_type": "火灾爆炸",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "拆除作业中施工人员违反安全操作规程引燃现场可燃物，导致3人被困死亡"
+      },
+      "raw_response": "```json\n{\"codes\":[\"H1\"], \"accident_type\":\"火灾爆炸\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":0, \"direct_cause\":\"拆除作业中施工人员违反安全操作规程引燃现场可燃物，导致3人被困死亡\"}\n```",
+      "codes": [
+        "H1"
+      ],
+      "accident_type": "火灾爆炸",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "拆除作业中施工人员违反安全操作规程引燃现场可燃物，导致3人被困死亡",
+      "elapsed_sec": 16.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 80,
+      "accident_id": "1849dc59",
+      "title": "湖南株洲楼房建筑工地发生火灾",
+      "parsed": {
+        "codes": [
+          "T2"
+        ],
+        "accident_type": "火灾爆炸",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 0,
+        "direct_cause": "防护网可燃材料被引燃导致火灾"
+      },
+      "raw_response": "{\"codes\":[\"T2\"], \"accident_type\":\"火灾爆炸\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":0, \"direct_cause\":\"防护网可燃材料被引燃导致火灾\"}",
+      "codes": [
+        "T2"
+      ],
+      "accident_type": "火灾爆炸",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 0,
+      "direct_cause": "防护网可燃材料被引燃导致火灾",
+      "elapsed_sec": 20.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 81,
+      "accident_id": "a002fb27",
+      "title": "安徽省合肥市“07.09”中毒事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "M5",
+          "F4",
+          "T3",
+          "H1",
+          "H3",
+          "H4"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 0,
+        "direct_cause": "桩井内硫化氢积聚，未检测未防护，人员中毒后盲目施救导致伤亡扩大"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"M3\",\"M4\",\"M5\",\"F4\",\"T3\",\"H1\",\"H3\",\"H4\"], \"accident_type\":\"中毒窒息\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":0, \"direct_cause\":\"桩井内硫化氢积聚，未检测未防护，人员中毒后盲目施救导致伤亡扩大\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "F4",
+        "T3",
+        "H1",
+        "H3",
+        "H4"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 0,
+      "direct_cause": "桩井内硫化氢积聚，未检测未防护，人员中毒后盲目施救导致伤亡扩大",
+      "elapsed_sec": 22.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 82,
+      "accident_id": "977b16f9",
+      "title": "北京下井作业昏迷事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "F4",
+          "H1",
+          "H3",
+          "H4"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 3,
+        "direct_cause": "下井作业未通风检测致沼气中毒，同伴盲目下井施救扩大中毒人员"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"M3\",\"M4\",\"F4\",\"H1\",\"H3\",\"H4\"], \"accident_type\":\"中毒窒息\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":3, \"direct_cause\":\"下井作业未通风检测致沼气中毒，同伴盲目下井施救扩大中毒人员\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "F4",
+        "H1",
+        "H3",
+        "H4"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 3,
+      "direct_cause": "下井作业未通风检测致沼气中毒，同伴盲目下井施救扩大中毒人员",
+      "elapsed_sec": 23.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 83,
+      "accident_id": "3e207c43",
+      "title": "北京：下井作业昏迷三工人险遇难",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M3",
+          "M4",
+          "F4",
+          "T2",
+          "H1",
+          "H3",
+          "H4"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 3,
+        "direct_cause": "污水井内沼气浓度过高，作业人员未检测气体即下井导致中毒昏迷，同伴未采取防护措施盲目施救致使事故扩大"
+      },
+      "raw_response": "{\"codes\":[\"M2\",\"M3\",\"M4\",\"F4\",\"T2\",\"H1\",\"H3\",\"H4\"], \"accident_type\":\"中毒窒息\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":3, \"direct_cause\":\"污水井内沼气浓度过高，作业人员未检测气体即下井导致中毒昏迷，同伴未采取防护措施盲目施救致使事故扩大\"}",
+      "codes": [
+        "M2",
+        "M3",
+        "M4",
+        "F4",
+        "T2",
+        "H1",
+        "H3",
+        "H4"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 3,
+      "direct_cause": "污水井内沼气浓度过高，作业人员未检测气体即下井导致中毒昏迷，同伴未采取防护措施盲目施救致使事故扩大",
+      "elapsed_sec": 18.6,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 84,
+      "accident_id": "4d24b0ca",
+      "title": "昆明地铁施工现场发生事故致1死2伤",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M4",
+          "F4",
+          "T2",
+          "H1"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 2,
+        "direct_cause": "人工挖孔桩作业时未检测坑内气体浓度导致工人吸入有毒气体中毒窒息"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M2\", \"M4\", \"F4\", \"T2\", \"H1\"],\n  \"accident_type\": \"中毒窒息\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 2,\n  \"direct_cause\": \"人工挖孔桩作业时未检测坑内气体浓度导致工人吸入有毒气体中毒窒息\"\n}\n```",
+      "codes": [
+        "M2",
+        "M4",
+        "F4",
+        "T2",
+        "H1"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 2,
+      "direct_cause": "人工挖孔桩作业时未检测坑内气体浓度导致工人吸入有毒气体中毒窒息",
+      "elapsed_sec": 20.1,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 85,
+      "accident_id": "2ed16588",
+      "title": "上海宝山7名工人地下管道作业时中毒",
+      "parsed": {
+        "codes": [
+          "M3",
+          "F4",
+          "H3",
+          "H4"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 7,
+        "direct_cause": "柴油发电机废气在有限空间积聚导致工人吸入有毒气体中毒"
+      },
+      "raw_response": "{\"codes\":[\"M3\",\"F4\",\"H3\",\"H4\"], \"accident_type\":\"中毒窒息\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":7, \"direct_cause\":\"柴油发电机废气在有限空间积聚导致工人吸入有毒气体中毒\"}",
+      "codes": [
+        "M3",
+        "F4",
+        "H3",
+        "H4"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 7,
+      "direct_cause": "柴油发电机废气在有限空间积聚导致工人吸入有毒气体中毒",
+      "elapsed_sec": 36.1,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 86,
+      "accident_id": "7fe3470b",
+      "title": "宜万铁路巴东火车站工地发生事故 致1死1伤",
+      "parsed": {
+        "codes": [
+          "H4"
+        ],
+        "accident_type": "中毒窒息",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "竖井通风不良致人窒息，下井盲目施救导致伤亡扩大"
+      },
+      "raw_response": "```json\n{\"codes\":[\"H4\"], \"accident_type\":\"中毒窒息\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"竖井通风不良致人窒息，下井盲目施救导致伤亡扩大\"}\n```",
+      "codes": [
+        "H4"
+      ],
+      "accident_type": "中毒窒息",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "竖井通风不良致人窒息，下井盲目施救导致伤亡扩大",
+      "elapsed_sec": 30.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 87,
+      "accident_id": "e4fb7c0c",
+      "title": "山东聊城一处工地发生打桩机倾倒事故 致3人死亡",
+      "parsed": {
+        "codes": [],
+        "accident_type": "物体打击",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 5,
+        "direct_cause": "打桩机倾倒砸塌工棚简易房"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"物体打击\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":5, \"direct_cause\":\"打桩机倾倒砸塌工棚简易房\"}",
+      "codes": [],
+      "accident_type": "物体打击",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 5,
+      "direct_cause": "打桩机倾倒砸塌工棚简易房",
+      "elapsed_sec": 21.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 88,
+      "accident_id": "bb94ce13",
+      "title": "陕西：工地民工意外死亡 事发6天安监局不知情",
+      "parsed": {
+        "codes": [
+          "T1",
+          "H3",
+          "C2"
+        ],
+        "accident_type": "车辆伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "拖运故障工程车时发生意外，民工被夹在两工程车中间挤压致死"
+      },
+      "raw_response": "```json\n{\"codes\":[\"T1\",\"H3\",\"C2\"], \"accident_type\":\"车辆伤害\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"拖运故障工程车时发生意外，民工被夹在两工程车中间挤压致死\"}\n```",
+      "codes": [
+        "T1",
+        "H3",
+        "C2"
+      ],
+      "accident_type": "车辆伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "拖运故障工程车时发生意外，民工被夹在两工程车中间挤压致死",
+      "elapsed_sec": 18.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 89,
+      "accident_id": "1b79513e",
+      "title": "深圳地铁10号线在建工程发生事故 致2死2伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "F3",
+          "T1",
+          "H1"
+        ],
+        "accident_type": "车辆伤害",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 2,
+        "direct_cause": "轨道作业车间断性制动失灵，撞上轨行区作业人员"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"F3\",\"T1\",\"H1\"],\"accident_type\":\"车辆伤害\",\"severity\":\"一般事故\",\"deaths\":2,\"injuries\":2,\"direct_cause\":\"轨道作业车间断性制动失灵，撞上轨行区作业人员\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "F3",
+        "T1",
+        "H1"
+      ],
+      "accident_type": "车辆伤害",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 2,
+      "direct_cause": "轨道作业车间断性制动失灵，撞上轨行区作业人员",
+      "elapsed_sec": 36.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 90,
+      "accident_id": "cc2a3510",
+      "title": "合肥一建筑工地两名工人被卷入搅拌机遇难",
+      "parsed": {
+        "codes": [
+          "F3",
+          "H1"
+        ],
+        "accident_type": "机械伤害",
+        "severity": "一般事故",
+        "deaths": 2,
+        "injuries": 0,
+        "direct_cause": "搅拌机安全防护装置缺失或失效，工人违章进入危险区域被卷入"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"F3\", \"H1\"],\n  \"accident_type\": \"机械伤害\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 2,\n  \"injuries\": 0,\n  \"direct_cause\": \"搅拌机安全防护装置缺失或失效，工人违章进入危险区域被卷入\"\n}\n```",
+      "codes": [
+        "F3",
+        "H1"
+      ],
+      "accident_type": "机械伤害",
+      "severity": "一般事故",
+      "deaths": 2,
+      "injuries": 0,
+      "direct_cause": "搅拌机安全防护装置缺失或失效，工人违章进入危险区域被卷入",
+      "elapsed_sec": 22.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 91,
+      "accident_id": "c06f1ae2",
+      "title": "江苏惠龙港工地发生事故 一男子被挖掘机击倒身亡",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "H1",
+          "H3"
+        ],
+        "accident_type": "机械伤害",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "挖掘机驾驶员在照明不足环境下操作，意外击中指挥人员致其死亡。"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"H1\", \"H3\"],\n  \"accident_type\": \"机械伤害\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 0,\n  \"direct_cause\": \"挖掘机驾驶员在照明不足环境下操作，意外击中指挥人员致其死亡。\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "H1",
+        "H3"
+      ],
+      "accident_type": "机械伤害",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "挖掘机驾驶员在照明不足环境下操作，意外击中指挥人员致其死亡。",
+      "elapsed_sec": 27.2,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 92,
+      "accident_id": "935bbd93",
+      "title": "包满铁路在建项目发生脱轨事故 致11死3伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M3",
+          "H1"
+        ],
+        "accident_type": "车辆伤害",
+        "severity": "重大事故",
+        "deaths": 11,
+        "injuries": 3,
+        "direct_cause": "石砟车在铁路铺轨施工过程中发生脱轨翻车"
+      },
+      "raw_response": "{\n  \"codes\": [\"M1\", \"M3\", \"H1\"],\n  \"accident_type\": \"车辆伤害\",\n  \"severity\": \"重大事故\",\n  \"deaths\": 11,\n  \"injuries\": 3,\n  \"direct_cause\": \"石砟车在铁路铺轨施工过程中发生脱轨翻车\"\n}",
+      "codes": [
+        "M1",
+        "M3",
+        "H1"
+      ],
+      "accident_type": "车辆伤害",
+      "severity": "重大事故",
+      "deaths": 11,
+      "injuries": 3,
+      "direct_cause": "石砟车在铁路铺轨施工过程中发生脱轨翻车",
+      "elapsed_sec": 34.0,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 93,
+      "accident_id": "85d75fa1",
+      "title": "黑龙江绥化一建筑工地发生安全事故3死2伤",
+      "parsed": {
+        "codes": [
+          "M1"
+        ],
+        "accident_type": "坍塌",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 2,
+        "direct_cause": "网架安装过程中结构失稳坍塌造成3死2伤"
+      },
+      "raw_response": "M层：报道提及“施工单位法人代表、项目经理、安全员等5人已被公安部门控制”，安全员被控制表明其在事故前未能有效发现和制止不安全状态，符合M1“现场监管缺失”的操作定义（关键词：安全员被控制，暗示失职）。其余M2～M5无直接证据提及。\nF层：网架安装事故可能涉及防护缺失，但文本未提及任何防护栏杆、安全网等信息，无法对应具体F编码。\nT层：事故原因正在调查中，未描述触发条件如设备故障、物料异常或环境突变，无T层证据。\nH层：未提及人员具体违章行为或风险辨识失败等，无H层证据。\nC层：未提及救援迟缓或信息迟报瞒报，伤者被及时救治，未显示后果放大因素，无C层证据。\n\n{\"codes\":[\"M1\"],\"accident_type\":\"坍塌\",\"severity\":\"较大事故\",\"deaths\":3,\"injuries\":2,\"direct_cause\":\"网架安装过程中结构失稳坍塌造成3死2伤\"}",
+      "codes": [
+        "M1"
+      ],
+      "accident_type": "坍塌",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 2,
+      "direct_cause": "网架安装过程中结构失稳坍塌造成3死2伤",
+      "elapsed_sec": 34.8,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 94,
+      "accident_id": "a493aa19",
+      "title": "合肥凤麟别院开发项目工程发生一起事故 造成1人死亡",
+      "parsed": {
+        "codes": [],
+        "accident_type": "物体打击",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "施工过程中发生物体打击事故，造成1人死亡"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"物体打击\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"施工过程中发生物体打击事故，造成1人死亡\"}",
+      "codes": [],
+      "accident_type": "物体打击",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "施工过程中发生物体打击事故，造成1人死亡",
+      "elapsed_sec": 13.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 95,
+      "accident_id": "734fd83b",
+      "title": "青岛城阳一建筑工地发生安全事故 造成一人身亡",
+      "parsed": {
+        "codes": [],
+        "accident_type": "其他",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 0,
+        "direct_cause": "事故原因不详"
+      },
+      "raw_response": "{\"codes\":[], \"accident_type\":\"其他\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":0, \"direct_cause\":\"事故原因不详\"}",
+      "codes": [],
+      "accident_type": "其他",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 0,
+      "direct_cause": "事故原因不详",
+      "elapsed_sec": 7.7,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 96,
+      "accident_id": "71f915d6",
+      "title": "天津地铁三号线施工现场发生透水事故",
+      "parsed": {
+        "codes": [
+          "T3"
+        ],
+        "accident_type": "其他",
+        "severity": "一般事故",
+        "deaths": 0,
+        "injuries": 0,
+        "direct_cause": "地铁施工导致地下透水引发地面酒店楼体裂缝"
+      },
+      "raw_response": "{\"codes\":[\"T3\"], \"accident_type\":\"其他\", \"severity\":\"一般事故\", \"deaths\":0, \"injuries\":0, \"direct_cause\":\"地铁施工导致地下透水引发地面酒店楼体裂缝\"}",
+      "codes": [
+        "T3"
+      ],
+      "accident_type": "其他",
+      "severity": "一般事故",
+      "deaths": 0,
+      "injuries": 0,
+      "direct_cause": "地铁施工导致地下透水引发地面酒店楼体裂缝",
+      "elapsed_sec": 21.5,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 97,
+      "accident_id": "32b3fa32",
+      "title": "合肥一建筑工地工人触电身亡 负责人不露面",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "H1"
+        ],
+        "accident_type": "触电",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "工人拆除钢架时未保持安全距离触碰高压线导致触电"
+      },
+      "raw_response": "```json\n{\"codes\":[\"M1\",\"M2\",\"H1\"], \"accident_type\":\"触电\", \"severity\":\"一般事故\", \"deaths\":1, \"injuries\":1, \"direct_cause\":\"工人拆除钢架时未保持安全距离触碰高压线导致触电\"}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "H1"
+      ],
+      "accident_type": "触电",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "工人拆除钢架时未保持安全距离触碰高压线导致触电",
+      "elapsed_sec": 25.3,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 98,
+      "accident_id": "6dc55f3e",
+      "title": "河北临漳市政施工出事故 吊车撞高压线致1死1伤",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M4",
+          "F4",
+          "H1",
+          "H3"
+        ],
+        "accident_type": "触电",
+        "severity": "一般事故",
+        "deaths": 1,
+        "injuries": 1,
+        "direct_cause": "吊车在起吊压缩机时臂架触碰10万伏高压线，电流经钢丝绳传导导致地面拉绳工人触电"
+      },
+      "raw_response": "```json\n{\n  \"codes\": [\"M1\", \"M2\", \"M4\", \"F4\", \"H1\", \"H3\"],\n  \"accident_type\": \"触电\",\n  \"severity\": \"一般事故\",\n  \"deaths\": 1,\n  \"injuries\": 1,\n  \"direct_cause\": \"吊车在起吊压缩机时臂架触碰10万伏高压线，电流经钢丝绳传导导致地面拉绳工人触电\"\n}\n```",
+      "codes": [
+        "M1",
+        "M2",
+        "M4",
+        "F4",
+        "H1",
+        "H3"
+      ],
+      "accident_type": "触电",
+      "severity": "一般事故",
+      "deaths": 1,
+      "injuries": 1,
+      "direct_cause": "吊车在起吊压缩机时臂架触碰10万伏高压线，电流经钢丝绳传导导致地面拉绳工人触电",
+      "elapsed_sec": 29.4,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 99,
+      "accident_id": "9d7e9b24",
+      "title": "河北省石家庄市电机科技园专特电机生产厂房工程触电事故",
+      "parsed": {
+        "codes": [
+          "M1",
+          "M2",
+          "M3",
+          "F3",
+          "T1",
+          "H1",
+          "H3"
+        ],
+        "accident_type": "触电",
+        "severity": "较大事故",
+        "deaths": 3,
+        "injuries": 3,
+        "direct_cause": "移动操作平台碾压电缆造成绝缘破损，平台带电致作业人员触电"
+      },
+      "raw_response": "{\"codes\":[\"M1\",\"M2\",\"M3\",\"F3\",\"T1\",\"H1\",\"H3\"], \"accident_type\":\"触电\", \"severity\":\"较大事故\", \"deaths\":3, \"injuries\":3, \"direct_cause\":\"移动操作平台碾压电缆造成绝缘破损，平台带电致作业人员触电\"}",
+      "codes": [
+        "M1",
+        "M2",
+        "M3",
+        "F3",
+        "T1",
+        "H1",
+        "H3"
+      ],
+      "accident_type": "触电",
+      "severity": "较大事故",
+      "deaths": 3,
+      "injuries": 3,
+      "direct_cause": "移动操作平台碾压电缆造成绝缘破损，平台带电致作业人员触电",
+      "elapsed_sec": 18.9,
+      "attempts": 1,
+      "parse_error": ""
+    },
+    {
+      "index": 100,
+      "accident_id": "331efa2d",
+      "title": "四川华蓥一广场发生施工事故 致4人死亡",
+      "parsed": {
+        "codes": [
+          "M2",
+          "M4",
+          "F1",
+          "T4",
+          "H3"
+        ],
+        "accident_type": "淹溺",
+        "severity": "较大事故",
+        "deaths": 4,
+        "injuries": 0,
+        "direct_cause": "连日暴雨导致基坑积水，作业人员坠入淹溺身亡"
+      },
+      "raw_response": "根据事故文本，按照M→F→T→H→C因果链逐层分析：\n\n- **M（管理根基）**：报道提及在连日暴雨情况下进行基坑施工，但未提及任何安全排查、应急预案或排水措施。可推断存在 **M2（隐患排查失效）**——未对暴雨条件下基坑积水、坍塌等危险进行排查；**M4（制度规程漏洞）**——无针对不良天气的施工预案或基坑排水专项方案。其他无明确证据。\n- **F（防线失效）**：基坑直径2米、深数米，事故后需排水打捞，说明人员可能坠入基坑淹溺。临边防护情况虽未提及，但若防护有效本可避免坠入，故推断 **F1（临边洞口防护缺失）** 很可能成立。其他无证据。\n- **T（触发条件）**：连日暴雨是直接的自然诱因，对应 **T4（气象水文触发）**。基坑可能因雨水涌入导致积水或局部坍塌，但报道未明确描述塌方，故 **T3（地质环境突变）** 证据较弱，以T4为主。\n- **H（人的行为）**：在已知暴雨的情况下仍进行基坑作业，且未能识别积水淹溺风险，属于 **H3（风险辨识失败）**。无明确违反具体操作规程或强令冒险的表述，故不纳入H1/H2。\n- **C（后果放大）**：救援方面，虽“打捞完毕”显示出事后进行了抽排，但4人均在基坑内死亡，可能存在救援迟缓，但报道未明确描述迟报或延误，故C层无足够证据。\n\n事故类型：基坑积水导致人员淹溺，应归类为“淹溺”。死亡4人，属“较大事故”。直接原因为连日暴雨导致基坑积水，作业人员坠入淹溺身亡。\n\n```json\n{\"codes\":[\"M2\",\"M4\",\"F1\",\"T4\",\"H3\"], \"accident_type\":\"淹溺\", \"severity\":\"较大事故\", \"deaths\":4, \"injuries\":0, \"direct_cause\":\"连日暴雨导致基坑积水，作业人员坠入淹溺身亡\"}\n```",
+      "codes": [
+        "M2",
+        "M4",
+        "F1",
+        "T4",
+        "H3"
+      ],
+      "accident_type": "淹溺",
+      "severity": "较大事故",
+      "deaths": 4,
+      "injuries": 0,
+      "direct_cause": "连日暴雨导致基坑积水，作业人员坠入淹溺身亡",
+      "elapsed_sec": 30.6,
+      "attempts": 1,
+      "parse_error": ""
+    }
+  ]
+}

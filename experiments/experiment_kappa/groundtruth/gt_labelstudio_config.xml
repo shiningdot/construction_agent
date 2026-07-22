@@ -1,0 +1,74 @@
+<View>
+  <Header value="CAIEMS 事故致因标注 (CAICS 框架) — 100条"/>
+
+  <View style="position: sticky; top: 0; background: #fff; z-index: 100; padding: 12px; border-bottom: 3px solid #1f77b4; max-height: 45vh; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <Text name="text" value="$text"/>
+  </View>
+
+  <!-- ============ 一、事故分类 ============ -->
+  <Header value="一、事故基础分类"/>
+  <Choices name="accident_type" toName="text" choice="single-radio" showInline="true">
+    <Choice value="坍塌"/><Choice value="高处坠落"/><Choice value="触电"/>
+    <Choice value="机械伤害"/><Choice value="起重伤害"/><Choice value="物体打击"/>
+    <Choice value="土方坍塌"/><Choice value="车辆伤害"/><Choice value="火灾爆炸"/>
+    <Choice value="中毒窒息"/><Choice value="淹溺"/><Choice value="其他"/>
+  </Choices>
+
+  <Header value="事故等级（一般≤2死 / 较大3-9 / 重大10-29 / 特别≥30）"/>
+  <Choices name="severity" toName="text" choice="single-radio" showInline="true">
+    <Choice value="一般事故"/><Choice value="较大事故"/>
+    <Choice value="重大事故"/><Choice value="特别重大事故"/>
+  </Choices>
+
+  <Header value="伤亡人数（文本未提及填0）"/>
+  <Number name="deaths" toName="text" required="true" min="0"/>
+  <Number name="injuries" toName="text" required="true" min="0"/>
+
+  <!-- ============ CAICS 致因框架 ============ -->
+  <Header value="二、CAICS 致因框架（5层19类，每层可多选，不确定不选）"/>
+
+  <Header value="M. 管理根基（5选N）— 系统性安全管理缺陷"/>
+  <Header value="M1现场监管缺失(无人监管/监理失职) | M2隐患排查失效(未排查/未整改) | M3安全培训不足(未培训/交底走过场) | M4制度规程漏洞(无安全方案/预案缺失) | M5市场行为违规(违法分包/无资质/抢工期)"/>
+  <Choices name="M" toName="text" choice="multiple" showInline="true">
+    <Choice value="M1-现场监管缺失"/><Choice value="M2-隐患排查失效"/>
+    <Choice value="M3-安全培训不足"/><Choice value="M4-制度规程漏洞"/>
+    <Choice value="M5-市场行为违规"/>
+  </Choices>
+
+  <Header value="F. 防线失效（4选N）— 物理屏障/防护的缺失"/>
+  <Header value="F1临边洞口防护缺失(无护栏/无防护) | F2支撑体系失稳(模板/脚手架坍塌) | F3设备安全装置失效(限位器被屏蔽/防坠器失效) | F4个体防护未使用(未系安全带/未戴安全帽)"/>
+  <Choices name="F" toName="text" choice="multiple" showInline="true">
+    <Choice value="F1-临边洞口防护缺失"/><Choice value="F2-支撑体系失稳"/>
+    <Choice value="F3-设备安全装置失效"/><Choice value="F4-个体防护未使用"/>
+  </Choices>
+
+  <Header value="T. 触发条件（4选N）— 直接触发事故的物质/环境条件"/>
+  <Header value="T1设备机具故障(塔吊/升降机故障) | T2物料状态异常(堆载超限/材料缺陷/瓦斯积聚) | T3地质环境突变(涌水/边坡失稳/地基沉降) | T4气象水文触发(暴雨/大风/雷电)"/>
+  <Choices name="T" toName="text" choice="multiple" showInline="true">
+    <Choice value="T1-设备机具故障"/><Choice value="T2-物料状态异常"/>
+    <Choice value="T3-地质环境突变"/><Choice value="T4-气象水文触发"/>
+  </Choices>
+
+  <Header value="H. 人的行为（4选N）— 直接导致事故的人为行为"/>
+  <Header value="H1违反操作规程(未按方案施工/放坡不足) | H2违规指挥决策(强令冒险作业/明知风险仍施工) | H3风险辨识失败(未意识到危险/安全意识薄弱) | H4应急行为失当(盲目施救/未及时撤离扩大伤亡)"/>
+  <Choices name="H" toName="text" choice="multiple" showInline="true">
+    <Choice value="H1-违反操作规程"/><Choice value="H2-违规指挥决策"/>
+    <Choice value="H3-风险辨识失败"/><Choice value="H4-应急行为失当"/>
+  </Choices>
+
+  <Header value="C. 后果放大（2选N）— 使后果超出预期的因素"/>
+  <Header value="C1救援响应迟缓(无预案/救援不及时/二次坍塌) | C2信息迟报瞒报(未及时上报/瞒报延误救援)"/>
+  <Choices name="C" toName="text" choice="multiple" showInline="true">
+    <Choice value="C1-救援响应迟缓"/><Choice value="C2-信息迟报瞒报"/>
+  </Choices>
+
+  <!-- ============ 三、直接原因 ============ -->
+  <Header value="三、直接原因简述"/>
+  <TextArea name="direct_cause" toName="text" rows="2"
+    placeholder="一句话概括，如'沟槽未按方案放坡且临边堆土，导致边坡坍塌'"/>
+
+  <!-- ============ 四、标注者备注 ============ -->
+  <Header value="四、标注者备注"/>
+  <TextArea name="annotator_notes" toName="text" rows="2"
+    placeholder="不确定的判断、文本信息不足、需要讨论的点..."/>
+</View>

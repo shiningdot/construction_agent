@@ -50,24 +50,28 @@ class HumanFactor(BaseModel):
     """人的因素。"""
     description: str = Field(description="具体描述")
     category: str = Field(description="分类，如：违章操作、安全意识不足、疲劳作业、技能不足、未佩戴PPE等")
+    reasoning: str = Field(default="", description="判断依据：引用原文语句说明为什么选择此分类")
 
 
 class MachineFactor(BaseModel):
     """设备/物的因素。"""
     description: str = Field(description="具体描述")
     category: str = Field(description="分类，如：设备故障、防护缺陷、工具不合格、安全装置失效等")
+    reasoning: str = Field(default="", description="判断依据：引用原文语句说明为什么选择此分类")
 
 
 class ManagementFactor(BaseModel):
     """管理因素。"""
     description: str = Field(description="具体描述")
     category: str = Field(description="分类，如：监管缺失、安全制度不健全、培训不足、隐患排查不到位、应急预案缺失等")
+    reasoning: str = Field(default="", description="判断依据：引用原文语句说明为什么选择此分类")
 
 
 class EnvironmentalFactor(BaseModel):
     """环境因素。"""
     description: str = Field(description="具体描述")
     category: str = Field(description="分类，如：恶劣天气、地质条件不良、作业环境复杂、照明不足等")
+    reasoning: str = Field(default="", description="判断依据：引用原文语句说明为什么选择此分类")
 
 
 class HfacsCode(BaseModel):
@@ -142,27 +146,23 @@ class Accident(BaseModel):
     contractor: str = Field(default="", description="施工总承包单位名称")
     trapped_count: int = Field(default=0, description="被困人数（区别于死亡/受伤）")
 
-    # ── 致因分析 ──
-    human_factors: list[HumanFactor] = Field(default_factory=list, description="人的因素")
-    machine_factors: list[MachineFactor] = Field(default_factory=list, description="设备/物因素")
-    management_factors: list[ManagementFactor] = Field(default_factory=list, description="管理因素")
-    environmental_factors: list[EnvironmentalFactor] = Field(default_factory=list, description="环境因素")
+    # ── CAICS 统一致因 ──
+    causes: list[dict] = Field(default_factory=list, description="CAICS致因列表 [{code,name,description,reasoning}]")
+    caics_codes: list[str] = Field(default_factory=list, description="CAICS编码链，如['M1','F1','T2','H1']")
 
-    # ── HFACS-CS 编码（V2.5 扩展） ──
-    hfacs_codes: list[str] = Field(
-        default_factory=list,
-        description="HFACS-CS 编码列表，如 ['O1', 'S2', 'A1']",
-    )
-    hfacs_details: list[HfacsCode] = Field(
-        default_factory=list,
-        description="HFACS-CS 详细映射，每项含编码/层级/来源",
-    )
-    hfacs_encoding_version: str = Field(
-        default="",
-        description="编码版本号，如 v2.5_llm_v1 或 v2.5_keyword_v1",
-    )
+    # ── 四维度致因（V1 分类）──
+    human_factors: list[dict] = Field(default_factory=list, description="人的因素列表")
+    machine_factors: list[dict] = Field(default_factory=list, description="设备/物因素列表")
+    management_factors: list[dict] = Field(default_factory=list, description="管理因素列表")
+    environmental_factors: list[dict] = Field(default_factory=list, description="环境因素列表")
+
+    # ── HFACS-CS 编码 ──
+    hfacs_codes: list[str] = Field(default_factory=list, description="HFACS-CS 编码列表")
+    hfacs_details: list[dict] = Field(default_factory=list, description="HFACS-CS 编码明细")
+    hfacs_encoding_version: str = Field(default="", description="HFACS 编码版本号")
 
     # ── 来源 ──
+    source: str = Field(default="", description="数据来源标注：PDF识别/新闻报告/用户输入/RSS抓取/CSV导入等")
     source_urls: list[str] = Field(default_factory=list, description="信息来源链接")
     summary: str = Field(default="", description="事故摘要/经过描述")
 
@@ -275,11 +275,10 @@ class Accident(BaseModel):
             "direct_cause": self.direct_cause or "",
             "contractor": self.contractor or "",
             "trapped_count": self.trapped_count or 0,
-            "human_factors": "; ".join(f"[{f.category}] {f.description}" for f in self.human_factors),
-            "machine_factors": "; ".join(f"[{f.category}] {f.description}" for f in self.machine_factors),
-            "management_factors": "; ".join(f"[{f.category}] {f.description}" for f in self.management_factors),
-            "environmental_factors": "; ".join(f"[{f.category}] {f.description}" for f in self.environmental_factors),
+            "causes": "; ".join(f"[{c['code']}] {c['name']}" for c in self.causes),
+            "caics_codes": "; ".join(self.caics_codes),
             "summary": self.summary,
+            "source": self.source,
             "source_urls": "; ".join(self.source_urls),
             "search_queries": "; ".join(self.search_queries),
             "search_snippets": " ||| ".join(
@@ -300,9 +299,18 @@ class AccidentCreateRequest(BaseModel):
     text: str = Field(description="用户输入的事故描述文本")
 
 
+class CauseItem(BaseModel):
+    """CAICS 致因条目。"""
+    code: str = Field(description="CAICS编码，如M1/F1/T2/H1")
+    name: str = Field(description="分类名")
+    description: str = Field(default="", description="引用原文的具体描述")
+    reasoning: str = Field(default="", description="判断逻辑")
+
+
 class AccidentExtractionResult(BaseModel):
     """Claude API 提取的结构化结果。"""
     title: str = Field(description="事故标题")
+    causes: list[CauseItem] = Field(default_factory=list, description="CAICS致因编码列表")
     date: Optional[str] = Field(default=None, description="事故发生日期（YYYY-MM-DD格式）")
     accident_time: Optional[str] = Field(default=None, description="事故发生具体时刻（HH:MM格式，如14:52）")
     location: str = Field(default="", description="事故地点（仅省级：省/自治区/直辖市/特别行政区）")
@@ -327,6 +335,7 @@ class AccidentExtractionResult(BaseModel):
     management_factors: list[dict] = Field(default_factory=list, description="管理因素列表")
     environmental_factors: list[dict] = Field(default_factory=list, description="环境因素列表")
     summary: str = Field(default="", description="事故经过摘要")
+    source: str = Field(default="", description="数据来源标注：PDF识别/新闻报告/用户输入/RSS抓取/CSV导入等")
     source_urls: list[str] = Field(default_factory=list, description="信息来源链接")
     images: list[str] = Field(default_factory=list, description="本地图片路径")
 
@@ -337,8 +346,10 @@ class AccidentExtractionResult(BaseModel):
 
     def to_accident(self, raw_input: str = "") -> Accident:
         """转换为 Accident 完整模型。"""
-        # 使用健壮的日期解析器，支持多种中文格式
         parsed_date = parse_date_to_dateobj(self.date) if self.date else None
+
+        codes = [c.code for c in self.causes] if self.causes else []
+        cause_dicts = [{"code": c.code, "name": c.name, "description": c.description, "reasoning": c.reasoning} for c in self.causes]
 
         accident = Accident(
             title=self.title,
@@ -361,11 +372,10 @@ class AccidentExtractionResult(BaseModel):
             direct_cause=self.direct_cause,
             contractor=self.contractor,
             trapped_count=self.trapped_count,
-            human_factors=[HumanFactor(**f) for f in self.human_factors],
-            machine_factors=[MachineFactor(**f) for f in self.machine_factors],
-            management_factors=[ManagementFactor(**f) for f in self.management_factors],
-            environmental_factors=[EnvironmentalFactor(**f) for f in self.environmental_factors],
+            causes=cause_dicts,
+            caics_codes=codes,
             summary=self.summary,
+            source=self.source,
             source_urls=self.source_urls,
             search_snippets=self.search_snippets,
             search_queries=self.search_queries,

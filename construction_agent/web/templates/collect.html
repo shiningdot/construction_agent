@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据采集 - Construction Agent</title>
+<style>
+/* ═══════════════════════════════════════════════
+   Construction Agent — 数据采集模块
+   概念: 矿场控制室  强调色: 琥珀金 #B8860B
+   ═══════════════════════════════════════════════ */
+:root {
+  --bg: #F7F5F0; --card: #FFFFFF; --card-hover: #FFFDF7;
+  --text: #2C2A27; --text-dim: #8B857D; --text-faint: #B5B0A8;
+  --border: #E8E4DD; --divider: #F0EDE7;
+  --accent: #B8860B; --accent-light: #FFF8E7; --accent-dim: #F5E6C8;
+  --green: #5B8C5A; --red: #C5554A; --amber: #C47A10;
+  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 8px rgba(0,0,0,0.04);
+  --radius: 6px; --radius-sm: 4px;
+  --font: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+}
+.dark {
+  --bg: #1A1C20; --card: #252830; --card-hover: #2A2D35;
+  --text: #E6E0D6; --text-dim: #999590; --text-faint: #615E58;
+  --border: #333840; --divider: #2A2D35;
+  --accent: #D4A014; --accent-light: #2D2818; --accent-dim: #3D3418;
+  --green: #4A9E70; --red: #D0655A; --amber: #D4A014;
+  --shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font); background: var(--bg); color: var(--text);
+  line-height: 1.6; height: 100vh; display: flex; flex-direction: column;
+  overflow: hidden; -webkit-font-smoothing: antialiased;
+}
+
+/* ── 顶部导航 ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 50px; flex-shrink: 0;
+  background: var(--card); border-bottom: 1px solid var(--border);
+  gap: 24px;
+}
+.topbar-brand {
+  font-size: 15px; font-weight: 700; letter-spacing: -0.3px;
+  display: flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.topbar-brand span { color: var(--accent); }
+.module-switch { display: flex; gap: 2px; background: var(--bg); border-radius: 8px; padding: 3px; }
+.module-btn {
+  padding: 6px 18px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  background: transparent; color: var(--text-dim);
+  transition: all 0.15s; text-decoration: none; display: flex; align-items: center; gap: 6px;
+}
+.module-btn:hover { color: var(--text); }
+.module-btn.active {
+  background: var(--card); color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06); font-weight: 600;
+}
+.module-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.module-dot.collect { background: var(--accent); }
+.module-dot.process { background: var(--green); }
+.theme-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  width: 32px; height: 32px; border-radius: var(--radius); cursor: pointer;
+  font-size: 15px; display: flex; align-items: center; justify-content: center;
+}
+
+/* ── 子导航标签栏 ── */
+.tab-bar {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg); border-radius: 8px; padding: 3px;
+  border: 1px solid var(--border);
+}
+.tab-btn {
+  padding: 7px 18px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  background: transparent; color: var(--text-dim);
+  transition: all 0.12s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  background: var(--card); color: var(--accent); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ── 原始数据表格 ── */
+.raw-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.raw-table th {
+  text-align: left; padding: 8px 12px; background: var(--bg);
+  border-bottom: 2px solid var(--border); font-size: 10px; font-weight: 600;
+  color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;
+  position: sticky; top: 0; z-index: 1;
+}
+.raw-table td { padding: 6px 12px; border-bottom: 1px solid var(--divider); }
+.raw-table tr:hover td { background: var(--card-hover); }
+.raw-table input[type=checkbox] { accent-color: var(--accent); }
+
+/* ── 主布局 ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── 侧栏: 数据源管理 ── */
+.sidebar {
+  width: 320px; min-width: 320px; background: var(--card);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-head {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-head h2 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.sidebar-count { font-size: 10px; color: var(--text-dim); background: var(--bg);
+  padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.sidebar-toolbar { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--divider); }
+.sidebar-toolbar button { flex: 1; }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+.source-card {
+  padding: 10px 12px; border-radius: var(--radius); cursor: pointer;
+  border: 1px solid transparent; transition: all 0.12s;
+  margin-bottom: 6px; position: relative;
+}
+.source-card:hover { background: var(--card-hover); border-color: var(--border); }
+.source-card.active { border-color: var(--accent); background: var(--accent-light); }
+.source-card-header { display: flex; align-items: center; gap: 8px; }
+.source-card-name { font-size: 13px; font-weight: 600; flex: 1; }
+.source-card-badge {
+  font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.badge-gov { background: #EBF5EB; color: #3D7A3D; }
+.badge-web { background: #E8F0FE; color: #3969A6; }
+.badge-academic { background: #FEF3E4; color: #A6601A; }
+.dark .badge-gov { background: #1A2E1A; color: #5B9E5B; }
+.dark .badge-web { background: #1A2638; color: #5B8FCC; }
+.dark .badge-academic { background: #2E2010; color: #CC8020; }
+.source-card-urls { margin-top: 6px; }
+.source-card-url {
+  font-size: 11px; color: var(--accent); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 1px 0; opacity: 0.8;
+}
+.source-card-meta { margin-top: 6px; display: flex; gap: 10px; font-size: 10px; color: var(--text-dim); }
+.source-card-meta span { display: flex; align-items: center; gap: 3px; }
+.source-card-actions {
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--divider);
+  display: flex; gap: 4px; opacity: 0; transition: opacity 0.12s;
+}
+.source-card:hover .source-card-actions { opacity: 1; }
+.source-card.active .source-card-actions { opacity: 1; }
+
+/* 状态点 */
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-idle { background: var(--text-faint); }
+.status-running { background: var(--amber); animation: pulse 1.2s infinite; }
+.status-done { background: var(--green); }
+.status-error { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── 主操作区 ── */
+.content { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* 控制栏 */
+.control-bar {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.control-label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.config-input {
+  width: 62px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; text-align: center; font-family: var(--mono);
+  background: var(--bg); color: var(--text);
+}
+.config-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(184,134,11,0.12); }
+.sep { width: 1px; height: 20px; background: var(--border); }
+
+/* 按钮 */
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 16px; border-radius: var(--radius-sm); border: none;
+  font-size: 12.5px; font-weight: 600; font-family: var(--font);
+  cursor: pointer; transition: all 0.12s; white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; filter: none; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg); }
+.btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 3px; }
+.btn-xs { padding: 2px 7px; font-size: 10px; border-radius: 3px; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-red { background: none; color: var(--red); border: 1px solid var(--red); }
+.btn-red:hover { background: #FFF5F5; }
+
+/* 进度卡 */
+.progress-list { display: flex; flex-direction: column; gap: 6px; }
+.progress-item {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.progress-item.running { border-left: 3px solid var(--amber); }
+.progress-item.done { border-left: 3px solid var(--green); }
+.progress-item.failed { border-left: 3px solid var(--red); }
+.progress-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.progress-name { font-size: 13px; font-weight: 600; }
+.progress-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.pbadge-running { background: #FFF8E0; color: var(--amber); }
+.pbadge-done { background: #EBF5EB; color: var(--green); }
+.pbadge-failed { background: #FFEEED; color: var(--red); }
+.progress-bar { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; margin: 6px 0; }
+.progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+.pfill-running { background: var(--amber); }
+.pfill-done { background: var(--green); }
+.progress-stats { display: flex; gap: 14px; font-size: 11px; color: var(--text-dim); }
+.progress-stats strong { color: var(--text); }
+
+/* 日志 */
+.log-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; flex-direction: column; max-height: 200px; overflow: hidden;
+}
+.log-head {
+  padding: 8px 14px; border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; font-weight: 600;
+}
+.log-body { flex: 1; overflow-y: auto; padding: 6px 14px; font-family: var(--mono); font-size: 11px; line-height: 1.8; }
+.log-line { padding: 1px 0; border-bottom: 1px solid var(--divider); }
+.log-time { color: var(--text-faint); margin-right: 6px; }
+.log-info { color: var(--accent); }
+.log-warn { color: var(--amber); }
+.log-err { color: var(--red); }
+.log-ok { color: var(--green); }
+
+/* ── 审核卡片 ── */
+.review-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+.review-card:hover { border-color: var(--accent); }
+.review-card.confirmed { border-left: 3px solid var(--green); opacity: 0.7; }
+.review-card.rejected { border-left: 3px solid var(--red); opacity: 0.7; }
+.review-card-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.review-card-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+.review-card-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.review-card-reason {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+.review-card-reason.low { background: #fff3cd; color: #856404; }
+.review-card-reason.high { background: #d4edda; color: #155724; }
+.review-card-actions { display: flex; gap: 8px; align-items: center; }
+.review-card-actions input[type=text] {
+  flex: 1; padding: 4px 8px; font-size: 11px;
+  border: 1px solid var(--border); border-radius: 3px;
+  background: var(--bg); color: var(--text);
+}
+.review-key-hint { font-size: 9px; color: var(--text-dim); white-space: nowrap; }
+
+/* 原始数据面板 */
+.raw-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; flex-direction: column; max-height: 360px; overflow: hidden;
+}
+.raw-head {
+  padding: 8px 14px; border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12px; font-weight: 600;
+}
+.raw-body { flex: 1; overflow-y: auto; }
+.raw-row {
+  display: flex; align-items: center; gap: 8px; padding: 5px 14px;
+  font-size: 12px; border-bottom: 1px solid var(--divider);
+}
+.raw-row:hover { background: var(--card-hover); }
+.raw-row input[type=checkbox] { accent-color: var(--accent); flex-shrink: 0; }
+.raw-date { flex-shrink: 0; font-size: 10px; color: var(--text-dim); min-width: 70px; }
+.raw-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raw-source { flex-shrink: 0; font-size: 10px; color: var(--text-dim); min-width: 60px; text-align: right; }
+.raw-status { flex-shrink: 0; font-size: 10px; }
+.raw-new { color: var(--amber); }
+.raw-done { color: var(--green); }
+.raw-filtered { color: var(--text-faint); }
+
+/* 弹窗 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--card); border-radius: 10px; padding: 24px; width: 500px; max-width: 90vw;
+  max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.modal h3 { font-size: 15px; margin-bottom: 16px; font-weight: 700; }
+.modal label { display: block; font-size: 11px; font-weight: 600; color: var(--text-dim);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.modal input, .modal select, .modal textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; font-family: var(--font); background: var(--bg); color: var(--text);
+  margin-bottom: 12px;
+}
+.modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(184,134,11,0.12); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* 空状态 */
+.empty { text-align: center; padding: 32px 16px; color: var(--text-dim); }
+.empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .sidebar { width: 100%; min-width: 0; max-height: 220px; }
+  .content { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ 顶部导航 ═══════════════ -->
+<header class="topbar">
+  <div class="topbar-brand">🏗️ Construction <span>Agent</span></div>
+  <div class="module-switch">
+    <a class="module-btn active">
+      <span class="module-dot collect"></span> 数据采集
+    </a>
+    <a href="/" class="module-btn">
+      <span class="module-dot process"></span> 事故处理
+    </a>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()" title="切换主题">🌓</button>
+</header>
+
+<!-- ═══════════════ 主布局: 侧栏 + 操作区 ═══════════════ -->
+<div class="main">
+
+  <!-- ── 左侧: 数据源管理 ── -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <h2>📡 采集数据源</h2>
+      <span class="sidebar-count" id="sourceCount">-</span>
+    </div>
+    <div class="sidebar-toolbar">
+      <button class="btn btn-primary btn-sm" onclick="openEditor()" style="flex:1;">+ 添加源</button>
+      <button class="btn btn-outline btn-sm" onclick="selectAllSources()">☑</button>
+    </div>
+    <div class="sidebar-list" id="sourceList"><div class="empty"><div class="empty-icon">📡</div>加载中…</div></div>
+  </aside>
+
+  <!-- ── 右侧: 操作区域 ── -->
+  <main class="content" id="mainContent">
+
+    <!-- 子导航标签 -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('crawl')" id="tab-crawl">📡 采集控制</button>
+      <button class="tab-btn" onclick="switchTab('raw')" id="tab-raw">📦 原始数据缓存</button>
+      <span style="margin-left:auto;font-size:15px;cursor:pointer;opacity:0.5;"
+            onclick="document.getElementById('sourceList').scrollIntoView({behavior:'smooth'})" title="滚动到数据源列表">☰</span>
+    </div>
+
+    <!-- 采集控制面板 -->
+    <div id="panel-crawl">
+
+    <!-- 控制栏 -->
+    <div class="control-bar">
+      <span class="control-label">爬取配置</span>
+      <span style="font-size:12px;">页范围</span>
+      <input class="config-input" id="cfgStart" value="1" type="number" min="1">
+      <span style="font-size:12px;color:var(--text-dim);">至</span>
+      <input class="config-input" id="cfgEnd" value="0" type="number" min="0" title="0=末页">
+      <span style="font-size:12px;color:var(--text-dim);">| 最多</span>
+      <input class="config-input" id="cfgMax" value="0" type="number" min="0" step="10" title="0=不限">
+      <span style="font-size:12px;color:var(--text-dim);">条</span>
+      <span class="sep"></span>
+      <span style="font-size:12px;color:var(--text-dim);">延迟</span>
+      <input class="config-input" id="cfgDelay" value="2" type="number" min="1" max="30" style="width:48px;">s
+      <span class="sep"></span>
+      <button class="btn btn-primary" id="btnStart" onclick="startCrawl()">▶ 开始采集</button>
+      <button class="btn btn-outline btn-sm" id="btnStop" onclick="stopCrawl()" disabled>■</button>
+      <span style="font-size:11px;color:var(--text-dim);margin-left:auto;" id="ctrlMsg">就绪 · 选中 <b id="selCount">0</b> 个源</span>
+    </div>
+
+    <!-- 所选源的 URL 信息 -->
+    <div id="selectedInfo" style="display:none; background:var(--accent-light); border:1px solid var(--accent-dim); border-radius:var(--radius); padding:10px 14px; font-size:12px;">
+      <span id="selectedInfoText"></span>
+    </div>
+
+    <!-- 进度区 -->
+    <div class="progress-list" id="progressList">
+      <div class="empty"><div class="empty-icon">🚀</div>在左侧勾选数据源，点击「开始采集」启动爬虫</div>
+    </div>
+
+    <!-- 数据面板（含标签切换）-->
+    <div class="tab-bar" style="margin-bottom:0;">
+      <button class="tab-btn active" onclick="switchDataTab('inline-raw')" id="datatab-inline-raw">📦 原始数据</button>
+      <button class="tab-btn" onclick="switchDataTab('review')" id="datatab-review">🔍 边缘审核 <span id="reviewBadge" style="background:var(--red);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;display:none;">0</span></button>
+    </div>
+
+    <!-- 原始数据面板（内嵌）-->
+    <div class="raw-panel" id="panel-inline-raw">
+      <div class="raw-head">
+        <span>📦 原始数据缓存</span>
+        <select id="rawSourceFilter" onchange="loadRawData(1)" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg);color:var(--text);">
+          <option value="">全部来源</option>
+        </select>
+        <span style="font-size:10px;color:var(--text-dim);" id="rawStats">-</span>
+        <button class="btn btn-outline btn-sm" onclick="loadRawData(1)">🔄</button>
+        <button class="btn btn-outline btn-sm" onclick="selectRawPage()">☑ 本页</button>
+        <button class="btn btn-outline btn-sm" onclick="selectRawAll()">☑ 全部</button>
+        <button class="btn btn-green btn-sm" id="btnImport" onclick="importRaw()" disabled>📥 提交处理</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRaw('json')">📄</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRaw('csv')">📊</button>
+        <span style="font-size:10px;color:var(--text-dim);">|</span>
+        <span id="rawPageInfo" style="font-size:10px;">1/1</span>
+        <button class="btn btn-outline btn-sm" onclick="loadRawData(PAGE-1)" style="padding:2px 6px;">◀</button>
+        <button class="btn btn-outline btn-sm" onclick="loadRawData(PAGE+1)" style="padding:2px 6px;">▶</button>
+      </div>
+      <div class="raw-body" id="rawBody"><div class="empty">暂无数据</div></div>
+    </div>
+
+    <!-- 边缘审核面板 -->
+    <div class="raw-panel" id="panel-review" style="display:none;">
+      <div class="raw-head">
+        <span>🔍 边缘案例审核</span>
+        <span style="font-size:11px;color:var(--text-dim);" id="reviewStats">-</span>
+        <button class="btn btn-outline btn-sm" onclick="loadReviewData()">🔄</button>
+        <button class="btn btn-green btn-sm" onclick="reviewBatch('confirmed_construction')">✅ 全部确认</button>
+        <button class="btn btn-outline btn-sm" onclick="reviewBatch('confirmed_non_construction')" style="color:var(--red);">❌ 全部拒绝</button>
+        <span style="font-size:9px;color:var(--text-dim);">快捷键: ← 拒绝 / → 确认</span>
+      </div>
+      <div class="raw-body" id="reviewBody"><div class="empty">暂无待审核案例</div></div>
+    </div>
+
+    <!-- 日志 -->
+    <div class="log-panel">
+      <div class="log-head">
+        <span>📋 采集日志</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="clearLogs()">清空</button>
+          <button class="btn btn-outline btn-sm" onclick="exportLogs()">导出</button>
+        </div>
+      </div>
+      <div class="log-body" id="logBody"><div class="log-line"><span class="log-time">--:--</span>就绪</div></div>
+    </div>
+
+    </div><!-- /panel-crawl -->
+
+    <!-- 原始数据缓存全屏面板 -->
+    <div id="panel-raw" style="display:none;flex:1;flex-direction:column;gap:12px;">
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+        background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;">
+        <span style="font-weight:600;font-size:13px;">📦 原始数据缓存</span>
+        <select id="rawSourceFilter2" onchange="loadRawDataFull(1)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);">
+          <option value="">全部来源</option>
+        </select>
+        <input id="rawKeyword" placeholder="搜索关键词..." style="flex:1;min-width:120px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);" onkeydown="if(event.key==='Enter')loadRawDataFull(1)">
+        <span style="font-size:11px;color:var(--text-dim);" id="rawStats2">-</span>
+        <span style="font-size:10px;color:var(--text-dim);">|</span>
+        <button class="btn btn-outline btn-sm" onclick="selectRawPage2()">☑ 本页</button>
+        <button class="btn btn-outline btn-sm" onclick="selectRawAll2()">☑ 全部</button>
+        <button class="btn btn-green btn-sm" id="btnImport2" onclick="importRaw2()" disabled>📥 提交处理</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRaw2('json')">📄 JSON</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRaw2('csv')">📊 CSV</button>
+        <span style="font-size:10px;color:var(--text-dim);margin-left:auto;">|</span>
+        <span id="rawPageInfo2" style="font-size:11px;">1/1</span>
+        <button class="btn btn-outline btn-sm" onclick="loadRawDataFull(PAGE2-1)" style="padding:2px 6px;">◀</button>
+        <button class="btn btn-outline btn-sm" onclick="loadRawDataFull(PAGE2+1)" style="padding:2px 6px;">▶</button>
+        <select id="rawPerPage2" onchange="loadRawDataFull(1)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg);color:var(--text);">
+          <option value="50">50条/页</option><option value="100" selected>100条/页</option><option value="200">200条/页</option><option value="500">500条/页</option>
+        </select>
+      </div>
+
+      <div style="display:flex;gap:12px;flex:1;min-height:0;">
+        <div class="raw-table-wrap" id="rawTableWrap" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;flex:1;">
+          <div class="empty" style="padding:60px;">加载中…</div>
+        </div>
+        <!-- 详情预览面板 -->
+        <div id="detailPanel" style="display:none;width:420px;min-width:320px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-y:auto;padding:16px;flex-shrink:0;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <h3 style="font-size:15px;font-weight:700;line-height:1.4;flex:1;margin-right:8px;" id="detailTitle">-</h3>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('detailPanel').style.display='none'" style="flex-shrink:0;">✕</button>
+          </div>
+          <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;color:var(--text-dim);">
+            <span id="detailDate">-</span>
+            <span id="detailSource">-</span>
+            <span id="detailStatus">-</span>
+            <a id="detailUrl" href="#" target="_blank" style="color:var(--accent);">🔗 原文</a>
+          </div>
+          <!-- PDF 链接区 -->
+          <div id="detailPdfs" style="display:none;margin-bottom:10px;padding:8px 12px;background:var(--accent-light);border-radius:4px;font-size:12px;">
+            <strong>📎 附件PDF:</strong> <span id="detailPdfLinks"></span>
+          </div>
+          <!-- 图片预览区 -->
+          <div id="detailImages" style="display:none;margin-bottom:10px;"></div>
+          <!-- 正文 -->
+          <div style="border-top:1px solid var(--divider);padding-top:12px;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">事故正文</div>
+            <div id="detailContent" style="font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:60vh;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panel-raw -->
+
+  </main>
+</div>
+
+<!-- ═══════════════ 弹窗: 添加/编辑数据源 ═══════════════ -->
+<div class="modal-overlay" id="sourceModal">
+  <div class="modal">
+    <h3 id="modalTitle">📡 添加采集数据源</h3>
+    <input type="hidden" id="editIdx" value="-1">
+    <label>唯一标识（英文）</label>
+    <input id="srcName" placeholder="如: safehoo" autocomplete="off">
+    <label>显示名称</label>
+    <input id="srcLabel" placeholder="如: 安全管理网">
+    <label>爬取 URL（每行一个）</label>
+    <textarea id="srcUrls" rows="4" placeholder="https://www.safehoo.com/NewsSpecial/Build/"></textarea>
+    <label>类型</label>
+    <select id="srcType">
+      <option value="web">行业网站</option>
+      <option value="gov">政府平台</option>
+      <option value="academic">学术数据集</option>
+      <option value="news">新闻媒体</option>
+    </select>
+    <label>描述</label>
+    <textarea id="srcDesc" rows="2" placeholder="描述数据源内容和特点"></textarea>
+    <label>请求延迟（秒）</label>
+    <input id="srcDelay" type="number" value="2" min="1" max="30">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('sourceModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSource()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   状态 & 内置数据源
+   ═══════════════════════════════════════════════ */
+const S = {
+  sources: [],
+  selected: new Set(),
+  running: false,
+  pollTimer: null,
+  rawPage: 1, rawPerPage: 100, rawAllMode: false,
+  logs: []
+};
+
+const BUILTIN = [
+  { name:'safehoo', label:'安全管理网',
+    urls:['https://www.safehoo.com/NewsSpecial/Build/Index.shtml',
+          'https://www.safehoo.com/Case/Build/'],
+    type:'web', desc:'建筑安全新闻+事故案例库, 2003年至今, 约1400条', delay:2 },
+  { name:'mem', label:'应急管理部',
+    urls:['https://www.mem.gov.cn/gk/sgcc/tbzdsgdcbg/'],
+    type:'gov', desc:'特别重大事故调查报告, 2003-2026', delay:3 },
+  { name:'beijing_em', label:'北京应急管理局',
+    urls:['http://yjglj.beijing.gov.cn/col/col4520/index.html'],
+    type:'gov', desc:'事故调查结果公示, 84篇, 建筑事故约5篇, PDF附件', delay:2 },
+  { name:'gd_em', label:'广东省应急管理厅',
+    urls:['https://yjgl.gd.gov.cn/gk/zdlyxxgk/sgdcbg/index.html'],
+    type:'gov', desc:'灾害事故调查评估报告, 53篇, 建筑施工约10篇, HTML+PDF+图片', delay:2 },
+  { name:'ln_em', label:'辽宁省应急管理厅',
+    urls:['https://yjgl.ln.gov.cn/yjgl/xxgk/zwgkzdgz/aqsczdlyxxgk/sgdccl/index.shtml'],
+    type:'gov', desc:'事故调查处理, 20篇, TRS CMS, PDF+HTML格式', delay:2 },
+  { name:'henan_em', label:'河南省应急管理厅',
+    urls:['https://yjglt.henan.gov.cn/zwgk/xxgkml/sgxx/'],
+    type:'gov', desc:'事故信息, 80篇, 5页分页, PDF附件格式', delay:2 },
+  { name:'nmg_em', label:'内蒙古应急管理厅',
+    urls:['https://yjglt.nmg.gov.cn/zwgk/zdxx/sgxxccpg/'],
+    type:'gov', desc:'事故信息和查处评估, 7篇, TRS CMS', delay:2 },
+  { name:'hebei_em', label:'河北省应急管理厅',
+    urls:['https://yjgl.hebei.gov.cn/portal/infopublic/toInfoPublicNews?type=sgdc'],
+    type:'gov', desc:'事故调查报告, 110篇(API驱动), PDF附件', delay:2 },
+  { name:'tj_em', label:'天津市应急管理局',
+    urls:['https://yjgl.tj.gov.cn/ZWGK6939/SGDCBG354/'],
+    type:'gov', desc:'事故调查报告, 10篇, PDF附件', delay:2 },
+  { name:'sx_em', label:'山西省应急管理厅',
+    urls:['https://yjt.shanxi.gov.cn/zwgk_0/zfxxgk_78327/fdzdgknr_78331/gszl/sgdc_78341/'],
+    type:'gov', desc:'事故调查报告, 15篇, TRS CMS, PDF附件', delay:2 },
+  { name:'sh_em', label:'上海市应急管理局',
+    urls:['https://yjglj.sh.gov.cn/xxgk/zfxxgk/zcwj/sgdcbg/'],
+    type:'gov', desc:'事故调查报告, ~105篇(7页), PDF附件', delay:2 },
+  { name:'js_em', label:'江苏省应急管理厅',
+    urls:['https://yjglt.jiangsu.gov.cn/col/col81395/index.html'],
+    type:'gov', desc:'事故调查处理, TRS CMS, HTML+PDF', delay:2 },
+  { name:'esafety', label:'易安网',
+    urls:['https://www.esafety.cn/law/accident-reports/search?industry=建筑施工'],
+    type:'web', desc:'建筑施工事故报告专栏, 421条, 图片格式(需OCR)', delay:1 },
+  { name:'mohurd', label:'住建部通报',
+    urls:['https://www.mohurd.gov.cn/gongkai/zc/wjk/',
+          'https://zlaq.mohurd.gov.cn'],
+    type:'gov', desc:'房屋市政工程事故年度通报, 2014年起', delay:5 },
+  { name:'open_gov', label:'政府开放平台',
+    urls:['https://data.shenyang.gov.cn',
+          'https://data.xianning.gov.cn',
+          'https://hzdata.sd.gov.cn'],
+    type:'gov', desc:'各省市开放数据平台, CSV/JSON格式', delay:5 },
+  { name:'news_aggregator', label:'新闻搜索引擎',
+    urls:['百度搜索: 建筑施工 安全事故 等17组关键词'],
+    type:'news', desc:'百度搜索聚合建筑事故新闻', delay:3 },
+  { name:'academic_import', label:'学术数据集',
+    urls:['https://data.mendeley.com/datasets/8m8fdd7vgv',
+          'https://github.com/IsmailMaCode/Chinese-construction-accident-database-159'],
+    type:'academic', desc:'Mendeley 571条 + GitHub 159条', delay:2 },
+];
+
+/* ═══════════════════════════════════════════════
+   初始化
+   ═══════════════════════════════════════════════ */
+async function init() {
+  await loadSources();
+  await loadRawData(1);
+}
+async function loadSources() {
+  // 尝试从 sessionStorage 恢复状态
+  let saved = null;
+  try { const raw = sessionStorage.getItem('collector_sources'); if (raw) saved = JSON.parse(raw); } catch(e) {}
+
+  try {
+    const r = await fetch('/api/collector/sources'); const d = await r.json();
+    const serverSources = d.sources && d.sources.length ? d.sources : BUILTIN.map(s => ({...s, status:'idle', lastCrawl:null, count:0}));
+    // 合并：保留本地运行状态（status/running/count），服务器数据覆盖配置
+    S.sources = serverSources.map(ss => {
+      const local = saved ? saved.find(x => x.name === ss.name) : null;
+      if (local) {
+        return { ...ss, status: local.status || 'idle', lastCrawl: local.lastCrawl, count: local.count || ss.count || 0 };
+      }
+      return ss;
+    });
+  } catch(e) {
+    S.sources = saved || BUILTIN.map(s => ({...s, status:'idle', lastCrawl:null, count:0}));
+  }
+  // 恢复选中状态
+  try { const sel = sessionStorage.getItem('collector_selected'); if (sel) S.selected = new Set(JSON.parse(sel)); } catch(e) {}
+  renderSources();
+  updateSelectedInfo();
+  document.getElementById('selCount').textContent = S.selected.size;
+}
+
+/* ═══════════════════════════════════════════════
+   渲染: 数据源列表
+   ═══════════════════════════════════════════════ */
+function renderSources() {
+  const c = document.getElementById('sourceList');
+  document.getElementById('sourceCount').textContent = S.sources.length + ' 个源';
+  if (!S.sources.length) { c.innerHTML = '<div class="empty"><div class="empty-icon">📡</div>暂无数据源</div>'; return; }
+  c.innerHTML = S.sources.map((s,i) => {
+    const active = S.selected.has(s.name);
+    const urls = s.urls || (s.url ? [s.url] : []);
+    const typed = {gov:'政府',web:'网站',academic:'学术',news:'新闻'}[s.type]||'网站';
+    const st = s.status||'idle';
+    const last = s.lastCrawl ? new Date(s.lastCrawl).toLocaleDateString('zh-CN') : '-';
+    return `<div class="source-card ${active?'active':''}" onclick="toggleSource('${s.name}')">
+      <div class="source-card-header">
+        <span class="status-dot status-${st}"></span>
+        <span class="source-card-name">${s.label||s.name}</span>
+        <span class="source-card-badge badge-${s.type}">${typed}</span>
+      </div>
+      <div class="source-card-urls">${urls.slice(0,3).map(u=>`<div class="source-card-url">🔗 ${u}</div>`).join('')}</div>
+      <div class="source-card-meta"><span>🕐 ${last}</span><span>📊 ${s.count||0}条</span><span>⏱ ${s.delay||2}s</span></div>
+      <div class="source-card-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-xs" onclick="openEditor(${i})">✏️</button>
+        <button class="btn btn-outline btn-xs" onclick="delSource('${s.name}')" style="color:var(--red);">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('selCount').textContent = S.selected.size;
+  // 更新原始数据源筛选下拉
+  const sel = document.getElementById('rawSourceFilter');
+  const opts = '<option value="">全部来源</option>' + S.sources.map(s => `<option value="${s.name}">${s.label||s.name}</option>`).join('');
+  sel.innerHTML = opts;
+  const sel2 = document.getElementById('rawSourceFilter2');
+  if (sel2) sel2.innerHTML = opts;
+}
+
+function toggleSource(name) {
+  S.selected.has(name) ? S.selected.delete(name) : S.selected.add(name);
+  document.getElementById('selCount').textContent = S.selected.size;
+  saveState();
+  renderSources();
+  updateSelectedInfo();
+}
+function selectAllSources() {
+  if (S.selected.size === S.sources.length) S.selected.clear();
+  else S.sources.forEach(s => S.selected.add(s.name));
+  document.getElementById('selCount').textContent = S.selected.size;
+  saveState();
+  renderSources();
+  updateSelectedInfo();
+}
+function updateSelectedInfo() {
+  const el = document.getElementById('selectedInfo');
+  const names = Array.from(S.selected);
+  if (!names.length) { el.style.display='none'; return; }
+  el.style.display='block';
+  const sources = names.map(n => S.sources.find(s => s.name===n)).filter(Boolean);
+  const lines = sources.map(s => {
+    const urls = (s.urls||[]).slice(0,3).join(' · ');
+    return `<b>${s.label}</b> → ${urls}`;
+  });
+  document.getElementById('selectedInfoText').innerHTML = lines.join('<br>');
+}
+
+/* ═══════════════════════════════════════════════
+   数据源 CRUD
+   ═══════════════════════════════════════════════ */
+function openEditor(idx) {
+  const modal = document.getElementById('sourceModal');
+  if (idx !== undefined && idx >= 0) {
+    const s = S.sources[idx];
+    document.getElementById('modalTitle').textContent = '✏️ 编辑数据源';
+    document.getElementById('editIdx').value = idx;
+    document.getElementById('srcName').value = s.name; document.getElementById('srcName').disabled = true;
+    document.getElementById('srcLabel').value = s.label||'';
+    document.getElementById('srcUrls').value = (s.urls||[]).join('\n');
+    document.getElementById('srcType').value = s.type||'web';
+    document.getElementById('srcDesc').value = s.desc||'';
+    document.getElementById('srcDelay').value = s.delay||2;
+  } else {
+    document.getElementById('modalTitle').textContent = '📡 添加采集数据源';
+    document.getElementById('editIdx').value = '-1';
+    document.getElementById('srcName').value = ''; document.getElementById('srcName').disabled = false;
+    document.getElementById('srcLabel').value = '';
+    document.getElementById('srcUrls').value = '';
+    document.getElementById('srcDesc').value = '';
+    document.getElementById('srcDelay').value = '2';
+    document.getElementById('srcType').value = 'web';
+  }
+  modal.classList.add('show');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function saveSource() {
+  const idx = parseInt(document.getElementById('editIdx').value);
+  const name = document.getElementById('srcName').value.trim();
+  const label = document.getElementById('srcLabel').value.trim();
+  const urls = document.getElementById('srcUrls').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if (!name || !label || !urls.length) { alert('请填写名称、标签和至少一个URL'); return; }
+  const obj = { name, label, urls, type: document.getElementById('srcType').value,
+    desc: document.getElementById('srcDesc').value.trim(),
+    delay: parseInt(document.getElementById('srcDelay').value)||2,
+    status:'idle', lastCrawl:null, count:0 };
+
+  if (idx >= 0) { S.sources[idx] = {...S.sources[idx], ...obj}; }
+  else {
+    if (S.sources.find(s=>s.name===name)) { alert('数据源 "'+name+'" 已存在'); return; }
+    S.sources.push(obj);
+  }
+  await syncSources();
+  closeModal('sourceModal');
+  renderSources();
+  addLog('info', idx>=0 ? `已更新: ${label}` : `已添加: ${label}`);
+}
+
+async function delSource(name) {
+  if (!confirm(`删除数据源 "${name}"？\n仅删除配置，不影响已采集的数据。`)) return;
+  S.sources = S.sources.filter(s => s.name !== name);
+  S.selected.delete(name);
+  await syncSources();
+  renderSources();
+  addLog('info', `已删除: ${name}`);
+}
+
+function saveState() {
+  try {
+    sessionStorage.setItem('collector_sources', JSON.stringify(S.sources));
+    sessionStorage.setItem('collector_selected', JSON.stringify(Array.from(S.selected)));
+  } catch(e) {}
+}
+async function syncSources() {
+  saveState();
+  try { await fetch('/api/collector/sources/sync', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sources:S.sources})}); } catch(e){}
+}
+
+/* ═══════════════════════════════════════════════
+   采集控制
+   ═══════════════════════════════════════════════ */
+async function startCrawl() {
+  if (S.running) return;
+  if (!S.selected.size) { alert('请先在左侧勾选数据源'); return; }
+  S.running = true;
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('ctrlMsg').innerHTML = '采集中…';
+
+  const sources = Array.from(S.selected);
+  const opts = {
+    start_page: parseInt(document.getElementById('cfgStart').value)||1,
+    end_page: parseInt(document.getElementById('cfgEnd').value)||0,
+    max_items: parseInt(document.getElementById('cfgMax').value)||0,
+    delay: parseInt(document.getElementById('cfgDelay').value)||2,
+  };
+  // 保存配置到 sessionStorage
+  try { sessionStorage.setItem('crawl_opts', JSON.stringify(opts)); } catch(e) {}
+
+  // 初始化进度卡
+  const list = document.getElementById('progressList');
+  list.innerHTML = sources.map(name => {
+    const s = S.sources.find(x=>x.name===name)||{};
+    return `<div class="progress-item running" id="prog-${name}">
+      <div class="progress-head"><span class="progress-name">${s.label||name}</span><span class="progress-badge pbadge-running">采集中</span></div>
+      <div class="progress-bar"><div class="progress-fill pfill-running" id="bar-${name}" style="width:5%"></div></div>
+      <div class="progress-stats">
+        <span>📄 采集: <strong id="cnt-c-${name}">0</strong></span>
+        <span>✅ 成功: <strong id="cnt-s-${name}">0</strong></span>
+        <span>⚠ 过滤: <strong id="cnt-f-${name}">0</strong></span>
+      </div></div>`;
+  }).join('');
+
+  try {
+    const r = await fetch('/api/collector/start', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sources, retry_count:0, retry_delay:0, crawl_options:opts})});
+    const d = await r.json();
+    if (d.task_id) { addLog('info', `任务启动: ${d.task_id}`); pollStatus(d.task_id); }
+  } catch(e) { addLog('err', `启动失败: ${e.message}`); resetUI(); }
+}
+
+function stopCrawl() {
+  S.running = false;
+  if (S.pollTimer) { clearInterval(S.pollTimer); S.pollTimer = null; }
+  document.getElementById('ctrlMsg').innerHTML = '已停止';
+  resetUI();
+}
+
+function pollStatus(taskId) {
+  if (S.pollTimer) clearInterval(S.pollTimer);
+  S.pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch(`/api/collector/status?task_id=${taskId}`); const d = await r.json();
+      for (const [name, info] of Object.entries(d.sources||{})) {
+        const bar = document.getElementById(`bar-${name}`);
+        if (bar) bar.style.width = Math.min(100, (info.progress||0)) + '%';
+        ['c','s','f'].forEach(k => { const el = document.getElementById(`cnt-${k}-${name}`); if (el) el.textContent = info[k==='c'?'collected':k==='s'?'success':'failed']||0; });
+        if (info.status === 'done' || info.status === 'failed') {
+          const card = document.getElementById(`prog-${name}`);
+          if (card) { card.className = `progress-item ${info.status==='done'?'done':'failed'}`;
+            const badge = card.querySelector('.progress-badge'); if(badge){badge.className=`progress-badge pbadge-${info.status==='done'?'done':'failed'}`;badge.textContent=info.status==='done'?'完成':'失败';}
+            const fill = card.querySelector('.progress-fill'); if(fill){fill.className=`progress-fill pfill-${info.status==='done'?'done':'failed'}`;}
+          }
+        }
+      }
+      d.logs && d.logs.forEach(l => addLog(l.level||'info', l.message));
+      if (d.finished) { clearInterval(S.pollTimer); S.pollTimer=null; S.running=false;
+        document.getElementById('ctrlMsg').innerHTML = `完成 · 新增 <b>${d.total_added||0}</b> 条`; resetUI(); loadRawData(1); }
+    } catch(e) {}
+  }, 1500);
+}
+
+function resetUI() {
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  S.sources.forEach(s => { if (s.status==='running') s.status='idle'; });
+  saveState();
+  renderSources();
+}
+
+/* ═══════════════════════════════════════════════
+   原始数据管理
+   ═══════════════════════════════════════════════ */
+async function loadRawData(page) {
+  if (page) S.rawPage = Math.max(1, page);
+  const filter = document.getElementById('rawSourceFilter').value;
+  let url = `/api/collector/raw-data?page=${S.rawPage}&per_page=${S.rawPerPage}`;
+  if (filter) url += `&source=${filter}`;
+  try {
+    const r = await fetch(url); const d = await r.json();
+    document.getElementById('rawStats').textContent = `共${d.total||0}条 · 新${d.stats?.new||0}`;
+    document.getElementById('rawPageInfo').textContent = `${S.rawPage}/${d.total_pages||1}`;
+    const body = document.getElementById('rawBody');
+    if (!d.items?.length) { body.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    body.innerHTML = d.items.map(item => {
+      const isNew = item.status==='new';
+      const checked = S.rawAllMode ? 'checked' : '';
+      return `<div class="raw-row">
+        <input type="checkbox" ${checked} onchange="toggleRawItem('${item.id}')">
+        <span class="raw-date">${item.publish_date||'-'}</span>
+        <span class="raw-title" title="${item.title||''}">${(item.title||'').substring(0,60)}</span>
+        <span class="raw-source">${item.source_name||''}</span>
+        <span class="raw-status ${isNew?'raw-new':'raw-done'}">${isNew?'●新':'✓'}</span>
+      </div>`;
+    }).join('');
+    updateImportBtn();
+  } catch(e) { console.error(e); }
+}
+
+let rawSelected = new Set();
+function toggleRawItem(id) {
+  S.rawAllMode = false;
+  rawSelected.has(id) ? rawSelected.delete(id) : rawSelected.add(id);
+  updateImportBtn();
+}
+function selectRawPage() {
+  S.rawAllMode = false;
+  fetch(`/api/collector/raw-data?page=${S.rawPage}&per_page=${S.rawPerPage}`).then(r=>r.json()).then(d => {
+    (d.items||[]).filter(i=>i.status==='new').forEach(i=>rawSelected.add(i.id));
+    loadRawData(S.rawPage);
+  });
+}
+function selectRawAll() {
+  S.rawAllMode = !S.rawAllMode;
+  rawSelected.clear();
+  document.getElementById('btnImport').textContent = S.rawAllMode ? '📥 全部提交' : '📥 提交处理';
+  document.getElementById('btnImport').disabled = false;
+  loadRawData(S.rawPage);
+}
+function updateImportBtn() {
+  const btn = document.getElementById('btnImport');
+  btn.disabled = !S.rawAllMode && rawSelected.size === 0;
+  btn.textContent = rawSelected.size > 0 ? `📥 提交 (${rawSelected.size})` : '📥 提交处理';
+}
+
+async function importRaw() {
+  if (S.rawAllMode) {
+    const r = await fetch('/api/collector/raw-data'); const d = await r.json();
+    const n = (d.stats?.new||0);
+    if (!confirm(`提交全部 ${n} 条待处理数据给 LLM 提取？`)) return;
+    const resp = await fetch('/api/collector/raw-data/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({import_all:true})});
+    const j = await resp.json();
+    addLog('ok', `提交完成: ${j.imported||0} 条`);
+  } else if (rawSelected.size > 0) {
+    if (!confirm(`提交选中的 ${rawSelected.size} 条给 LLM 提取？`)) return;
+    const resp = await fetch('/api/collector/raw-data/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids:Array.from(rawSelected)})});
+    const j = await resp.json();
+    addLog('ok', `提交完成: ${j.imported||0} 条`);
+  }
+  rawSelected.clear(); S.rawAllMode = false;
+  await loadRawData(S.rawPage);
+}
+
+function exportRaw(fmt) {
+  const ids = rawSelected.size > 0 ? Array.from(rawSelected).join(',') : '';
+  window.open(`/api/collector/raw-data/export?format=${fmt}&ids=${ids}`, '_blank');
+}
+
+/* ═══════════════════════════════════════════════
+   日志
+   ═══════════════════════════════════════════════ */
+function addLog(level, msg) {
+  const now = new Date(), time = now.toTimeString().slice(0,5);
+  S.logs.push({time, level, msg});
+  if (S.logs.length > 200) S.logs.shift();
+  const body = document.getElementById('logBody');
+  const cls = {info:'log-info',warn:'log-warn',err:'log-err',ok:'log-ok',success:'log-ok',error:'log-err'}[level]||'';
+  body.innerHTML += `<div class="log-line ${cls}"><span class="log-time">${time}</span>${msg}</div>`;
+  body.scrollTop = body.scrollHeight;
+}
+function clearLogs() { S.logs=[]; document.getElementById('logBody').innerHTML=''; }
+function exportLogs() {
+  const t = S.logs.map(l=>`[${l.time}] ${l.msg}`).join('\n');
+  const b = new Blob([t],{type:'text/plain'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=`crawl_log_${new Date().toISOString().slice(0,10)}.txt`; a.click();
+}
+
+/* ═══════════════════════════════════════════════
+   主题
+   ═══════════════════════════════════════════════ */
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark')?'dark':'light');
+}
+(function(){
+  if (localStorage.getItem('theme')==='dark' || (!localStorage.getItem('theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches))
+    document.documentElement.classList.add('dark');
+})();
+
+init();
+// 恢复爬取配置
+try {
+  const savedOpts = JSON.parse(sessionStorage.getItem('crawl_opts')||'{}');
+  if (savedOpts.start_page) document.getElementById('cfgStart').value = savedOpts.start_page;
+  if (savedOpts.end_page !== undefined) document.getElementById('cfgEnd').value = savedOpts.end_page;
+  if (savedOpts.max_items) document.getElementById('cfgMax').value = savedOpts.max_items;
+  if (savedOpts.delay) document.getElementById('cfgDelay').value = savedOpts.delay;
+} catch(e) {}
+// 同步两个源筛选下拉框
+document.getElementById('rawSourceFilter').addEventListener('change', function(){
+  document.getElementById('rawSourceFilter2').value = this.value;
+});
+document.getElementById('rawSourceFilter2').addEventListener('change', function(){
+  document.getElementById('rawSourceFilter').value = this.value;
+});
+/* ═══════════════════════════════════════════════
+   标签切换
+   ═══════════════════════════════════════════════ */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('panel-crawl').style.display = tab === 'crawl' ? 'flex' : 'none';
+  document.getElementById('panel-crawl').style.flexDirection = 'column';
+  document.getElementById('panel-crawl').style.gap = '14px';
+  const rawPanel = document.getElementById('panel-raw');
+  rawPanel.style.display = tab === 'raw' ? 'flex' : 'none';
+  if (tab === 'raw') loadRawDataFull(S.pageRaw || 1);
+}
+
+/* ── 数据面板内标签切换 ── */
+function switchDataTab(tab) {
+  document.querySelectorAll('#datatab-inline-raw, #datatab-review').forEach(b => b.classList.remove('active'));
+  document.getElementById('datatab-' + tab).classList.add('active');
+  document.getElementById('panel-inline-raw').style.display = tab === 'inline-raw' ? 'flex' : 'none';
+  document.getElementById('panel-review').style.display = tab === 'review' ? 'flex' : 'none';
+  if (tab === 'inline-raw') loadRawData(1);
+  if (tab === 'review') loadReviewData();
+}
+
+/* ═══════════════════════════════════════════════
+   边缘审核功能
+   ═══════════════════════════════════════════════ */
+const REVIEW = { items: [], selected: new Set() };
+
+async function loadReviewData() {
+  try {
+    const r = await fetch('/api/collector/review');
+    REVIEW.items = await r.json();
+    const s = await fetch('/api/collector/review/stats');
+    const stats = await s.json();
+    document.getElementById('reviewStats').textContent =
+      `待审${stats.pending} · 已确认${stats.confirmed} · 已拒绝${stats.rejected}`;
+    const badge = document.getElementById('reviewBadge');
+    if (stats.pending > 0) {
+      badge.textContent = stats.pending;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+    renderReviewCards();
+  } catch (e) {
+    document.getElementById('reviewBody').innerHTML =
+      '<div class="empty">加载失败: ' + e.message + '</div>';
+  }
+}
+
+function renderReviewCards() {
+  const body = document.getElementById('reviewBody');
+  if (!REVIEW.items.length) {
+    body.innerHTML = '<div class="empty">✅ 暂无待审核案例</div>';
+    return;
+  }
+  body.innerHTML = REVIEW.items.map((item, idx) => {
+    const reason = item.classification_reason || '自动分类低置信度';
+    const conf = item.classification_confidence || 'low';
+    const pdfUrl = (item.pdf_urls && item.pdf_urls[0]) || '';
+    return `<div class="review-card" id="review-${item.id}">
+      <div class="review-card-title">#${idx+1} ${escHtml(item.title)}</div>
+      <div class="review-card-meta">
+        <span>📂 ${escHtml(item.source_name||'')}</span>
+        <span>📅 ${escHtml(item.publish_date||'未知日期')}</span>
+        ${pdfUrl ? `<span><a href="${escHtml(pdfUrl)}" target="_blank" style="color:var(--accent);">📎 查看PDF</a></span>` : ''}
+      </div>
+      <span class="review-card-reason ${conf}">⚠️ ${escHtml(reason)}</span>
+      <div class="review-card-actions">
+        <button class="btn btn-green btn-sm" onclick="reviewOne('${item.id}','confirmed_construction',${idx})">✅ 建筑事故</button>
+        <button class="btn btn-outline btn-sm" onclick="reviewOne('${item.id}','confirmed_non_construction',${idx})" style="color:var(--red);">❌ 非建筑</button>
+        <input type="text" id="note-${item.id}" placeholder="备注（可选）" onkeydown="if(event.key==='Enter')reviewOne('${item.id}','confirmed_construction',${idx})">
+      </div>
+    </div>`;
+  }).join('');
+
+  // 键盘快捷键
+  document.addEventListener('keydown', reviewKeyHandler);
+}
+
+function reviewKeyHandler(e) {
+  if (document.getElementById('panel-review').style.display === 'none') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const cards = document.querySelectorAll('.review-card:not(.confirmed):not(.rejected)');
+  if (!cards.length) return;
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const btn = cards[0].querySelector('.btn-green');
+    if (btn) btn.click();
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const btns = cards[0].querySelectorAll('.btn-outline');
+    const rejectBtn = Array.from(btns).find(b => b.textContent.includes('非建筑'));
+    if (rejectBtn) rejectBtn.click();
+  }
+}
+
+async function reviewOne(id, classification, idx) {
+  const note = document.getElementById('note-' + id)?.value || '';
+  try {
+    const r = await fetch('/api/collector/review/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, classification, note })
+    });
+    const d = await r.json();
+    if (d.success) {
+      const card = document.getElementById('review-' + id);
+      if (card) {
+        card.classList.add(classification === 'confirmed_construction' ? 'confirmed' : 'rejected');
+        setTimeout(() => {
+          card.style.transition = 'opacity 0.3s';
+          card.style.opacity = '0';
+          setTimeout(() => { card.remove(); loadReviewData(); }, 300);
+        }, 500);
+      }
+    }
+  } catch (e) {
+    alert('操作失败: ' + e.message);
+  }
+}
+
+async function reviewBatch(classification) {
+  if (!REVIEW.items.length) return;
+  const ids = REVIEW.items.map(r => r.id);
+  if (!confirm(`确认将全部 ${ids.length} 条标记为"${classification === 'confirmed_construction' ? '建筑事故' : '非建筑'}"?`)) return;
+  try {
+    const r = await fetch('/api/collector/review/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, classification })
+    });
+    const d = await r.json();
+    if (d.success) {
+      loadReviewData();
+    }
+  } catch (e) {
+    alert('批量操作失败: ' + e.message);
+  }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ═══════════════════════════════════════════════
+   原始数据全屏视图（独立于采集面板的副本）
+   ═══════════════════════════════════════════════ */
+let S2 = { page: 1, perPage: 100, allMode: false, selected: new Set() };
+
+async function loadRawDataFull(page) {
+  if (page) S2.page = Math.max(1, page);
+  const filter = document.getElementById('rawSourceFilter2').value;
+  const kw = document.getElementById('rawKeyword').value.trim();
+  let url = `/api/collector/raw-data?page=${S2.page}&per_page=${parseInt(document.getElementById('rawPerPage2').value)||100}`;
+  if (filter) url += `&source=${filter}`;
+  if (kw) url += `&keyword=${encodeURIComponent(kw)}`;
+
+  try {
+    const r = await fetch(url); const d = await r.json();
+    document.getElementById('rawStats2').textContent = `共${d.total||0}条 · 新${d.stats?.new||0}`;
+    document.getElementById('rawPageInfo2').textContent = `${S2.page}/${d.total_pages||1}`;
+    window.PAGE2 = S2.page;
+
+    const wrap = document.getElementById('rawTableWrap');
+    if (!d.items?.length) { wrap.innerHTML = '<div class="empty" style="padding:60px;">暂无数据</div>'; return; }
+
+    let html = '<table class="raw-table"><thead><tr>';
+    html += '<th style="width:30px;"><input type="checkbox" onchange="toggleRawPage2(this)" title="全选本页"></th>';
+    html += '<th style="width:80px;">日期</th><th>标题</th><th style="width:80px;">来源</th><th style="width:60px;">状态</th>';
+    html += '</tr></thead><tbody>';
+
+    d.items.forEach(item => {
+      const isNew = item.status === 'new';
+      const st = isNew ? '<span style="color:var(--amber);">●新</span>' :
+                 item.status === 'processed' ? '<span style="color:var(--green);">✓已处理</span>' :
+                 '<span style="color:var(--text-faint);">-</span>';
+      html += `<tr onclick="if(event.target.tagName!=='INPUT')showDetail('${item.id}')" style="cursor:pointer;">
+        <td><input type="checkbox" ${S2.allMode?'checked':''} data-id="${item.id}" onchange="toggleRawItem2(this);event.stopPropagation();"></td>
+        <td style="font-size:11px;color:var(--text-dim);">${item.publish_date||'-'}</td>
+        <td title="${item.title||''}">${(item.title||'').substring(0,70)}</td>
+        <td style="font-size:11px;color:var(--text-dim);">${item.source_name||''}</td>
+        <td>${st}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    updateImportBtn2();
+  } catch(e) { console.error(e); }
+}
+
+function toggleRawItem2(cb) {
+  S2.allMode = false;
+  const id = cb.dataset.id;
+  S2.selected.has(id) ? S2.selected.delete(id) : S2.selected.add(id);
+  updateImportBtn2();
+}
+function toggleRawPage2(masterCb) {
+  S2.allMode = false;
+  document.querySelectorAll('#rawTableWrap input[type=checkbox][data-id]').forEach(cb => {
+    cb.checked = masterCb.checked;
+    if (masterCb.checked) S2.selected.add(cb.dataset.id);
+    else S2.selected.delete(cb.dataset.id);
+  });
+  updateImportBtn2();
+}
+function selectRawPage2() {
+  S2.allMode = false;
+  document.querySelectorAll('#rawTableWrap input[type=checkbox][data-id]').forEach(cb => {
+    cb.checked = true; S2.selected.add(cb.dataset.id);
+  });
+  updateImportBtn2();
+}
+function selectRawAll2() {
+  S2.allMode = !S2.allMode;
+  S2.selected.clear();
+  updateImportBtn2();
+  loadRawDataFull(S2.page);
+}
+function updateImportBtn2() {
+  const btn = document.getElementById('btnImport2');
+  btn.disabled = !S2.allMode && S2.selected.size === 0;
+  btn.textContent = S2.allMode ? '📥 全部提交' :
+    S2.selected.size > 0 ? `📥 提交(${S2.selected.size})` : '📥 提交处理';
+}
+async function importRaw2() {
+  if (S2.allMode) {
+    const r = await fetch('/api/collector/raw-data'); const d = await r.json();
+    if (!confirm(`提交全部 ${d.stats?.new||0} 条给LLM？`)) return;
+    const resp = await fetch('/api/collector/raw-data/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({import_all:true})});
+    const j = await resp.json();
+    addLog('ok', `提交: ${j.imported||0} 条`);
+  } else if (S2.selected.size > 0) {
+    if (!confirm(`提交选中 ${S2.selected.size} 条给LLM？`)) return;
+    const resp = await fetch('/api/collector/raw-data/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ids:Array.from(S2.selected)})});
+    const j = await resp.json();
+    addLog('ok', `提交: ${j.imported||0} 条`);
+  }
+  S2.selected.clear(); S2.allMode = false;
+  loadRawDataFull(S2.page);
+}
+let DETAIL_CACHE = {}; // 缓存已加载的详情
+
+async function showDetail(id) {
+  const panel = document.getElementById('detailPanel');
+  panel.style.display = 'block';
+
+  // 先从缓存或表格行获取基础数据
+  if (!DETAIL_CACHE[id]) {
+    // 获取完整数据
+    try {
+      const r = await fetch(`/api/collector/raw-data/detail?id=${id}`);
+      const d = await r.json();
+      DETAIL_CACHE[id] = d;
+    } catch(e) {
+      DETAIL_CACHE[id] = {title:'加载失败', content:'', source_url:'', source_name:'', publish_date:'', status:''};
+    }
+  }
+
+  const item = DETAIL_CACHE[id];
+  document.getElementById('detailTitle').textContent = item.title || '(无标题)';
+  document.getElementById('detailDate').textContent = '📅 ' + (item.publish_date || '未知');
+  document.getElementById('detailSource').textContent = '📂 ' + (item.source_name || '');
+  document.getElementById('detailStatus').textContent = item.status === 'new' ? '● 新' : item.status === 'processed' ? '✓ 已处理' : '- 已过滤';
+  document.getElementById('detailUrl').href = item.source_url || '#';
+
+  // PDF 链接
+  const pdfs = item.pdf_urls || [];
+  const pdfDiv = document.getElementById('detailPdfs');
+  if (pdfs.length > 0) {
+    pdfDiv.style.display = 'block';
+    document.getElementById('detailPdfLinks').innerHTML = pdfs.map((url,i) =>
+      `<a href="${url}" target="_blank" style="color:var(--accent);margin-right:8px;">📄 PDF${pdfs.length>1?i+1:''}</a>`).join('');
+  } else { pdfDiv.style.display = 'none'; }
+
+  // 图片 (如果有)
+  const images = item.images || [];
+  const imgDiv = document.getElementById('detailImages');
+  if (images.length > 0) {
+    imgDiv.style.display = 'block';
+    imgDiv.innerHTML = images.map(url =>
+      `<img src="${url}" style="max-width:100%;max-height:300px;border-radius:4px;margin:4px 0;border:1px solid var(--border);" onerror="this.style.display='none'" loading="lazy">`
+    ).join('');
+  } else { imgDiv.style.display = 'none'; }
+
+  // 正文 (截取前5000字显示)
+  const content = item.content || '(无正文内容)';
+  document.getElementById('detailContent').textContent = content.length > 5000
+    ? content.substring(0, 5000) + '\n\n... [内容过长，已截断。点击原文链接查看完整内容]'
+    : content;
+}
+
+function exportRaw2(fmt) {
+  const ids = S2.selected.size > 0 ? Array.from(S2.selected).join(',') : '';
+  window.open(`/api/collector/raw-data/export?format=${fmt}&ids=${ids}`, '_blank');
+}
+
+</script>
+</body>
+</html>

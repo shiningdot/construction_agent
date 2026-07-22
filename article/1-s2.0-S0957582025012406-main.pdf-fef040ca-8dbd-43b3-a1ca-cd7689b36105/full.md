@@ -1,0 +1,421 @@
+# Fine-tuned large language models for natech analytics: Evidence from two decades of Texas chemical emission incidents
+
+![](images/e3351cba7a3ba8f7cc4083e1f1a3c60fe63d507dbc8ec20c18e28d92adb38720.jpg)
+
+Haoyu Yang <sup>a</sup>, Shuaiyu Zhao <sup>a</sup>, Zihao Wang <sup>a</sup> , Jiejia Wang <sup>b</sup>, Lei Zou <sup>c</sup> , Qingsheng Wang <sup>a,\*</sup>
+
+<sup>a</sup> Artie McFerrin Department of Chemical Engineering, Texas A&M University, College Station, TX 77843, United States
+
+<sup>b</sup> School of Engineering and Applied Science, George Washington University, Washington, DC 20052, United States
+
+<sup>c</sup> Department of Geography, Texas A&M University, College Station, TX 77843, United States
+
+## A R T I C L E I N F O
+
+Keywords: Natech Large language models Supervised fine-tuning Chemical emission incidents
+
+## A B S T R A C T
+
+Natural-hazard-triggered technological accidents (Natechs) pose compound risks to the process industries, yet large historical databases remain under-utilized due to unstructured narratives and keyword-based screening. In this work, we develop an automated, data-driven framework that fine-tunes generative large language models (LLMs) to jointly (i) classify Natech status and the primary hazard, (ii) extract affected unit–issue pairs, and (iii) generate brief, evidence-style justifications from incident text. Using the Texas Commission on Environmental Quality (TCEQ) air emission event database (2004–2024) as a region-specific testbed, we construct a supervised fine-tuning corpus via a schema-constrained template and evaluate the fine-tuned LLMs against LSTM and BERT baselines. The best fine-tuned model leads on every metrics, with an overall accuracy of 0.958 and macro-F1 of 0.930, while a compact 3B variant remains competitive, demonstrating the superior performance and data ef ficiency of pretrained transformers under constrained supervision. Applied at scale, the framework quantifies climate-related patterns in Texas. By frequency, Natech incidents form \~6 % of statewide records, with counts surging during extreme years (hurricanes in 2005, 2008 and 2017; winter freeze in 2021). By excessive emis sions, Natech contributions \~10 % statewide and \~14 % in coastal Texas; along the coast, hurricanes dominate and yield a disproportionately large share of Natech releases. The framework delivers single-pass, structured analytics that reduce manual effort and improve reproducibility, providing decision-ready evidence for emer gency preparedness and mitigation. Looking ahead, coupling the model with retrieval-grounded weather data and human-in-the-loop audits could enable a production-grade Natech analytics agent for continuous monitoring and planning.
+
+## 1. Introduction
+
+Natural hazard-triggered technological accidents (Natechs) have attracted growing interdisciplinary attention in risk mitigation in pro cess industries (Showalter and Mvers. 1994). Although less frequent than accidents driven by equipment failure or human error, Natechs can impose outsized economic losses and long-lasting impacts on public health and the environment (Girgin and Krausmann, 2016; Krausmann et al., 2011; Ricci et al., 2021). A common consequence is the release of hazardous materials (hazmat), often via domino effects when natural hazards disrupt vulnerable units and utilities (Cruz and Suarez-Paba, 2019; Krausmann et al., 2019). In practice, Natechs constitute a com pound risk: the triggering hazard, the fragility of industrial infrastruc ture, and cascading process upsets interact to produce consequences that exceed those of the natural event alone (Pawar et al., 2021). Learning systematically from past Natechs is therefore essential to improve un derstanding, analysis, and risk reduction (Girgin and Krausmann, 2016; Krausmann et al., 2011; Luo et al., 2020; Ricci et al., 2021; Sengul et al., 2012).
+
+Prior studies (Misuri and Cozzani, 2021; Ricci et al., 2021, 2023; Valente et al., 2025) have mined large incident repositories, e.g., the U. S. National Response Center (NRC) (United States Coast Guard, 2025), France’s ARIA (France Bureau for Analysis of Industrial Risk and Pollution, 2025), and European databases such as FACTS, eNATECH, and eMARS to characterize Natech frequencies, triggers, and impacts. Most previous studies have retrieved natural hazard categories from Natech descriptions using keyword-based extraction (Girgin and Krausmann. 2016: Krausmann et al., 2011: Ricci et al., 2021: Sengul et al., 2012). For other attributes, such as affected unit operations, im mediate causes, or consequences, retrieval often depended on whether structured labels were present; otherwise, information had to be inferred manually, limiting scalability and reproducibility. This workflow has several drawbacks: keywords can be subjective and ambiguous; for example, generic terms like “rain”, “wind”, or “cold” may be inter changeable in context or may not indicate a Natech at all (Sengul et al., 2012; Yang et al., 2025). Furthermore, manual verification coupled with keyword search is time-consuming, if not infeasible, for large databases, especially those lacking meaningful labels.
+
+Accordingly, a more intelligent, automated framework for Natech database analysis is desirable. Recent advances in artificial intelligence (AI) and natural language processing (NLP) have enabled automated text analysis (Goh and Ubeynarayana, 2017; Tixier et al., 2016): deep learning models such as Long Short-Term Memory (LSTM) networks (Hochreiter and Schmidhuber, 1997) and convolutional neural networks (CNNs) (Krizhevsky et al., 2012), often paired with word-embedding models (e.g., Word2Vec) (Mikolov et al., 2013), have improved incident-narrative classification. However, applications of AI/NLP to Natech remain limited. The semi-intelligent Natech identification framework (SINIF) (Luo et al., 2020, 2021) is a representative deep-learning framework (LSTM/CNN) for Natech text classification on the NRC database, achieving large-scale automated extraction but still relying on keyword/word-index features and manual checks, which constrains scaling to larger corpora. Moreover, effective Natech extraction ideally covers multiple sections: hazard category labels, units affected, and consequences, i.e., a joint classification-plus-summarization problem that traditional deep-learning pipelines handle only partially. In contrast, the trans former architecture (Vaswani et al., 2017) has fundamentally changed text processing, and subsequent generative large language models (LLMs) provide transferable capabilities suited to more complex infer ence and reasoning tasks.
+
+This study proposes an automated, data-driven Natech analysi framework based on fine-tuned LLMs. We cast information retrieval as a constrained, multi-output generation task: (i) Natech flag and primary hazard category, (ii) unit–issue pairs (e.g., “flare: over-pressure”), and (iii) brief, evidence-style justifications. We use the Texas Commission on Environmental Quality (TCEQ) air emission event database (Texas Commission on Enviromental Quality, 2025), covering two decades in one of the U.S. regions most exposed to extreme weather, as a testbed to build a region-specific model for large-scale historical analysis. The pipeline comprises: (1) programmatic data curation and conversion of narratives into a fine-tuning corpus with a fixed output schema; (2) supervised fine-tuning (SFT) of pretrained LLMs; (3) comparative eval uation against BERT (Devlin et al., 2019) and LSTM baselines; and (4) model application and data analytics on Natech trends in Texas with special focus on the Gulf Coast region. This paper (i) introduces a uni fied, fine-tuned-LLM framework that performs Natech classification and structured generation from incident narratives (ii) provides a two-decade, region-specific analysis of climate-related releases for Texas and coastal Texas using the TCEQ database (iii) demonstrates that fine-tuned LLMs are a novel and promising tool for Natech database analysis, enabling decision-ready evidence for preparedness and miti gation planning.
+
+## 2. Methodology
+
+Fig. 1 presents an overview of the proposed LLM-based framework. The following subsections detail the methodology, data collection and preprocessing, fine-tuning dataset construction, SFT techniques, pre trained model selection and evaluation metrics.
+
+## 2.1. Data collection and preprocessing
+
+We used the TCEQ database spanning 2004–2024. A template example of the data structure is shown in Appendix Figure S1. Under 30 Texas Administrative Code (TAC) §101.1, an emission event involves unauthorized emissions associated with upsets or unplanned mainte nance/startup/shutdown activities: the database therefore directly targets hazmat release incidents. We focus on Texas, with particular interest in the Gulf Coast industrial corridor (TCEQ Region 10 – Beau mont, 12 – Houston, 14 – Corpus Christi, and 15 – Harlingen), because of the high concentration of petrochemical assets and recurrent severeweather exposures, notably hurricanes and winter storms. Because Natech occurrence is not geographically uniform, conclusions from global or nationwide aggregates may underperform for regional risk assessment; using local records provides a tighter empirical basis for region-specific model development.
+
+After retrieving data from the TCEQ website, two preprocessing steps were applied:
+
+![](images/2b9d9fcbf227bbf7cda446bde7c7ed2d44aef3a44d0fd5bff10bf157fd2b7cd8.jpg)  
+Fig. 1. Overview of the proposed LLM-based framework for Natech database analysis.
+
+1) Deduplication. We merged records likely describing the same event using a composite key of owner/operator, regulated entity, and incident start datetime (and, when available, physical location). This consolidation captures cases where a single hazard triggered releases from multiple emission points and avoids inflating event counts or leaking near-duplicate narratives across train/test splits. The dataset size decreased from 93,958 to 82,089 records.
+
+2) Pre-screening. To reduce computational cost while minimizing false negatives, we applied a conservative keyword filter that included both hazard-specific terms and generic, weather-adjacent terms that are not necessarily climate-related (e.g., “cold”, “temperature”). This step was intentionally recall-oriented, accepting more false positives to ensure coverage of potential Natechs. This yielded 10,927 candi dates for downstream analysis. A full list of keywords is shown in Appendix Table S12.
+
+## 2.2. SFT dataset construction
+
+From each candidate incident record, we extracted the fields required to contextualize the prompt: date, physical location, cause of emission event, actions taken/being taken, and additional information necessary to evaluate the event. These were concatenated into a stan dardized “incident card” and embedded in an instruction template for SFT. The generic template appears in Table 1, and the category labels follows Natech taxonomies adapted from prior studies (Luo et al., 2020; Sengul et al., 2012).
+
+We used OpenAI o3-mini (OpenAI, 2025) as a teacher to generate reference responses for each instruction. Although public technical de tails of o3-mini are limited, it is positioned as a distilled successor to prior GPT-family models with hundreds of billions of parameters and, in practice, served as a much stronger candidate compared to any open-source models used in the current project. To verify basic
+
+## Table 1
+
+<table><tr><td>Natech</td><td>Boolean</td><td># True = climate / extreme-weather related</td></tr><tr><td>primary_category</td><td>String</td><td># Main weather driver (if related=true)</td></tr><tr><td>additional_categories</td><td>Array</td><td># May be empty, no duplicates</td></tr><tr><td>weather_justification</td><td>String</td><td># ~30 words explaining the evidence</td></tr><tr><td>units_affected</td><td>Array</td><td># Each [process unit: issue], concise</td></tr><tr><td colspan="3">Allowed categories (use exact spelling):</td></tr><tr><td colspan="3">HURRICANE/TROPICAL_STORM, TORNADO, LIGHTNING/THUNDERSTORM, STORM, FLOOD_HEAVY_RAIN, WINTER_FREEZE/COLD WEATHER/WINTER STORM, STRONG_WIND, OTHER, NOT RELATED</td></tr><tr><td colspan="3"># - OTHER = vague or generic weather mention (still potentially related)</td></tr><tr><td colspan="3"># - NOT RELATED = the incident is clearly *not* driven by weather/climate Classification rules</td></tr><tr><td colspan="3">1) If the text (i) cites causes clearly unrelated to weather/climate (e.g., equipment failure, human error, process upset) **and** (ii) lacks any indication that a weather hazard contributed, then set Natech = false, primary_category = NOT RELATED, and additional_categories = [].</td></tr><tr><td colspan="3">2) Otherwise set Natech = true. Set primary_category to the main hazard. If additional hazards are present, include them in additional_categories, but primary_category remains the same.</td></tr><tr><td colspan="3">3) Units_affected should include the process unit and the issue demonstrating how it is affected and the event mechanism.</td></tr><tr><td colspan="3">4) Do not invent extra keys. Output pure JSON (no markdown or comments).</td></tr><tr><td colspan="3">Input (from records in database):</td></tr><tr><td colspan="3">Date: [Date]</td></tr><tr><td colspan="3">Location: [Physical location]</td></tr><tr><td colspan="3">Cause: [Causes of emission event]</td></tr><tr><td colspan="3">Action: [Actions taken or being taken]</td></tr><tr><td colspan="3">Additional information: [Additional information necessary to evaluate the event]</td></tr><tr><td colspan="3">Output (manually checked structured output from OpenAI o3-mini):</td></tr><tr><td colspan="3">Natech: []; Primary: []; Categories: []; Justification: []; Units: [process unit: issue].</td></tr></table>
+
+reliability before dataset generation, we audited 1000 stratified incident records (including all 600 test samples) against domain guidelines: the misclassification rate was < 1 %, with typical errors arising from generic climate expressions such as “wind” or “ambient temperature”, clearly outperforming our open-source base models as shown in Section 3. This supported using o3-mini outputs as silver-standard targets for SFT.
+
+Using synthetic data can significantly accelerate the data preparation process. In typical industrial NLP settings, labeled Natech data are scarce, but high-capacity teachers can already produce lowhallucination, schema-conformant outputs when tightly prompted. Distilling these references into a lighter model reduces compute and memory requirements while preserving task competence, and it enables more flexible human-in-the-loop refinement. From a deployment standpoint, a fine-tuned open-source student model can approach teacher-level accuracy while running on modest edge hardware, yielding lower per-document cost and avoiding transmission of poten tially confidential data to third-party services. By contrast, invoking a large proprietary model at inference time typically entails higher cost, external-API latency, and additional data-governance risk. Thus, once task-adequate performance is established, smaller fine-tuned models provide a more scalable, private, and controllable path to deployment (Hinton et al., 2015; Wang et al., 2023).
+
+## 2.3. Training/test set split
+
+The corpus comprised 3000 incidents paired with teacher-generated outputs (o3-mini). We adopted an 80/20 split (2400 training / 600 test). Samples were drawn via stratified sampling so that the label distribu tions in both subsets approximated that of the full corpus. Two classes, strong wind and tornado, were extremely low resource. To avoid intro ducing label/prior shift relative to the deployment distribution, we preserved the natural class skew in both training and test sets rather than oversampling. In previous studies, large pretrained models have demonstrated data efficiency and can learn from few-shot examples (Brown et al., 2020), there the current split was considered reasonable. To evaluate the impact of class imbalance on minority-class perfor mance, we reported macro-averaged metrics and per-class scores in Section 3. The training/test set label distributions are shown in Fig. 2.
+
+## 2.4. SFT via Low-Rank Adaptation (LoRA)
+
+Training LLMs from scratch is infeasible for most engineering research because it demands billions of tokens and weeks of multi-GPU computation. Instead, a practical alternative is to fine-tune a pre-trained base model that already encodes general linguistic and reasoning ca pabilities. Conventional fine-tuning techniques either freeze most layers and add task-specific heads or embeddings at the input/output (headonly/prefix tuning) (Howard et al., 2018), or unfreeze all parameters and run full back-propagation (full-parameter fine-tuning). The first variant is parameter-efficient but often suffers from representation mismatch: the tiny head tends to over-fit the small domain corpus while the frozen backbone cannot adapt, leading to sub-optimal use of the pretrained knowledge (Houlsby et al., 2019). The second approach often yields the best task performance but also incurs catastrophic forgetting, i.e., erosion of the model’s general abilities when gradients overwrite old knowledge (Chen et al., 2020; Li and Hoiem, 2017), besides, it is much more memory- and storage-intensive.
+
+![](images/55f27bfdd4fdf676c5653ebf090df28c078bbaf2760c21bff3fcb15b25effe7a.jpg)  
+Fig. 2. Label distribution of training/test sets.
+
+The rationale behind Low-Rank Adaptation (LoRA) (Hu et al., 2021) is that most pretrained language models are heavily over-parametrized; empirical studies suggest their weight matrices admit a much lower hypothesized “intrinsic dimension” (Aghajanyan et al., 2021). There fore, the model should still learn effectively despite being projected to a smaller subspace. Instead of updating the full matrix during fine-tuning, LoRA learns a low-rank increment that is added to the frozen pretrained weights:
+
+$$
+\Delta W = B A
+$$
+
+$$
+W = W _ {0} + \Delta W
+$$
+
+Where $W _ { 0 } \in \mathbb { R } ^ { d \times k }$ is the pretrained weight matrix, ΔW is the update to the weights, which is decomposed into $B \in \mathbb { R } ^ { d \times r }$ and $A \in \mathbb { R } ^ { r \times k }$ . The “intrinsic rank” should satisfy r≪min(d, k).
+
+Therefore, the modified forward pass for $h = W _ { 0 } x$ can be represented by:
+
+$$
+h = W _ {0} x + \Delta W x = W _ {0} x + B A x
+$$
+
+Where h and x are the output and input, respectively. We initialize A ∼ ${ \mathcal { N } } ( 0 , \sigma ^ { 2 } )$ and set $B = 0 ,$ , so that the update is zero at the beginning. In practice, the update is usually scaled by a factor <sup>α</sup>, so the final forward output is given by:
+
+$$
+h = W _ {0} x + \frac {\alpha}{r} B A x
+$$
+
+By performing LoRA, the trainable parameters are reduced from d × k to $r ( d + k )$ . The complete procedure is illustrated in Fig. 3.
+
+## 2.5. Pretrained base models
+
+In recent years, the development of LLMs has accelerated rapidly, with numerous pretrained models achieving remarkable progress. Among them, the GPT series developed by OpenAI has marked several milestones in the field, with models such as GPT-3 (Brown et al., 2020) and GPT-4 (Achiam et al., 2023) demonstrating state-of-the-art perfor mance across a wide range of benchmarks. Despite their capabilities, these models remain proprietary, requiring all computation and data processing to occur through cloud-based APIs. This constraint can lead to high operational costs for generation and fine-tuning tasks. For ap plications with narrower scopes or domain-specific needs, open-source LLMs have emerged as viable and more cost-effective alternatives. Notable examples include the LLaMA series released by Meta AI (Touvron et al., 2023), and the Qwen series developed by Alibaba (Bai et al., 2023). These models enable flexible local deployment, making them particularly suitable for fine-tuning on confidential datasets or for use on personal computing devices.
+
+![](images/af6ca9a908e0d0ba190e203d979cb54c3fb5a045c5d23730a01d5d6b76196039.jpg)  
+Fig. 3. Illustration of LoRA procedure, adapted from (Hu et al., 2021).
+
+In this study, we utilized a range of LLaMA series models with varying parameter sizes, including LLaMA-3.2–1B-Instruct, LLaMA-3.2–3B-Instruct, and LLaMA-3.1–8B-Instruct. We focus on these sub-10B models to ensure reproducibility and efficiency: each can be finetuned with LoRA on a single 24-GB GPU. Larger open-source models (12–30B+) may offer some gains, but they require multi-GPU or > 48 GB VRAM setups, reducing accessibility. Evaluating those larger models is left as future work. To benchmark classification performance on our dataset, we additionally included the LSTM and BERT models as base lines for comparison. Fine-tuning was performed using the LLaMA Factory toolkit (Zheng et al., 2024) under a standard YAML configura tion (hyperparameters are shown in Appendix Tables S1-S3). At test time we run the base model plus the trained LoRA adapter and generated the outputs deterministically (do\_sample=False) under fixed random seeds for reproducibility.
+
+## 2.6. Evaluation metrics
+
+The overall generation involves three stages:
+
+I. Classification – determine whether an emission incident is related to natural hazards and, if so, identify the primary driver
+
+II. Open-ended justification – generate the rationale for the decision
+
+III. Information extraction – retrieve the affected units and the details of impact.
+
+Each stage is evaluated with task-specific automatic metrics, detailed below.
+
+## 2.6.1. Classification
+
+For each category, we compute commonly used metrics, including precision, recall and F1 score as follows:
+
+$$
+\mathrm{P} _ {i} = \frac {T P _ {i}}{T P _ {i} + F P _ {i}}
+$$
+
+$$
+\mathrm{R} _ {i} = \frac {T P _ {i}}{T P _ {i} + F N _ {i}}
+$$
+
+$$
+\mathrm{F1} _ {i} = \frac {2 \mathrm{P} _ {i} \mathrm{R} _ {i}}{\mathrm{P} _ {i} + \mathrm{R} _ {i}}
+$$
+
+Set-level metrics include overall accuracy and the macro-average precision, recall and F1 score, defined as:
+
+$$
+\begin{array}{l} \mathrm{Acc} = \frac {\sum_ {i = 1} ^ {K} (T P _ {i} + T N _ {i})}{\sum_ {i = 1} ^ {K} (T P _ {i} + T N _ {i} + F P _ {i} + F N _ {i})} \\ \mathrm{P} _ {\text {macro}} = \frac {\sum_ {i = 1} ^ {K} \mathrm{P} _ {i}}{K} \\ \mathrm{R} _ {\text {macro}} = \frac {\sum_ {i = 1} ^ {K} \mathrm{R} _ {i}}{K} \\ \mathrm{F1} _ {\text {macro}} = \frac {\sum_ {i = 1} ^ {K} \mathrm{F1} _ {i}}{K} \end{array}
+$$
+
+## 2.6.2. Open-ended generation
+
+Semantic fidelity between the LLaMA output and the silver reference (o3-mini) is measured with BERTScore-F1 (Zhang et al., 2019), using the encoder deberta-large-mnli (He et al., 2020). Given the candidate token sequence $\widehat { T } = [ \widehat { t } _ { 1 } , . . . \widehat { t } _ { m } ]$ and the reference token sequence $T = [ t _ { 1 }$ $\cdots ^ { t _ { k } ] } .$ , we build the cosine-similarity matrix:
+
+$$
+S _ {i j} = \cos (\boldsymbol {e} (\widehat {t _ {i}}), \boldsymbol {e} (t _ {j})), \quad 1 \leq i \leq m, \quad 1 \leq j \leq k
+$$
+
+Where $\pmb { e } ( \bullet )$ denotes the contextual embedding produced by the encoder.
+
+And define:
+
+$$
+\mathrm{P} = \frac {\sum_ {i = 1} ^ {m} \max _ {j} S _ {i j}}{m}
+$$
+
+$$
+\mathrm{R} = \frac {\sum_ {j = 1} ^ {k} \max _ {i} S _ {i j}}{k}
+$$
+
+$$
+\mathrm{F1} = \frac {2 \mathrm{PR}}{\mathrm{P} + \mathrm{R}}
+$$
+
+Where $S _ { i j }$ is the cosine-similarity matrix:
+
+$$
+S _ {i j} = \cos (\boldsymbol {e} (\widehat {t _ {i}}), \boldsymbol {e} (t _ {j})), \quad 1 \leq i \leq m, \quad 1 \leq j \leq k
+$$
+
+In the context of BERTScore, these metrics carry distinct semantic interpretations. Precision reflects the proportion of tokens in the generated output that have a close semantic match in the reference, thus emphasizing factual correctness and penalizing the introduction of irrelevant or hallucinated content. Recall measures the proportion of tokens in the reference that are semantically matched by tokens in the generated output, thereby emphasizing completeness and penalizing omissions of relevant information. The F1 score balances these two as pects, providing an overall indicator of both relevance and coverage in the generated text. Corpus-level results are obtained by averaging the sentence-level scores over the entire test set, and higher values indicate better semantic overlap.
+
+## 3. Results and discussion
+
+## 3.1. Natech classification performance
+
+Table 2 summarizes the overall performance; full per-class results are reported in Appendix Tables S4-S12. The LSTM baseline performs poorly on the Natech labeling, with substantially lower scores across metrics, and it fails on several low-resource classes (e.g., strong wind and tornado receive zero true positives; see Appendix Table S4). In contrast, all finetuned pretrained models achieve significantly better results, with finetuned LLaMA-3.2–1B-Instruct achieving macro-F1 over 0.8, and other models’ F1 scores approaching or exceeding 0.9, indicating strong and reliable classification. We attribute these gains to both architecture and pretraining. Transformer models capture long-range semantic de pendencies via self-attention (Qiu et al., 2020; Vaswani et al., 2017), and when initialized from large-corpus pretraining they provide transferable representations that learn effectively from limited task data (Brown
+
+## Table 2
+
+Accuracy, macro-precision, macro-recall, and macro-F1 for all models.
+
+<table><tr><td></td><td>Accuracy</td><td>Precision</td><td>Recall</td><td>F1 score</td></tr><tr><td>Keyword-based method</td><td>0.787</td><td>0.727</td><td>0.863</td><td>0.764</td></tr><tr><td>Fine-tuned LSTM</td><td>0.597</td><td>0.383</td><td>0.369</td><td>0.349</td></tr><tr><td>Fine-tuned BERT</td><td>0.932</td><td>0.889</td><td>0.905</td><td>0.889</td></tr><tr><td>Base LLaMA-3.2-1B-Instruct</td><td>0.129</td><td>0.203</td><td>0.247</td><td>0.162</td></tr><tr><td>Fine-tuned LLaMA-3.2-1B-Instruct</td><td>0.922</td><td>0.923</td><td>0.790</td><td>0.815</td></tr><tr><td>Base LLaMA-3.2-3B-Instruct</td><td>0.199</td><td>0.437</td><td>0.316</td><td>0.257</td></tr><tr><td>Fine-tuned LLaMA-3.2-3B-Instruct</td><td>0.953</td><td>0.933</td><td>0.899</td><td>0.914</td></tr><tr><td>Base LLaMA-3.1-8B-Instruct</td><td>0.540</td><td>0.538</td><td>0.650</td><td>0.506</td></tr><tr><td>Fine-tuned LLaMA-3.1-8B-Instruct</td><td>0.958</td><td>0.957</td><td>0.911</td><td>0.930</td></tr></table>
+
+et al., 2020; Devlin et al., 2019). Because curating high-quality labeled incident data is often the bottleneck in engineering applications, these findings support pretrained models as a practical and high-leverage foundation for Natech database analysis.
+
+In addition to deep-learning models, we evaluate a simple keyword baseline (Appendix Tables S12–S13). It achieves moderate but clearly lower performance (with F1 score < 0.8) than the fine-tuned transformer models. As detailed in Appendix Table S12, categories with generic terms $( \boldsymbol { \mathrm { e } } . \boldsymbol { \mathrm { g } } . ,$ , heavy rain, freezing cold, strong wind, and other) suffer precision loss; tightening the keyword list improves precision but sub stantially harms recall. This trade-off illustrates a structural limitation of rule-based method and motivates using pre-trained transformer models.
+
+For the three base LLMs, classification performance improves with model parameter size. However, given the very low metrics, none of the base models can be directly used without fine-tuning. Two issues particularly impair their performance. First, the base models tend to predict the first label (hurricane) regardless of the justification, espe cially for the LLaMA-1B and LLaMA-3B models, as shown in Fig. 4(a) and (b). This is known as positional bias, which is also observed in recent studies (Li and Gao, 2024; Zheng et al., 2023). Second, the models sometimes produce invalid labels or fail to output structured results, both related to unsuccessful instruction following. For example, the 1B and 3B models each generate more than 5 % incomprehensible re sponses, and the LLaMA-3B model assigns only 18 valid labels out of 39 successfully parsed hurricane samples. By contrast, the base LLaMA-8B model does show better instruction alignment, though its classification remains mediocre. These observations emphasize the need to fine-tune a base model before deployment.
+
+Regarding the fine-tuned models, BERT, LLaMA-3B, and LLaMA-8B exhibit comparable classification performance, with macro F1 scores significantly outperforming the 1B model. The fine-tuned LLaMA-8B model leads on every metrics, achieving macro precision, recall and F1 score of 0.957, 0.911 and 0.930, respectively, suggesting good gener alization under an imbalanced training set. As shown in Fig. 5, these three models identify 97 %, 95 %, and 96 % of the Natech cases in the test set, respectively. Considering the overall accuracy and weighted metrics reported in the Appendix, the 3B and 8B variants achieve a modest improvement over BERT, with margins of around 2 %, con firming that LLMs are a viable option for developing automated Natech database analysis tools.
+
+The advantage of LLMs lies more in their applicability and flexibility rather than in raw accuracy. First, in the context of Natech studies, adequately parameterized LLMs can match, if not surpass, the perfor mance of BERT, a discriminative model purpose-built for classification, supporting their fidelity for domain-specific tasks. More importantly, as generative models, LLMs offer versatility: a single model can produce multiple outputs (e.g., secondary categories, affected units, and justifi cations) in one inference pass, and all tasks can be fine-tuned jointly within one training loop. This flexibility is particularly valuable in safety analytics pipelines where multiple annotations are to be extracted from the same narrative.
+
+In addition, LLMs facilitate human-in-the-loop verification and refinement in safety decision-making. Their generative nature supports explainability via prompt-driven reasoning, producing concise textual justifications that help surface potential biases. For example, in a windrelated emission event, the narrative states: “Due to wind conditions OXY has chosen to vent gas to prevent fire danger, while wind conditions were calm and didn’t create a potential fire hazard.” Although wind conditions influenced the flaring decision, the 8B model emphasized the latter clause and predicted not related, even while noting wind as a contrib uting factor. In contrast, BERT or smaller LLMs may predict the related label based on the lexical presence of “wind”, which can lead to over fitting in more complex contexts.
+
+From a development standpoint, mitigating such biases in BERT can be challenging because it operates as a largely opaque black box, whereas LLaMA performance can be improved via targeted few-shot prompts or human feedback in natural language. Finally, in terms of deployment feasibility, all LLMs in this study can be run on personal computing hardware without significant computational burden. Over all, these characteristics make LLMs a more versatile and future-proof foundation for multi-faceted, cross-domain, and long-context indus trial incident reasoning.
+
+![](images/5250c6179e63b0f152a15bbd0036f9b48f0e89aabeba0b46ed5f4679f1133465.jpg)
+
+![](images/e1f88aa83d10232603478901c9307a7d3ba03a8c5c80fe9f566763b0502f368d.jpg)  
+Fig. 4. Confusion matrices of base LLMs (without fine-tuning).
+
+![](images/eee6cf6d78b069a4911c3eed37aee6e140fe6c97e1c91eb4f5eac3646f05f37f.jpg)
+
+![](images/17d23d336106fb4c7c9e2f83e2d49324d3cb39adf29420dba0a9f22c05be6411.jpg)  
+Fig. 5. Confusion matrices of fine-tuned BERT and LLMs.
+
+## 3.2. Text generation performance
+
+The proposed LLMs are also fine-tuned to perform two generation tasks: (i) extracting process units affected along with their correspond ing issues, and (ii) producing open-ended justifications for Natech classification. Extract the process units affected together with their corresponding issues. These structured outputs help investigators quickly identify vulnerable operations and reason about impactpropagation mechanisms, which can subsequently be analyzed via downstream clustering. While short justifications can be used as oper ational aids for error analysis and iterative model improvement, even not as definitive causal explanations, and we do not claim that they reflect ground-truth mechanisms. Still, they are useful for surfacing potential model biases or misattributions when disagreements arise. Several illustrative examples are shown in the Appendix Table S14. In this study, we report the BERTScore to evaluate how well the student LLMs align with reference annotations from the teacher model (o3- mini).
+
+As shown in Table 3, the fine-tuned LLaMA-8B model achieves the highest scores across all metrics, following the general trend where larger models tend to perform better. Comparing base and fine-tuned models, SFT substantially improves alignment with reference outputs. The unit/issue extraction task appears to be more challenging, as re flected by generally lower scores compared to the justification genera tion task. Moreover, the marginal benefit of increasing model size is limited for the justification generation task, with all three models per forming similarly. Given the close relationship between justification generation and prior classification accuracy, these results suggest that data availability may be the current bottleneck to further improvements in both tasks. Nevertheless, effectively leveraging and enhancing the open-ended generation capabilities of LLMs remains an open challenge within the scope of this work.
+
+## 3.3. Climate-related hazmat release in Texas
+
+## 3.3.1. Overall Natech frequency by category
+
+All 10,927 pre-screened samples were analyzed with our fine-tuned LLaMA-3.1–8B-Instruct model, with manual verification for the rarer classes (tornado and strong wind). In total, 5126 samples were identified as Natechs, accounting for 6 % of the 82,089 records. This proportion is \~20 % higher than the top prior estimate of Natech probability (5 %) reported in previous studies (Girgin and Krausmann, 2016; Krausmann et al., 2011: Ricci et al., 2021), and about twice the earlier statistic (3 %) for climate-related hazmat releases across the US (Sengul et al., 2012). These results quantify how the Texas industrial sector appears more prone to natural hazard impacts than national baselines. The 2004–2024 trend of climate-related emission incidents is shown in Fig. 6.
+
+As shown in Fig. 10, the most frequent triggers are freezing cold (26 %), lightning (23 %), and hurricane (17 %), followed by storm (13 %) and other (12 %), each exceeding 10 % of total Natechs. Because storm aggregates several phenomena that are likely to be related to the top categories (e.g., winter storms, thunderstorms, tropical storms) and other captures generic weather terms, the discussion below focuses on the top three categories.
+
+A notable difference from the prior literature is that freezing cold emerges as a major contributor in Texas. While numerous studies emphasize lightning (Rasmussen, 1995; Renni et al., 2010; Yang et al., 2025) and hurricanes (Misuri et al., 2019; Sengul et al., 2012) as frequent Natech triggers, the impacts of extreme cold have only recently received attention (Ricci et al., 2021; Ricci et al., 2020, 2023). A clear peak appears in 2021, coincident with Winter Storm Uri; beyond that peak, cold-related events are distributed across many years in our study window, suggesting a persistent, year-round exposure that warrants broad operational hardening. By contrast, hurricane-related Natechs are clustered around named tropical cyclones; the three prominent peaks align with Rita (2005), Ike (2008), and Harvey (2017), reflecting episodic, seasonal extremes. Lightning is also a major trigger, but unlike hurricanes, shows a more uniform distribution across years, indicating a widespread hazard not limited to named extremes.
+
+BERTScore for LLMs on different tasks (extraction and justification generation).
+
+<table><tr><td rowspan="2"></td><td colspan="3">Affected units and issues extraction</td><td colspan="3">Natech justification</td></tr><tr><td>Precision</td><td>Recall</td><td>F1 score</td><td>Precision</td><td>Recall</td><td>F1 score</td></tr><tr><td>Base LLaMA-1B</td><td>0.355</td><td>0.323</td><td>0.336</td><td>0.513</td><td>0.499</td><td>0.505</td></tr><tr><td>Fine-tuned 1B</td><td>0.665</td><td>0.643</td><td>0.652</td><td>0.755</td><td>0.740</td><td>0.747</td></tr><tr><td>Base LLaMA-3B</td><td>0.416</td><td>0.398</td><td>0.405</td><td>0.493</td><td>0.542</td><td>0.514</td></tr><tr><td>Fine-tuned 3B</td><td>0.687</td><td>0.675</td><td>0.679</td><td>0.757</td><td>0.745</td><td>0.751</td></tr><tr><td>Base LLaMA-8B</td><td>0.525</td><td>0.469</td><td>0.493</td><td>0.518</td><td>0.504</td><td>0.510</td></tr><tr><td>Fine-tuned 8B</td><td>0.712</td><td>0.691</td><td>0.700</td><td>0.758</td><td>0.747</td><td>0.752</td></tr></table>
+
+The monthly stacked bars (Fig. 7) complement the yearly distribu tion by revealing strong within-year seasonality behind these patterns. Hurricane-driven incidents concentrate in late summer to early fall (Aug–Oct) with a dominant September maximum, consistent with the tropical-storm season. Cold-related incidents concentrate in winter (Dec–Feb) and recur in many winters, not just during 2021. Lightning peaks in late spring and summer (May–Aug); while highly seasonal within a year, it occurs in most years, reinforcing its role as a ubiquitous trigger. “Storm” and “Other” remain diffuse by design, monthly peaks around late spring and late summer likely reflect overlaps with thun derstorms and winter storms and the use of generic weather descriptors.
+
+These distributional features imply two complementary mitigation pathways. For hurricane-related Natechs, preparedness should empha size seasonal, surge-oriented measures: coastal/wind/flood hardening, contingency storage/transfer capacity, and rapid shutdown/restart playbooks keyed to seasonal outlooks and storm nowcasts. For freezingcold and lightning-related events, which recur across many years with predictable seasonal windows, the priority shifts to baseline resilience and operational weather thresholds: winterization of utilities and pro cess lines; lightning protection, grounding, and safe-venting interlocks; and the use of daily temperature and lightning indicators or short-term predictive models to guide routine operations. In short, tropical-storm risks call for anticipatory seasonal readiness focused on peak months, whereas cold and lightning require everyday robustness aligned with their recurring seasonal cycles.
+
+## 3.3.2. Excessive chemical release triggered by Natechs
+
+The chemicals involved in the database were clustered into eight groups: methane (CH₄), nitrogen oxides (NOₓ), sulfur dioxide (SO₂), carbon monoxide (CO), particulate matter (PM), volatile organic com pounds (VOC), reduced sulfur compounds (RSC), and other species. Over a 20-year period, climate-related Natech releases accounted for approximately 10 % of the total reported excessive emissions in Texas (Table 4), corresponding to an average of over 3000 tons of pollutants per year. Within the Gulf Coast region of Texas (TCEQ regions 10, 12, 14, and 15), the annual average share was even higher, at around 14 %.
+
+Although these proportions appear relatively small in the long-term average, they mask substantial interannual variability. As shown in Fig. 8(a), the statewide Natech share fluctuated from below 5 % in mild years to peaks of 20–25 % in extreme years. Fig. 8(b) shows that in the Gulf Coast region, this proportion could exceed 50 % during severe hurricane seasons. Pronounced peaks occurred in 2005, 2008, 2017, and 2021, corresponding to major hurricanes and the February 2021 winter freeze. These episodes underline the episodic nature of Natech risk, where a single extreme climate event can cause a disproportionate share of annual hazardous releases.
+
+Analysis by hazard category (Fig. 11) shows that Texas Natech emissions are dominated by freezing cold events (29.8 %) and hurricanes (27.1 %), with lightning (20.3 %) as another significant contributor. Heavy rain, storm, strong wind, and tornado events contribute much smaller shares (<10 % each). The dominance of both tropical and winter hazards highlights the need for multi-hazard preparedness at the state level. The differing hazard profile of the Gulf Coast region is examined in Section 3.3.3.
+
+![](images/1c3d1c9c3c27f4dbecaaa680533700fcd8a0328553e192ef88987a25fdba5e92.jpg)  
+Fig. 6. Annual climate-related incident counts by hazard category in Texas, 2004–2024.
+
+![](images/8178ebac420bf344014aa971adf51ef8e5c70120de6019766a3dcfca005971de.jpg)  
+Fig. 7. Monthly distribution of Natech incidents by hazard category (stacked), 2004–2024.
+
+## 3.3.3. Geographical natech vulnerability: Texas vs. Gulf Coast Region of Texas
+
+A comparison between the Gulf Coast region of Texas and the statewide average reveals clear differences in Natech vulnerability. As shown in Fig. 9, the Gulf Coast region has higher Natech shares for most chemicals. $\ S O _ { 2 }$ shows the largest disparity, with 21.6 % of total Gulf Coast $\ S O _ { 2 }$ emissions triggered by climate hazards compared to only 8.9 % statewide. Elevated shares are also observed for NOₓ, VOC, CO, and RSC (\~13–16 % in the Gulf Coast vs. \~9–11 % statewide). An exception is $\mathrm { C H } _ { 4 } ,$ where the statewide share (9.9 %) slightly exceeds that of the Gulf Coast (6.4 %), reflecting the influence of inland oil and gas facilities. PM has the lowest shares in both regions, at ≤ 4 %.
+
+Hazard category patterns further underscore these differences. In the Gulf Coast region, hurricanes are the dominant driver of Natech emis sions, accounting for over half (52.4 %) of all climate-related releases, meanwhile representing a substantial share of incidents (39.2 %) (Fig. 11). Statewide, by comparison, hurricanes contribute a smaller share of emissions (27.1 %), while freezing cold (29.8 %) and lightning (20.3 %) remain substantial components of the Natech emission. In short, the Gulf Coast is hurricane-centric, whereas Texas overall exhibits a multi-hazard profile in which winter freezes and lightning continue to play large roles, implying cyclone-focused resilience for coastal facilities and broader multi-hazard preparedness elsewhere.
+
+## 3.4. Model limitations and future development
+
+This study demonstrates that SFT of a compact LLM yields a prac tical, scalable, and reliable tool for Natech analytics. The model auto mates multi-output inference from historical records, enabling rapid, repeatable analyses that surface the linkage between natural hazards and excessive hazmat releases in the process industries.
+
+Several limitations warrant emphasis. First, class imbalance and data scarcity persist for several low-frequency hazards (e.g., tornado, strong wind). When deployed on much larger or distribution-shifted corpora, this scarcity may induce unstable estimates for minority classes. Future work should (i) expand training data for rare hazards by drawing on additional repositories and regulatory sources; (ii) apply targeted fewshot prompts during inference to regularize minority-class decisions; and (iii) use active learning to sample and label the most uncertain
+
+(b) Annual climate-related emissions by category — Gulf Coast  
+Table 4  
+Yearly average excessive emissions by pollutant: Texas vs. Texas Gulf Coast region (unit: tons per year).
+
+<table><tr><td></td><td colspan="3">Texas</td><td colspan="3">Gulf Coast region</td></tr><tr><td></td><td>Climate-related</td><td>Total</td><td>Percentage</td><td>Climate-related</td><td>Total</td><td>Percentage</td></tr><tr><td> $CH_4$ </td><td>462.40</td><td>4661.25</td><td>9.92</td><td>52.90</td><td>825.21</td><td>6.41</td></tr><tr><td> $NO_x$ </td><td>141.10</td><td>1297.13</td><td>10.88</td><td>72.13</td><td>455.10</td><td>15.85</td></tr><tr><td> $SO_2$ </td><td>1121.67</td><td>12582.72</td><td>8.91</td><td>283.87</td><td>1315.15</td><td>21.58</td></tr><tr><td>CO</td><td>584.55</td><td>5391.47</td><td>10.84</td><td>375.82</td><td>2714.64</td><td>13.84</td></tr><tr><td>PM</td><td>19.97</td><td>472.03</td><td>4.23</td><td>10.97</td><td>290.21</td><td>3.78</td></tr><tr><td>VOC</td><td>688.97</td><td>7115.24</td><td>9.68</td><td>433.71</td><td>3187.11</td><td>13.61</td></tr><tr><td>RSC</td><td>22.78</td><td>236.55</td><td>9.63</td><td>3.43</td><td>21.61</td><td>15.89</td></tr><tr><td>Other</td><td>47.07</td><td>280.81</td><td>16.76</td><td>44.13</td><td>233.40</td><td>18.91</td></tr><tr><td>Total</td><td>3088.51</td><td>32037.20</td><td>—</td><td>1276.95</td><td>9042.43</td><td>—</td></tr><tr><td>Overall (%)</td><td>—</td><td>—</td><td>9.64</td><td>—</td><td>—</td><td>14.12</td></tr></table>
+
+(a) Annual climate-related hazmat release by category — Texas  
+![](images/efc18460efb6228864b30404ddc09bbd0c3f2da48afdee126fb1523008379094.jpg)
+
+![](images/f3820b165c6039eb3eb058c7486c57c828da808342a89fd6ba64b923c6be0cf0.jpg)  
+Fig. 8. Annual climate-related excessive emissions by hazard category, Texas vs. Gulf Coast region (2004–2024).
+
+![](images/9b25eb46bd7e93f07e57829fa607c47b5abe796cf5139850c3a9546907ec6737.jpg)  
+Fig. 9. Dumbbell plot of Natech share of total emissions by pollutant, Texas vs. Gulf Coast region (2004–2024).
+
+narratives, thereby improving data efficiency. Second, generation-style outputs (process units: issue and free-text justifications) are more sen sitive to training-data quality and formatting noise; downstream schema-constrained decoding and post-parsing validators help, but extraction errors can persist when source narratives are terse or ambiguous. This points to the need for larger, cleaner generation corpora and for domain-aware canonicalization (e.g., unit/issue ontol ogies) to stabilize structured extraction. Moreover, synthetic supervision warrants explicit caveats: teacher-generated labels can propagate teacher biases. In this study, we mitigate this by auditing all test samples and benchmarking fine-tuned student models against both discrimina tive and keyword baselines. Nevertheless, in practice, exhaustive manual examination of all synthetic samples would be infeasible at scale, so ongoing analyst oversight remains important. Finally, the current project only uses Texas data. Although our input schema and fine-tuning objective are generic, transferability beyond Texas should be verified empirically on target repositories. To address these limitations, we propose the following practical deployment safeguards for a simple, auditable workflow in future model development:
+
+(i) Recall-oriented keyword gate (e.g., tornado | funnel cloud for tornado; high wind | windstorm | gust for strong wind) to ensure minority-trigger narratives are routed for review;
+
+(ii) Human-in-the-loop review for all gate-flagged items or modelpredicted minority classes; analyst decisions take precedence and are recorded with model version and timestamp;
+
+(iii) Continuous improvement: analyst disagreements and highquality corrections are periodically folded into few-shot exem plars and, as data accumulate, lightweight LoRA (optionally
+
+(a) Climate-related incidents in Texas  
+![](images/b59e1f97560fccfddf5def908080bb1fb270a4894fa531a257f1248d6f611555.jpg)
+
+(b) Climate-related incidents in Gulf Coast region  
+![](images/c514f16d9b038e8ba59e2cc898c1f63cedfe5471010335c1971459b9bb1b8002.jpg)
+
+Fig. 10. Climate-related incident frequency by category, Texas vs. Gulf Coast region.  
+![](images/9ba8e09dcaa4036e2127f665ab97d275e04e2062c78bc185a9e45809f54cb5dc.jpg)  
+Fig. 11. Climate-related excessive hazmat release by category, Texas vs. Gulf Coast region.
+
+RLHF) to reduce residual bias, without duplicating near-identical samples;
+
+(iv) Porrtability protocol for new regions: a thin pre-processing adapter to map fields into the incident-card template, a few region-specific exemplars per class (especially rare triggers), optional brief LoRA on a small labeled subset, and held-out per class validation prior to deployment.
+
+Beyond data and decoding, several technical extensions are prom ising. Retrieval-augmented generation (RAG) (Lewis et al., 2020) can ground justifications in contemporaneous weather observations, advi sories, and plant-specific documentation, while reinforcement learning for human feedback (RLHF) (Ouyang et al., 2022) or rule-guided finetuning can align the model to safety doctrine and plant operating pro cedures. A production system should integrate multi-source context (meteorological reanalysis, lightning and flood products, local inciden registers) into a Natech agent that performs end-to-end triage, extraction, and aggregation with periodic human audits and telemetry for drift detection. Finally, model governance (versioning, reproducible prompts, and scheduled re-training) is essential to maintain reliability as new data accumulate.
+
+## 4. Conclusion
+
+We developed a fine-tuned LLM framework that turns chemica emission narratives into structured Natech analytics at scale. Among all models, the fine-tuned LLaMA-3.1–8B-Instruct delivers the best overall classification performance, surpassing the BERT and LSTM baselines on accuracy and macro metrics; the compact 3B variant also reached strong macro-F1, underscoring the data efficiency of pretrained transformers under limited, unbalanced supervision. Beyond classification, the sys tem jointly performs information extraction (process units: issue pairs) and short justifications, yielding a single-pass, auditable output that reduces manual curation time and improves versatility.
+
+Applying the framework to two decades of TCEQ events shows that climate-related (Natech) releases are modest on average at the state level (\~10 % statewide; \~14 % in coastal Texas) yet episodic and surgeprone, with sharp peaks during catastrophic hurricanes (2005, 2008, 2017) and severe freeze (2021). The risk is geographically differenti ated: the Gulf Coast of Texas is hurricane-centric, where hurricanetriggered events contribute a disproportionately large share of emis sion mass, while the statewide pattern is multi-hazard, with freezing cold and lightning remaining substantial components of the emission.
+
+Taken together, these findings demonstrate that fine-tuned LLMs can elevate Natech research from manual, keyword-driven review to auto mated, explainable, and reproducible analytics that support seasonal preparedness and long-term mitigation planning. The approach provides a practical foundation for next-generation systems that couple LLM reasoning with retrieval grounding and human-in-the-loop oversight, enabling continuous improvement as new data and events accumulate.
+
+## CRediT authorship contribution statement
+
+Zihao Wang: Writing – review & editing, Validation, Data curation. Jiejia Wang: Writing – review & editing, Validation, Methodology. Lei Zou: Writing – review & editing, Validation, Funding acquisition. Haoyu Yang: Writing – original draft, Visualization, Methodology, Investigation, Formal analysis, Data curation. Shuaiyu Zhao: Writing – review & editing, Visualization, Validation, Formal analysis. Qingsheng Wang: Writing – review & editing, Validation, Supervision, Resources, Project administration, Funding acquisition, Conceptualization.
+
+## Declaration of Competing Interest
+
+The authors declare the following financial interests/personal re lationships which may be considered as potential competing interests: Given his role as Subject Editor, Dr. Qingsheng Wang had no involve ment in the peer review of this article and had no access to information regarding its peer review. Full responsibility for the editorial process for this article was delegated to another journal editor. If there are other authors, they declare that they have no known competing financial in terests or personal relationships that could have appeared to influence the work reported in this paper.
+
+## Acknowledgement
+
+This work is part of the project, “Climate-LEAD: Climate effects on localized environmental health disparities in overburdened Texas communities along the Gulf Coast”, which is funded by the Gulf Research Program under the U.S. National Academies of Sciences, En gineering, and Medicine (Award No.: SCON-10000653).
+
+## Appendix A. Supporting information
+
+Supplementary data associated with this article can be found in the online version at doi:10.1016/j.psep.2025.107973.
+
+## References
+
+Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F.L., Almeida, D., Altenschmidt, J., Altman, S., & Anadkat, S. (2023). Gpt-4 technical report. arXiv preprint arXiv:2303.08774.
+
+Aghajanyan, A., Gupta, S., & Zettlemoyer, L. (2021, August). Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning. In C. Zong, F. Xia, W. Li, & R. Navigli, Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) Online
+
+Bai, J., Bai, S., Chu, Y., Cui, Z., Dang, K., Deng, X., Fan, Y., Ge, W., Han, Y., & Huang, F., 2023. Owen technical report, arXiv preprint arXiv:2309.16609o..
+
+Brown, T.B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S., Herbert-Voss, A., Krueger, G., Henighan, T., Child. R.. Ramesh. A., Ziegler, D.M., Wu, J., Winter, C.....Amodei, D
+
+(2020). Language models are few-shot learners Proceedings of the 34th International Conference on Neural Information Processing Systems, Vancouver, BC, Canada.
+
+Chen, S., Hou, Y., Cui, Y., Che, W., Liu, T., & Yu, X. (2020, November). Recall and Learn: Fine-tuning Deep Pretrained Language Models with Less Forgetting. In B. Webber, T. Cohn, Y. He, & Y. Liu, Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP) Online.
+
+Cruz, A.M., Suarez-Paba, M.C., 2019. Advances in natech research: an overview. Prog. Disaster Sci. 1. https://doi,org/10.1016/i,pdisas.2019.100013.
+
+Devlin, J., Chang, M.-W., Lee, K., Toutanova, K., 2019. BERT: Pre-training of deep bidirectional transformers for language understanding. North Am. Chapter Assoc. Comput. Linguist.
+
+France Bureau for Analysis of Industrial Risk and Pollution. (2025). Analysis, Research and Information on Accidents (ARIA) https://www.aria.developpement-durable. gouv.fr/the-barpi/the-aria-database/?lang=en.
+
+Girgin, S., Krausmann, E., 2016. Historical analysis of U.S. Onshore hazardous liquid pipeline accidents triggered by natural hazards. J. Loss Prev. Process Ind. 40, 578–590. https://doi.org/10.1016/j.ilp.2016.02.008
+
+Goh, Y.M., Ubevnaravana, C., 2017. Construction accident narrative classification: ar evaluation of text mining techniques, Accid. Anal. Prey, 108, 122–130.
+
+He, P., Liu, X., Gao, J., & Chen, W., 2020. Deberta: Decoding-enhanced bert with disentangled attention. arXiv preprint arXiv:2006.03654..
+
+Hinton, G.E., Vinyals, O., & Dean, J., 2015. Distilling the Knowledge in a Neural Network. ArXiv, abs/1503.02531..
+
+Hochreiter, S., Schmidhuber, J., 1997. Long short-term memory. Neural Comput. 9 (8), 1735–1780.
+
+Houlsby, N., Giurgiu, A., Jastrzebski, S., Morrone, B., De Laroussilhe, Q., Gesmundo, A., Attariyan, M., Gelly, S., 2019. Parameter-efficient transfer learning for NLP. Int. Conf. Mach. Learn.
+
+HowardJ., & Ruder, S. (2018, July). Universal Language Model Fine-tuning for Text Classification. In.I. Gurevych & Y. Miyao, Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) Melbourne, Australia.
+
+Hu, J.E., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., & Chen, W. (2021). LoRA: Low-Rank Adaptation of Large Language Models. ArXiv, abs/2106.09685
+
+Krausmann, E., Renni, E., Campedel, M., Cozzani, V., 2011. Industrial accidents triggered by earthquakes, floods and lightning: lessons learned from a database analysis. Nat. Hazards 59 (1). 285–300. https://doi,org/10.1007/s11069-011-9754-3
+
+Krausmann, E., Girgin, S., Necci, A., 2019. Natural hazard impacts on industry and critical infrastructure: natech risk drivers and risk management performance indicators. Int. J. Disaster Risk Reduct. 40. https://doi.org/10.1016/j. ijdrr.2019.101163.
+
+Krizhevsky, A., Sutskever, I., Hinton, G.E., 2012. Imagenet classification with deep
+
+Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., Küttler, H., Lewis. M.. Yih. W.-t. Rocktäschel. T.. 2020. Retrieval-augmented generation for knowledge-intensive nlp tasks. Ady. Neural Inf. Process. Syst. 33, 9459–9474.
+
+Li, R., & Gao, Y. (2024). Anchored Answers: Unravelling Positional Bias in GPT-2’s Multiple-Choice Ouestions, arXiv preprint arXiv:2405.03205
+
+Li. Z.. Hoiem. D., 2017. Learning without forgetting, JEEE Trans. Pattern Anal. Mach Intell, 40 (12), 2935–2947.
+
+Luo, X., Cruz, A.M., Tzioutzios, D., 2020. Extracting natech reports from large databases: development of a Semi-Intelligent natech identification framework. Int. J. Disaster Risk Sci. 11 (6), 735–750. https://doi.org/10.1007/s13753-020-00314-6.
+
+Luo, X., Cruz, A.M., Tzioutzios, D., 2021. Climate change and temporal-spatial variation of tropical storm-related natechs in the United States from 1990 to 2017: is there a link? Int. J. Disaster Risk Reduct. 62. https://doi.org/10.1016/j.iidrr,2021.102366.
+
+Mikolov, T., Sutskever, I., Chen, K., Corrado, G.S., Dean, J., 2013. Distributed representations of words and phrases and their compositionality. Adv. Neural Inf. Process. Syst. 26
+
+Misuri, A., Cozzani, V., 2021. A paradigm shift in the assessment of natech scenarios in chemical and process facilities. Process Saf. Environ. Prot. 152, 338–351. https:/ doi.org/10.1016/j.psep.2021.06.018.
+
+Misuri, A., Moreno, V.C., Quddus, N., Cozzani, V., 2019. Lessons learnt from the impact of hurricane harvey on the chemical and process industry. Reliab. Eng. Syst. Saf. 190, 106521.
+
+OpenAI. (2025). o3-mini. https://openai.com/index/openai-o3-mini/.
+
+Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., instructions with human feedback, Ady. Neural Inf, Process. Syst, 35. 27730–27744
+
+Pawar, B., Park, S., Hu, P., Wang, Q., 2021. Applications of resilience engineering principles in different fields with a focus on industrial systems: a literature review. J. Loss Prey. Process Ind. 69. 104366
+
+Qiu, X., Sun, T., Xu, Y., Shao, Y., Dai, N., Huang, X., 2020. Pre-trained models for natural language processing: a survey. Sci. China Technol. Sci. 63 (10), 1872–1897. https:// doi.org/10.1007/s11431-020-1647-3.
+
+Renni, E., Krausmann, E., Cozzani, V., 2010. Industrial accidents triggered by lightning. J. Hazard. Mater, 184 (1-3). 42–48
+
+Ricci, F., Moreno, V.C., Cozzani, V., 2020. Analysis of natech accidents triggered by extreme temperatures in the chemical and process industry. Chem. Eng. Trans. 82 79-84.
+
+Ricci, F., Casson Moreno, V., Cozzani, V., 2021. A comprehensive analysis of the occurrence of natech events in the process industry, Process Saf, Environ, Prot. 147. 703–713. https://doi.org/10.1016/i.psep.2020.12.031.
+
+Ricci, F., Moreno, V.C., Cozzani, V., 2023. Natech accidents triggered by cold waves. Process Saf. Environ. Prot. 173, 106–119.
+
+Sengul, H., Santella, N., Steinberg, L.J., Cruz, A.M., 2012. Analysis of hazardous material releases due to natural hazards in the United States. Disasters 36 (4), 723–743. https://doi.org/10.1111/i.1467-7717.2012.01272.x
+
+Showalter, P.S., Myers, M.F., 1994. Natural disasters in the United States as release agents of oil, chemicals, or radiological materials between 1980-1989: analysis and recommendations. Risk Anal. 14 (2). 169–182, https://doi,org/10.1111/i.1539- 6924.1994.tb00042.x.
+
+Texas Commission on Enviromental Quality. (2025). Air Emission Event Report Database https://www.tceq.texas.gov/airquality/emission-events/eventreporting.
+
+Tixier, A.J.-P., Hallowell, M.R., Rajagopalan, B., Bowman, D., 2016. Automated content analysis for construction safety: a natural language processing system to extract precursors and outcomes from unstructured injury reports. Autom. Constr. 62, 45–56.
+
+Touvron, H., Lavril, T., Izacard, G., Martinet, X., Lachaux, M.-A., Lacroix, T., Rozi\`ere, B., Goval, N., Hambro, E., & Azhar, F., 2023. Llama: Open and efficient foundation language models. arXiy preprint arXiv:2302.13971..
+
+United States Coast Guard. (2025). National Response Center (NRC) database 〈http:// www.nrc.uscg.mil/〉.
+
+Valente, M., Ricci, F., Cozzani, V., 2025. A systematic review of resilience engineering applications to natech accidents in the chemical and process industry. Reliab. Eng. Syst. Saf. 255. https://doi.org/10.1016/j.ress.2024.110670.
+
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.N., Kaiser, L., Polosukhin, I., 2017. Attention is all you need. Adv. Neural Inf. Process. Syst. 30.
+
+Wang, Y., Kordi, Y., Mishra, S., Liu, A., Smith, N.A., Khashabi, D., & Hajishirzi, H. (2023, July). Self-Instruct: Aligning Language Models with Self-Generated Instructions. In A. Rogers, J. Boyd-Graber, & N. Okazaki, Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) Toronto, Canada.
+
+Yang, H., Li, C.-Y., Zou, L., Wang, Q., 2025. Understanding the effects of natural hazards on chemical emission incidents using machine learning techniques. Process Saf. Environ. Prot. 196. https://doi.org/10.1016/i,psep.2025.106900.
+
+Zhang, T., Kishore, V., Wu, F., Weinberger, K.Q., & Artzi, Y., 2019. BERTScore: Evaluating Text Generation with BERT. ArXiv, abs/1904.09675.
+
+Zheng, C., Zhou, H., Meng, F., Zhou, J., & Huang, M., 2023. Large language models are not robust multiple choice selectors. arXiv preprint arXiv:2309.03882..
+
+ZhengY., Zhang, R., Zhang, J., Ye, Y., & Luo, Z. (2024, August). LlamaFactory: Unified Efficient Fine-Tuning of 100+ Language Models. In.Y. Cao, Y. Feng, & D. Xiong, Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations) Bangkok, Thailand

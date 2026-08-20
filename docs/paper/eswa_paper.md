@@ -20,7 +20,7 @@ Construction accident reports contain the richest, least exploited source of cau
 
 Construction remains among the most hazardous industries worldwide. In China, hundreds of fatal construction accidents are officially reported each year, with collapse, fall-from-height, and hoisting incidents the most recurrent types. Each accident produces investigation reports and news narratives that record what happened, how it happened, and why. These texts constitute the largest and least exploited resource for construction safety research: they contain causal information accumulated at national scale over decades, yet they remain unstructured natural language that resists systematic analysis.
 
-The bottleneck is conversion. Turning narratives into analyzable records has traditionally required manual reading and coding by domain experts, a process that does not scale to the volume of reports produced annually (Kong and Ahn, 2024). Rule-based and keyword-matching systems generalize poorly across the varied linguistic patterns of accident writing (Togan et al., 2025). Supervised classifiers such as BERT (Devlin et al., 2019) and its distilled variants improve coverage but demand substantial annotated corpora that are expensive to produce in this domain. Large language models have recently opened a different route: direct inference from unstructured text without task-specific training data (Brown et al., 2020; OpenAI, 2023). Prior studies have demonstrated LLM extraction of accident attributes from OSHA narratives (Ahmadi et al., 2024), HFACS classification of Korean fall accidents (Kim and Han, 2024), HFACS-guided causal inference on aviation reports (Liu et al., 2025), and knowledge-graph construction from construction reports (Liu and Luo, 2025).
+The bottleneck is conversion. Turning narratives into analyzable records has traditionally required manual reading and coding by domain experts, a process that does not scale to the volume of reports produced annually (Kong and Ahn, 2024). Rule-based and keyword-matching systems generalize poorly across the varied linguistic patterns of accident writing (Togan et al., 2025). Supervised classifiers such as BERT (Devlin et al., 2019) and its distilled variants improve coverage but demand substantial annotated corpora that are expensive to produce in this domain. Large language models have recently opened a different route: direct inference from unstructured text without task-specific training data (Brown et al., 2020; OpenAI, 2023). Prior studies have demonstrated LLM extraction of accident attributes from OSHA narratives (Ahmadi et al., 2024), HFACS classification of Korean fall accidents (Kim and Han, 2024), HFACS-guided causal inference on aviation reports (Liu et al., 2025a), and knowledge-graph construction from construction reports (Liu and Luo, 2025).
 
 Three gaps persist across this literature. First, no existing system couples a causal taxonomy designed for the construction domain with an end-to-end pipeline that connects collection, extraction, causal coding, standardization, storage, and online access; prior work stops at extraction or at a static knowledge artifact. Second, the prompting strategies that drive LLM causal coding have been ranked on a single model (GPT-4o) in a single domain (aviation), leaving open whether the ranking generalizes across models — and the studies that employ domain-knowledge chain-of-thought prompts have not examined how the *phrasing* of embedded knowledge conditions the model's behavior. Third, the reliability of LLM annotations has not been formally validated against human experts in the construction domain with appropriate agreement statistics, so the substitution of human coders by LLMs rests on anecdote rather than measurement.
 
@@ -96,7 +96,7 @@ The Construction Accident Integrated Cause System (CAICS) is a five-layer, ninet
 | C — Consequence Amplification | C1 | Delayed rescue response | Excessive delay from accident to effective rescue, or inefficient rescue organization. |
 | | C2 | Concealed or delayed reporting | The responsible unit failed to report promptly, or deliberately concealed the accident. |
 
-Two design choices differentiate CAICS from adaptations of the aviation-derived HFACS taxonomy (Shappell and Wiegmann, 2000; Liu et al., 2025). First, the F layer captures physical protection failures, which are endemic in construction (missing edge protection, unstable support systems) but have no natural home in HFACS, whose layers describe human and organizational performance in operational aviation. Second, the C layer records consequence amplification factors, a phenomenon frequently reported in Chinese construction accidents, where delayed reporting (C2) is itself a regulatory violation that compounds casualties by delaying external rescue. The taxonomy is deliberately small (nineteen categories) relative to HFACS-based extensions: category sparsity per code was a binding constraint observed in preliminary experiments, and the final size balances discriminative power against per-category statistical power.
+Two design choices differentiate CAICS from adaptations of the aviation-derived HFACS taxonomy (Shappell and Wiegmann, 2000; Liu et al., 2025a). First, the F layer captures physical protection failures, which are endemic in construction (missing edge protection, unstable support systems) but have no natural home in HFACS, whose layers describe human and organizational performance in operational aviation. Second, the C layer records consequence amplification factors, a phenomenon frequently reported in Chinese construction accidents, where delayed reporting (C2) is itself a regulatory violation that compounds casualties by delaying external rescue. The taxonomy is deliberately small (nineteen categories) relative to HFACS-based extensions: category sparsity per code was a binding constraint observed in preliminary experiments, and the final size balances discriminative power against per-category statistical power.
 
 ### 3.3 Pipeline Architecture
 
@@ -104,7 +104,7 @@ Figure 1 depicts the overall architecture. The pipeline consists of six processi
 
 **Figure 1.** CAIEMS system architecture.
 
-**[图1占位：技术路线图英文版，Figure 1]**
+![](figures/fig1_architecture.png)
 
 **Stage 1: Multi-source collection.** A crawler ingests accident reports from public safety information portals (safehoo.com, esafety.cn) and local emergency-management bureaus. Raw HTML is parsed into structured fields (title, publication date, body text, source URL) and stored as candidate records. The corpus assembled for this paper spans 1978 to 2026 and covers all 31 provincial-level regions of mainland China.
 
@@ -116,7 +116,7 @@ Figure 1 depicts the overall architecture. The pipeline consists of six processi
 
 **Figure 2.** CAICS five-layer causal structure with an example evidence chain.
 
-**[图2占位：CAICS 五层树状图 + 示例证据链，Figure 2]**
+![](figures/fig2_caics_tree.png)
 
 **Stage 5: LLM-first MECE enum standardization.** Five basic fields (work task, equipment involved, material involved, worker type, building structure) are free-text in the source narratives. We standardize them through an LLM-first enumeration procedure that operationalizes the MECE principle: the LLM reviews the complete value distribution of a field across the corpus, designs a category framework satisfying mutual exclusivity and collective exhaustiveness, and then maps every observed value onto the framework. The procedure runs in two phases with different model configurations: framework design uses a high-capacity configuration, and full-corpus mapping uses a lightweight configuration for cost efficiency. This design inverts the conventional rule-first approach, in which an analyst prescribes categories before observing the data and subsequently encounters unmappable values. Table 2 reports the resulting enumerations. For the work task field, the LLM merged six original categories into four and introduced one new category (auxiliary work and on-site transport), reducing the residual "other" share from 18.9% to 2.9%.
 
@@ -124,13 +124,11 @@ Figure 1 depicts the overall architecture. The pipeline consists of six processi
 
 | Field | Categories | Largest category (share) | Residual "other" |
 |-------|-----------:|---------------------------|------------------|
-| Work task (WT) | 11 | WT02 main structure works (397) | 2.9% |
-| Equipment involved (EQP) | 13 | — | — |
-| Material involved (MAT) | 7 | — | — |
-| Worker type (WKR) | 13 | — | — |
-| Building structure (BLD) | 12 | — | — |
-
-**[表2需补充各字段完整分布数据，Phase 4 定稿时从 DB 取值]**
+| Work task (WT) | 11 | WT02 main structure works (397, 18.0%) | 2.9% |
+| Equipment involved (EQP) | 13 | EQP01 hoisting machinery (335, 24.4%) | 1.9% |
+| Material involved (MAT) | 7 | MAT01 concrete and cement products (423, 28.9%) | 11.1% |
+| Worker type (WKR) | 13 | WKR01 general laborers (928, 48.7%) | 6.3% |
+| Building structure (BLD) | 12 | BLD01 steel structures (127, 35.4%) | 3.6% |
 
 **Stage 6: Storage and access.** All artifacts (records, causal codes, enumerations, images, analyses) are stored in a SQLite relational database with nine tables. The final database contains 2,623 accident records, 17,364 evidence-bound causal codes (6.6 codes per record on average), and 33 standardized fields per record. An interactive Web platform and REST API expose the database: users can filter accidents by type, severity, region, work task, and causal code, and can inspect the evidence chains behind every causal annotation. The database is released publicly upon publication (Data Availability Statement, Section 7).
 
@@ -159,7 +157,7 @@ Table 3 summarizes the database. The severity distribution follows the Chinese c
 
 **Figure 3.** Distribution of causal codes across the nineteen CAICS categories.
 
-**[图3占位：CAICS 编码分布条形图（M1 2331, H1 2217, H3 2144, M2 1883, F2 1588, M4 1500, M3 1284, T2 662, F4 615, M5 588...），Figure 3]**
+![](figures/fig3_code_dist.png)
 
 ---
 
@@ -185,7 +183,7 @@ Figure 4 summarizes the sample hierarchy.
 
 **Figure 4.** Dataset hierarchy and the three evaluation samples.
 
-**[图4占位：样本关系流程图 Figure 4]**
+![](figures/fig4_sampling.png)
 
 ### 4.2 Evaluation Metrics
 
@@ -258,7 +256,7 @@ The remedy replaces the gate with a two-step judgment: (1) explicit matching —
 
 **Figure 5.** The Lexical Gatekeeping Effect and its remediation.
 
-**[图5占位：门控效应诊断图 — v1 vs v2 F1/Recall/M1 recall/空编码率，Figure 5]**
+![](figures/fig5_gatekeeping.png)
 
 The mechanism behind the effect is instructive. Interrogative phrasing ("does the text mention X?") activates the model's literal pattern-matching mode: attention concentrates on fragments containing the exact keywords, and paraphrases receive low weight. Declarative cue phrasing ("cues include a, b, c; even without these words, infer from the accident's nature") activates the reasoning mode, in which keywords define an open semantic family and the model judges membership autonomously. This asymmetry generalizes beyond construction: in any domain requiring recall-over-precision annotation (safety analysis, medical screening), CoT prompts should phrase conditions as clue guidance rather than condition checks; condition-check phrasing suits zero-false-positive settings such as legal citation.
 
@@ -266,7 +264,7 @@ Liu et al. (2025a) implicitly avoided the effect: their HFACS-CoT employed guidi
 
 #### 4.4.4 Serial layer-by-layer reasoning fails on bidirectional causal chains
 
-S5 decomposed the five-layer analysis into five independent API calls, each performed by a layer specialist, with the prior layer's results injected as a summary. The theoretical expectation, following the design of HFACS-CoT+ (Liu et al., 2025), was that per-layer isolation prevents cross-layer attention dilution. The result inverts the expectation: F1 = 0.488, below Zero-Shot, at six times the API cost (5,430 s vs. 1,382 s for 100 records).
+S5 decomposed the five-layer analysis into five independent API calls, each performed by a layer specialist, with the prior layer's results injected as a summary. The theoretical expectation, following the design of HFACS-CoT+ (Liu et al., 2025a), was that per-layer isolation prevents cross-layer attention dilution. The result inverts the expectation: F1 = 0.488, below Zero-Shot, at six times the API cost (5,430 s vs. 1,382 s for 100 records).
 
 The diagnosis is architectural. Each layer specialist receives a lossy summary of upstream findings ("M layer = M1, M2; F layer = F2; T layer = T2") without the reasoning that produced them. More fundamentally, CAICS causal chains are bidirectional: a trigger event (T) exposes a protection failure (F), which traces back to a management deficiency (M). A single integrated call can traverse these links freely within one reasoning context; the serial architecture truncates the chain at every layer boundary. Liu et al. (2025a) found serial decomposition benign on GPT-4o for HFACS aviation codes, whose inter-code dependencies are comparatively sparse and well-mapped. Our results suggest the viability of serial architectures depends on the coupling density of the domain's causal structure: for tightly coupled frameworks such as CAICS, integrated single-call reasoning with an enlarged reasoning budget is the superior design.
 
@@ -295,7 +293,7 @@ Figure 6 places each human-AI kappa against its expert range.
 
 **Figure 6.** Human-AI agreement versus expert inter-rater ranges.
 
-**[图6占位：Kappa 森林图 Figure 6]**
+![](figures/fig6_kappa.png)
 
 The sample size was fixed before data collection by the Fleiss' kappa standard-error formula: for expected kappa near 0.90 with a target 95% confidence-interval half-width of 0.063, the required $n$ is approximately 300, and the observed CIs confirm the design (maximum observed half-width 0.045). The remaining disagreements are concentrated in semantically adjacent accident-type boundaries (e.g., earthwork collapse versus general collapse), where experts disagree with each other at comparable rates, indicating that the residual human-AI divergence reflects genuine task ambiguity rather than systematic LLM error.
 
@@ -424,14 +422,48 @@ Zhou, D., Schärli, N., Hou, L., et al. (2023). Least-to-Most Prompting Enables 
 
 ## Appendix A. Prompt Templates
 
-The six prompting strategies (S0–S5) are specified as follows; full prompt texts are reproduced verbatim in the supplementary repository.
+The six prompting strategies are reproduced below in condensed form; the complete prompts are released with the supplementary repository.
 
-- **S0 Basic Zero-Shot**: the CAICS taxonomy (nineteen codes with definitions) and the JSON output format, no reasoning guidance.
-- **S1 Basic Few-Shot**: S0 plus three expert-annotated examples (text → codes with evidence).
-- **S2 Auto-CoT**: S0 plus an instruction to self-organize reasoning along the M→F→T→H→C causal chain before coding.
-- **S3 Plan-and-Solve**: S0 plus an instruction to first draft an analysis plan, then execute it.
-- **S4 CAICS-CoT (ours)**: CAICS knowledge embedded as clue-guided CoT with the two-step judgment (explicit matching + authorized inference); coverage preference over conservative omission.
-- **S5 CAICS-CoT+ (ours)**: five independent per-layer API calls (M/F/T/H/C specialists) with inter-layer summary injection, plus a final aggregation call.
+**A.1 S0 Basic Zero-Shot** (system prompt, verbatim core):
+
+> You are a construction accident analysis expert. Extract causal codes from the accident text.
+> CAICS framework (5 layers, 19 categories):
+> M Management: M1 deficient supervision, M2 failed hazard inspection, M3 insufficient training, M4 procedural gaps, M5 irregular market conduct
+> F Protection: F1 edge/opening protection, F2 support instability, F3 disabled safety devices, F4 unused PPE
+> T Trigger: T1 equipment failure, T2 abnormal material state, T3 geological change, T4 meteorological
+> H Human acts: H1 procedure violation, H2 improper command, H3 failed risk perception, H4 poor emergency response
+> C Consequence: C1 delayed rescue, C2 concealed reporting
+> Output JSON: {"codes":["M1","F2"], "accident_type":"...", "severity":"...", "deaths":N, "injuries":N, "direct_cause":"..."}
+
+**A.2 S1 Basic Few-Shot**: identical to S0, plus three expert-annotated examples inserted before the user message, each formatted as (accident text → JSON output with codes, evidence quotations, and inference notes). Example excerpt: *"升降机未经检验合格即投入使用..."* → `{"codes":["M1","M3","M4","F2","T1","H1","H2"], ...}`.
+
+**A.3 S2 Auto-CoT**: S0 plus the instruction: "First organize your reasoning along the M→F→T→H→C causal chain step by step, then merge all selected codes into the final JSON `codes` field."
+
+**A.4 S3 Plan-and-Solve**: S0 plus the instruction: "First draft a brief analysis plan covering the five CAICS layers, then execute the plan and output the final JSON."
+
+**A.5 S4 CAICS-CoT (ours)**. Two versions were tested. The v1 system prompt phrased every code as a conditional check (excerpt, verbatim):
+
+> M3 insufficient training: does the text mention "untrained" / "inadequate safety briefing" / "pro forma briefing" / "lack of safety knowledge"?
+> F1 edge and opening protection: "no protection" / "no guardrail" / "unprotected edge" / "opening uncovered" / "no safety net"?
+> ... [all nineteen codes in interrogative form]
+> Do not fabricate codes that the text does not support.
+> Output JSON: {"codes":[...], ...}
+
+The v2 system prompt replaced conditional checks with the two-step judgment (excerpt, verbatim):
+
+> Core principle: apply both **explicit evidence matching** and **implicit domain inference**. Some causes have no direct keywords in the text but can be reasonably inferred from the accident's nature and common patterns in construction — mark these as "inferred".
+> M1 deficient supervision: **inference**: a fatal accident in itself demonstrates a serious supervision deficiency; output M1[inferred] even if the text does not mention it directly.
+> M2 failed hazard inspection: **inference**: if the accident involved pre-existing structural defects or equipment problems that went undetected → M2[inferred].
+> M3 insufficient training: **inference**: if workers clearly violated procedures but the text does not mention training → M3[inferred].
+> H1 procedure violation: cues: explicit violation of plans/procedures/codes. **inference**: if workers' acts violated basic safety common sense → H1[inferred].
+> ...
+> Safety analysis prefers over-coding to under-coding: missing a cause costs more than adding one.
+
+**A.6 S5 CAICS-CoT+ (ours)**: five independent API calls, one per layer. Call 1 (M layer): "You are a safety management expert. Identify management-root causes from the accident text. [M1–M5 with cues and inferences] Output JSON: {"M":["M1","M2"],"reasoning":"..."}". Call 2 (F layer) receives "Known management-layer findings: {result_M}" and so on; each downstream call injects the summaries of all upstream results. A final aggregation call merges the five layer outputs into the unified JSON.
+
+---
+<!-- 附录 A 完 -->
+
 
 ---
 <!-- 正文与声明完，待 Stage 2.5 完整性验证 -->

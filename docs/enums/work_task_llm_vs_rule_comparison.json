@@ -1,0 +1,114 @@
+{
+  "total_values": 15,
+  "disagreement_count": 15,
+  "disagreement_rate": 1.0,
+  "llm_distribution": {
+    "WT14": 1,
+    "WT06": 1,
+    "WT07": 1,
+    "WT04": 1,
+    "WT01": 2,
+    "WT08": 1,
+    "WT09": 2,
+    "WT03": 2,
+    "WT10": 1,
+    "WT11": 1,
+    "WT05": 1,
+    "WT02": 1
+  },
+  "rule_distribution": {
+    "MISSING": 15
+  },
+  "disagreements": [
+    {
+      "value": "WT15-其他",
+      "llm_code": "WT14",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT08-塔吊与起重",
+      "llm_code": "WT06",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT12-装饰与装修",
+      "llm_code": "WT07",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT05-混凝土浇筑",
+      "llm_code": "WT04",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT01-土方与基坑",
+      "llm_code": "WT01",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT13-拆除作业",
+      "llm_code": "WT08",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT11-管道与管网",
+      "llm_code": "WT09",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT07-脚手架作业",
+      "llm_code": "WT03",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT04-模板与支撑",
+      "llm_code": "WT03",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT09-桥梁工程",
+      "llm_code": "WT10",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT10-隧道与地下",
+      "llm_code": "WT11",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT06-钢结构与网架",
+      "llm_code": "WT05",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT14-设备安装",
+      "llm_code": "WT09",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT03-钢筋工程",
+      "llm_code": "WT02",
+      "rule_code": "MISSING",
+      "count": 1
+    },
+    {
+      "value": "WT02-桩基工程",
+      "llm_code": "WT01",
+      "rule_code": "MISSING",
+      "count": 1
+    }
+  ]
+}

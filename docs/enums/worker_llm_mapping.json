@@ -1,0 +1,2058 @@
+{
+  "普工": {
+    "code": "WKR01",
+    "count": 428
+  },
+  "民工": {
+    "code": "WKR01",
+    "count": 87
+  },
+  "施工人员": {
+    "code": "WKR01",
+    "count": 85
+  },
+  "工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "木工": {
+    "code": "WKR02",
+    "count": 53
+  },
+  "架工": {
+    "code": "WKR06",
+    "count": 33
+  },
+  "钢筋工": {
+    "code": "WKR04",
+    "count": 30
+  },
+  "路人": {
+    "code": "WKR12",
+    "count": 30
+  },
+  "泥工": {
+    "code": "WKR03",
+    "count": 29
+  },
+  "瓦工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "砖工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "混凝土工": {
+    "code": "WKR05",
+    "count": 26
+  },
+  "建筑工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "架子工": {
+    "code": "WKR06",
+    "count": 23
+  },
+  "起重工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "农民工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "电工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "临时工": {
+    "code": "WKR01",
+    "count": 16
+  },
+  "电焊工": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "焊工": {
+    "code": "WKR07",
+    "count": 14
+  },
+  "抹灰工": {
+    "code": "WKR03",
+    "count": 14
+  },
+  "安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "作业人员": {
+    "code": "WKR01",
+    "count": 12
+  },
+  "村民": {
+    "code": "WKR12",
+    "count": 10
+  },
+  "施工工人": {
+    "code": "WKR01",
+    "count": 9
+  },
+  "司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "力工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "油漆工": {
+    "code": "WKR13",
+    "count": 7
+  },
+  "机修工": {
+    "code": "WKR10",
+    "count": 7
+  },
+  "钢结构安装工": {
+    "code": "WKR11",
+    "count": 6
+  },
+  "装修工人": {
+    "code": "WKR13",
+    "count": 6
+  },
+  "职工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "维修工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "电梯安装工": {
+    "code": "WKR11",
+    "count": 6
+  },
+  "模板工": {
+    "code": "WKR02",
+    "count": 6
+  },
+  "学生": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "吊车司机": {
+    "code": "WKR08",
+    "count": 6
+  },
+  "木工、混凝土工": {
+    "code": "WKR02",
+    "count": 5
+  },
+  "工长": {
+    "code": "WKR13",
+    "count": 5
+  },
+  "小工": {
+    "code": "WKR01",
+    "count": 5
+  },
+  "塔吊司机": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "吊装工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "顾客": {
+    "code": "WKR12",
+    "count": 4
+  },
+  "铆工": {
+    "code": "WKR13",
+    "count": 4
+  },
+  "钳工": {
+    "code": "WKR13",
+    "count": 4
+  },
+  "空调安装工": {
+    "code": "WKR11",
+    "count": 4
+  },
+  "石工": {
+    "code": "WKR03",
+    "count": 4
+  },
+  "瓦工、普工": {
+    "code": "WKR03",
+    "count": 4
+  },
+  "泥工、普工": {
+    "code": "WKR03",
+    "count": 4
+  },
+  "油工": {
+    "code": "WKR13",
+    "count": 4
+  },
+  "水暖工": {
+    "code": "WKR10",
+    "count": 4
+  },
+  "挖掘机司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "拆除工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "居民": {
+    "code": "WKR12",
+    "count": 4
+  },
+  "安装工人": {
+    "code": "WKR11",
+    "count": 4
+  },
+  "女工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "塔吊操作工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊安装工": {
+    "code": "WKR08",
+    "count": 4
+  },
+  "农民": {
+    "code": "WKR12",
+    "count": 4
+  },
+  "农工": {
+    "code": "WKR01",
+    "count": 4
+  },
+  "装修工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "群众": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "玻璃安装工": {
+    "code": "WKR11",
+    "count": 3
+  },
+  "水电工": {
+    "code": "WKR10",
+    "count": 3
+  },
+  "水泥工": {
+    "code": "WKR05",
+    "count": 3
+  },
+  "检修工": {
+    "code": "WKR10",
+    "count": 3
+  },
+  "机械操作工": {
+    "code": "WKR09",
+    "count": 3
+  },
+  "施工作业人员": {
+    "code": "WKR01",
+    "count": 3
+  },
+  "合同工": {
+    "code": "WKR01",
+    "count": 3
+  },
+  "高空作业工人": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "隧道工": {
+    "code": "WKR13",
+    "count": 2
+  },
+  "防水工": {
+    "code": "WKR13",
+    "count": 2
+  },
+  "钢结构施工人员": {
+    "code": "WKR11",
+    "count": 2
+  },
+  "钢筋工、普工": {
+    "code": "WKR04",
+    "count": 2
+  },
+  "辅工": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "装载机司机": {
+    "code": "WKR09",
+    "count": 2
+  },
+  "装卸工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "行人": {
+    "code": "WKR12",
+    "count": 2
+  },
+  "粉刷工": {
+    "code": "WKR03",
+    "count": 2
+  },
+  "管道工": {
+    "code": "WKR10",
+    "count": 2
+  },
+  "砼工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "砖工、普工": {
+    "code": "WKR03",
+    "count": 2
+  },
+  "砌筑工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "盾构作业人员": {
+    "code": "WKR09",
+    "count": 2
+  },
+  "白铁工": {
+    "code": "WKR11",
+    "count": 2
+  },
+  "瓦工、力工": {
+    "code": "WKR03",
+    "count": 2
+  },
+  "焊工、普工": {
+    "code": "WKR07",
+    "count": 2
+  },
+  "浇筑工": {
+    "code": "WKR05",
+    "count": 2
+  },
+  "泥水工": {
+    "code": "WKR03",
+    "count": 2
+  },
+  "汽车司机": {
+    "code": "WKR09",
+    "count": 2
+  },
+  "模板工、混凝土工": {
+    "code": "WKR02",
+    "count": 2
+  },
+  "架工、瓦工": {
+    "code": "WKR06",
+    "count": 2
+  },
+  "架工、泥工": {
+    "code": "WKR06",
+    "count": 2
+  },
+  "杂工": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "机械工": {
+    "code": "WKR09",
+    "count": 2
+  },
+  "木工、钢筋工": {
+    "code": "WKR02",
+    "count": 2
+  },
+  "普工、瓦工": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "普工、挖掘机司机": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "施工员": {
+    "code": "WKR13",
+    "count": 2
+  },
+  "操作工人": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "操作工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "拆除工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "技术员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "打桩工": {
+    "code": "WKR09",
+    "count": 2
+  },
+  "工人、路人": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "安装人员": {
+    "code": "WKR11",
+    "count": 2
+  },
+  "外墙涂料工": {
+    "code": "WKR03",
+    "count": 2
+  },
+  "塔吊拆卸工": {
+    "code": "WKR08",
+    "count": 2
+  },
+  "塔吊安拆工": {
+    "code": "WKR08",
+    "count": 2
+  },
+  "垃圾清运工": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "吊运工": {
+    "code": "WKR08",
+    "count": 2
+  },
+  "劳务工人": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "劳务人员": {
+    "code": "WKR01",
+    "count": 2
+  },
+  "高空作业车操作员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "高空作业人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "高处作业工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "高处作业人员、车间工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "高处作业人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "马车夫": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "风钻工、放炮工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "风钻工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "风电设备安装工人": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "领班、外籍劳工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "顾客、清洁工": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "项目经理": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "项目总工、挖机操作人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "项目安全负责人、挖掘机司机、力工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "顶管作业工人": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "顶升作业人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "隧道施工工人": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "隧道施工人员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "随车人员兼装卸工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "防腐绝热作业人员": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "门窗安装负责人": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "镶贴工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "铺装工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "铸焊机操作工": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "铲车司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "铝合金安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "铁塔安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "钻探辅助工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "钻井工、普工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "钻井工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "钳工、实习技术员、车间副主任": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "钳工、学工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "钢网架安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "钢筋工、电焊工": {
+    "code": "WKR04",
+    "count": 1
+  },
+  "钢筋工、混凝土浇捣工": {
+    "code": "WKR04",
+    "count": 1
+  },
+  "钢筋工、技术员、施工队长": {
+    "code": "WKR04",
+    "count": 1
+  },
+  "钢架施工工人": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "钢架工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "钢板拆除工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "采茶工": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "采石工人、铲车司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "采沙工人": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "配管工、木工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "通风工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "通信线路工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "运土工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "运保工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "辅助工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "轨道车司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "路面劳务工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "起重机械安装人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "贴砖工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "质量安全员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "货车驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "货车司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "设备维修员": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "装饰装修工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "装饰工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "装载机操作人员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "衬里专业队作业人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "街道职工": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "落矿清扫工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "茶客": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "脚手班班长": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "脚手架工人": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "网架安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "综合班力工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "维修电工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "维修人员": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "维保工人": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "维保人员": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "绞车工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "经营户": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "粮库工作人员": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "粉刷辅工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "管理员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "管工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "筑炉工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "租户": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "社会自由务工人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "砼振捣工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "破碎机驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "砌砖工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "石材工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "真石漆粉刷工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "真石漆工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "监控安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "电镀厂工人": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "电气技术员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "电梯司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "电机车司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "电力线路工人": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "生产工人": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "班长、施工人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "班组长、工人、泵车工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "现场负责人": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "现场管理人员与技术人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "特种作业人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "爆破工、爆破工程师": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "爆破工、民工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "爆破工、杂工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "爆破工、施工员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "爆破员、爆破工程技术人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "热切割工": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "炊事员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "灰工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "灯带安装高处作业施工人员": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "火锯工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "漆工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "游散人员、焊工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "清淤工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "混凝工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土浇筑工、泵工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土浇筑工、施工员、监理员": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土浇筑工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土泵车驾驶员兼操作员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "混凝土泵车大臂软管操作工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "混凝土操作工、混凝土泵车操作员、混凝土运输车驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "混凝土工、钢筋工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、辅助工、木工班组长": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、砌墙工、粉刷工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、混凝土泵车指挥员": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、泵车司机": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、泵管操作工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、模板工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、木工、钢筋工、泵车司机": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、木工、小工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、木工、力工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土工、塔吊司机": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "混凝土公司工作人员、操作员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "消防管道安装工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "消防人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "涂料装修工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "测量工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "测量员、驾驶员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "测绘技术人员、普工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "浇筑工、泵工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "泵站工、厂长、仪表工、绿化工、大池工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "泥瓦工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、队长": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、石工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、混凝土泵工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、木工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、普工、临时工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "泥工、临时工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "法定代表人、清洁工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "油漆组组长": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "油漆操作工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "油漆工、电焊工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "油漆工、泥工、塔吊司机": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "油工、合同工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "河道管护工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "沥青工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "沟渠工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "汽吊司机、起重工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "水道工、民工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "水泥工、焊接工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "水暖工、普工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "水工、电工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "水工、临时工、民工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "氧割工": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "气焊工、铆工": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "民技工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "民工、电焊工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "民工、普工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "民工、技术员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "民工、工长": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "民工、包工队负责人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "模板工人": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "模板工、焊工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "模板工、塔机指挥员": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "模板安装工人": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "检修人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "桩井工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "桥梁安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "桥架安装工人": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "架线工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "架梁施工人员": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "架桥机操作人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "架桥工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "架工、电工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、民工、瓦工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、民工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、木工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、普工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、司机、抹灰工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、力工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架工、临时工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工普工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工、铝合金安装工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工、钢筋工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工、混凝土工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工、施工人员": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "架子工、幕墙玻璃工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "村民（亲戚帮工）": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "材料清点工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "材料工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "材料员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "材料制作组小组长、电焊工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "机采工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "机电工、司机": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "机械工、民工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "机械安装工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "机修工、施工人员": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "机修学工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "木工、钢筋工、杂工、技术人员": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、钢筋工、施工员": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、电焊工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、瓦工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、焊工、砼工、钢筋工、测量工、液压工、起重工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、混凝土工、钢筋工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、泥工、机械工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、泥工、普工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、泥工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、普工、瓦工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、普工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、技术员、安全员、普工、采购员": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、工人": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、外包工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木工、农建工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "木临工": {
+    "code": "WKR02",
+    "count": 1
+  },
+  "服装厂工人": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "更夫": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "暖通销售员": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "普通工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普通作业人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、锻工、焊工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、钢筋工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、群众": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、混凝土泵车指挥员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、混凝土司机": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、泥工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、水泥工、木工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、水暖工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、民工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、木工、泥工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、施工员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、搭架工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、技术人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、垃圾清理工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、司机、信号员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、包工头": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "普工、信号工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工群众": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "施工员、混凝土工、木工、钢筋工、架子工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "施工员、液压机械破碎机操作员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "施工人员、看料人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、班长": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、村民": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、拖拉机司机": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、快递员、外卖员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、巡查人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "施工人员、塔吊司机": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "料工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "教师": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "放线员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "收料员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "操作手辅助工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "搅拌机司机": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "搅拌工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "推土机驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "掘进工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "排险人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "排水班组工人": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "换刀工人": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "挖机操作人员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "挖掘机驾驶员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "挖掘工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "挖掘工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "挖孔桩工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "挑土工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "指挥工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "挂绳工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "拾荒人员": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "拍浆工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "拆除作业工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "拆迁工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "拆房工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "拆卸工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "拆卸人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "护炉工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "护坡工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "技术负责人": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "技术人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "技工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "打零工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "打桩机操作工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "扎铁工": {
+    "code": "WKR04",
+    "count": 1
+  },
+  "扎筋工人": {
+    "code": "WKR04",
+    "count": 1
+  },
+  "房主": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "影楼内人员（非施工人员）": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "彩钢瓦维修安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "建筑起重机械检维修工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "建筑民工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "建筑架子工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "建筑工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "建桥工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "废品回收人员": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "库房保管员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "广告牌拆除工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "广告公司工人": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "幼儿": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "平工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "干部": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "市民（非施工人员）": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "市民": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "工程师": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "工匠": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "工作人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "展厅工作人员": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "屋面树脂瓦安装协作人员": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "导梁机班组作业人员": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "实习技术员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "实习学生": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "安装拆卸工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "安装承包负责人": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "安全监护": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "安全员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "学徒工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "学工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "季节工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "外籍工人": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "外墙装饰工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙装潢工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙翻新工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙维修工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙真石漆作业人员": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙清洁工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "外墙涂料工人": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙抹灰工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "外墙保温工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "壮工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "塔机安装作业人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊维修工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊操作员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊拆除工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊拆除人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊安装工人": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊安装作业人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊作业工人": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塔吊作业人员": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "塑钢窗安装工": {
+    "code": "WKR11",
+    "count": 1
+  },
+  "堵漏工": {
+    "code": "WKR03",
+    "count": 1
+  },
+  "基督教徒": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "地基施工人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "地基工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "土石工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "土方工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "围观群众": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "喷浆工": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "后勤临时人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "吊篮安装工": {
+    "code": "WKR06",
+    "count": 1
+  },
+  "司索工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "司炉工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "卷扬机工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "印刷厂工人": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "包工头": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "勤杂工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "劳务公司作业人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "助教": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "动火作业人员": {
+    "code": "WKR07",
+    "count": 1
+  },
+  "务工人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "副队长": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "副科长": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "副班长": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "副主任": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "制鞋工": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "出碴人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "农民临时工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "农业工人": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "养路工": {
+    "code": "WKR09",
+    "count": 1
+  },
+  "养护工、驾驶员": {
+    "code": "WKR05",
+    "count": 1
+  },
+  "公司员工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "儿童": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "修理工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "信号工": {
+    "code": "WKR08",
+    "count": 1
+  },
+  "保管": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "保温工人": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "保温工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "保安人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "保安、市政工程施工人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "保安、工人": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "作业班组班长、施工人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "作业人员、建设单位管理人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "住户": {
+    "code": "WKR12",
+    "count": 1
+  },
+  "企业员工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "主动防护网作业人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "主体结构作业员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "临时雇佣作业人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时聘用人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时电工": {
+    "code": "WKR10",
+    "count": 1
+  },
+  "临时民工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时性副业工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时工、检修人员": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时工、小工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "临时工(外省民工)": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "中国民工": {
+    "code": "WKR01",
+    "count": 1
+  },
+  "专职安全管理人员": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "下料工": {
+    "code": "WKR13",
+    "count": 1
+  },
+  "上料工": {
+    "code": "WKR01",
+    "count": 1
+  }
+}

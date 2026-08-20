@@ -1,0 +1,3022 @@
+{
+  "混凝土": {
+    "code": "MAT01",
+    "count": 165
+  },
+  "土方": {
+    "code": "MAT02",
+    "count": 152
+  },
+  "钢筋": {
+    "code": "MAT03",
+    "count": 50
+  },
+  "钢管": {
+    "code": "MAT03",
+    "count": 38
+  },
+  "砖": {
+    "code": "MAT04",
+    "count": 18
+  },
+  "模板": {
+    "code": "MAT05",
+    "count": 18
+  },
+  "水泥": {
+    "code": "MAT01",
+    "count": 17
+  },
+  "混凝土、钢筋": {
+    "code": "MAT01",
+    "count": 15
+  },
+  "预制板": {
+    "code": "MAT01",
+    "count": 13
+  },
+  "泥土": {
+    "code": "MAT02",
+    "count": 11
+  },
+  "钢模板": {
+    "code": "MAT03",
+    "count": 10
+  },
+  "砂浆": {
+    "code": "MAT01",
+    "count": 10
+  },
+  "钢结构": {
+    "code": "MAT03",
+    "count": 8
+  },
+  "钢筋混凝土": {
+    "code": "MAT01",
+    "count": 8
+  },
+  "彩钢板": {
+    "code": "MAT03",
+    "count": 8
+  },
+  "岩石": {
+    "code": "MAT02",
+    "count": 8
+  },
+  "砖块": {
+    "code": "MAT04",
+    "count": 7
+  },
+  "玻璃": {
+    "code": "MAT07",
+    "count": 7
+  },
+  "砖墙": {
+    "code": "MAT04",
+    "count": 6
+  },
+  "燃气": {
+    "code": "MAT06",
+    "count": 6
+  },
+  "水泥板": {
+    "code": "MAT01",
+    "count": 6
+  },
+  "木板": {
+    "code": "MAT05",
+    "count": 6
+  },
+  "钢架": {
+    "code": "MAT03",
+    "count": 5
+  },
+  "钢板": {
+    "code": "MAT03",
+    "count": 5
+  },
+  "积雪": {
+    "code": "MAT07",
+    "count": 5
+  },
+  "彩钢瓦": {
+    "code": "MAT03",
+    "count": 5
+  },
+  "黄土": {
+    "code": "MAT02",
+    "count": 4
+  },
+  "钢网架": {
+    "code": "MAT03",
+    "count": 4
+  },
+  "钢筋、混凝土": {
+    "code": "MAT03",
+    "count": 4
+  },
+  "钢模": {
+    "code": "MAT03",
+    "count": 4
+  },
+  "钢梁": {
+    "code": "MAT03",
+    "count": 4
+  },
+  "钢材": {
+    "code": "MAT03",
+    "count": 4
+  },
+  "红砖": {
+    "code": "MAT04",
+    "count": 4
+  },
+  "砖头": {
+    "code": "MAT04",
+    "count": 4
+  },
+  "灰浆": {
+    "code": "MAT01",
+    "count": 4
+  },
+  "混凝土、模板": {
+    "code": "MAT01",
+    "count": 4
+  },
+  "楼板": {
+    "code": "MAT01",
+    "count": 4
+  },
+  "建筑垃圾": {
+    "code": "MAT07",
+    "count": 4
+  },
+  "钢轨": {
+    "code": "MAT03",
+    "count": 3
+  },
+  "钢丝绳": {
+    "code": "MAT03",
+    "count": 3
+  },
+  "箱梁": {
+    "code": "MAT01",
+    "count": 3
+  },
+  "硫化氢": {
+    "code": "MAT06",
+    "count": 3
+  },
+  "石料": {
+    "code": "MAT04",
+    "count": 3
+  },
+  "石块": {
+    "code": "MAT04",
+    "count": 3
+  },
+  "真石漆": {
+    "code": "MAT07",
+    "count": 3
+  },
+  "电线": {
+    "code": "MAT07",
+    "count": 3
+  },
+  "煤气": {
+    "code": "MAT06",
+    "count": 3
+  },
+  "炸药": {
+    "code": "MAT06",
+    "count": 3
+  },
+  "泥浆": {
+    "code": "MAT06",
+    "count": 3
+  },
+  "污水": {
+    "code": "MAT06",
+    "count": 3
+  },
+  "水泥砂浆": {
+    "code": "MAT01",
+    "count": 3
+  },
+  "彩钢板、钢管": {
+    "code": "MAT03",
+    "count": 3
+  },
+  "墙体": {
+    "code": "MAT04",
+    "count": 3
+  },
+  "土石": {
+    "code": "MAT02",
+    "count": 3
+  },
+  "土方、石块": {
+    "code": "MAT02",
+    "count": 3
+  },
+  "土方、混凝土": {
+    "code": "MAT02",
+    "count": 3
+  },
+  "回填土": {
+    "code": "MAT02",
+    "count": 3
+  },
+  "铝塑板": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "铁皮": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "铁板": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢跳板": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢箱梁": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢管、脚手板": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢管、架板": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢管、扣件": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢筋、钢管": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢构件": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "钢围堰": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "配重块": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "自来水管道": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "脚手架": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "耐火砖": {
+    "code": "MAT04",
+    "count": 2
+  },
+  "碎石": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "砖墙、土方": {
+    "code": "MAT04",
+    "count": 2
+  },
+  "砂石": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "石渣": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "石棉瓦": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "石头": {
+    "code": "MAT04",
+    "count": 2
+  },
+  "电石": {
+    "code": "MAT06",
+    "count": 2
+  },
+  "炸药、雷管": {
+    "code": "MAT06",
+    "count": 2
+  },
+  "混凝土块": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "混凝土、钢管、扣件": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "混凝土、钢管": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "混凝土、钢筋混凝土": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "混凝土、钢筋、模板": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "淤泥": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "泥沙、土方": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "沥青": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "沙袋": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "沙子": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "汽油": {
+    "code": "MAT06",
+    "count": 2
+  },
+  "水泥砖块": {
+    "code": "MAT04",
+    "count": 2
+  },
+  "水泥块": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "水": {
+    "code": "MAT06",
+    "count": 2
+  },
+  "民工": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "毛竹": {
+    "code": "MAT05",
+    "count": 2
+  },
+  "楼梯板": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "标准节": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "架杆": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "木方": {
+    "code": "MAT05",
+    "count": 2
+  },
+  "木料": {
+    "code": "MAT05",
+    "count": 2
+  },
+  "木工": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "普工": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "施工人员": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "扣件": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "建筑材料": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "巨石": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "工字钢": {
+    "code": "MAT03",
+    "count": 2
+  },
+  "工人": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "岩体、土方": {
+    "code": "MAT02",
+    "count": 2
+  },
+  "屋面板": {
+    "code": "MAT01",
+    "count": 2
+  },
+  "保温板": {
+    "code": "MAT07",
+    "count": 2
+  },
+  "乙炔": {
+    "code": "MAT06",
+    "count": 2
+  },
+  "黄土、流沙": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "麻绳、缆风绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "高强钢丝、预应力筋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "高强螺栓": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "风机叶片、塔筒": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "风化石、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "风化岩、沙土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "预应力钢筋混凝土管": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预埋地脚螺栓、螺母": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "预制箱梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制空心板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制混凝土空心板、钢筋、砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制混凝土方桩": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制混凝土平板、墙体": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制水泥楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制水泥板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制板、钢梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制板、炉渣、混凝土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制板、混凝土、钢筋、钢架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制板、混凝土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制板、堆积货物": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "预制井、喇叭口、三通井": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "顶板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "页岩": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "非阻燃材料（座椅坐垫、化纤衣服、编织袋、塑料瓶）": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "雪弗板、灯箱、软膜": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "雨篷板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "隔热板支架、钢丝绳": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "隔热板、砖": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "陶粒砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "阳台栏板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "防水涂料": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "防护网": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "防护板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "防坠器": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "门式起重机主梁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "锅炉过热管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铸铁下水管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铝线": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铝粉粉尘": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "铝棒": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铝合金门窗": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铝单板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铝制装饰板、铝板、方钢龙骨": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铅丝": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁管、木材": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁矿石": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "铁皮、水泥、钢架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁棚": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁枝": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁条、墙板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁块、泡沫板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "铁件、垫木": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钻杆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钻头": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢锭": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢铁框架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢钉": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢质型材、风管铁皮": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢质器材": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢绞线": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢结构构件": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢结构支架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢结构屋架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢结构、混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢箱梁、铁砂混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢箱梁、混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管脚手架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管扣件式脚手架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、钢筋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、竹片、护网": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、木头、钢丝、混凝土、楼板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、扣件、脚手板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、扣件、混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、扣件、木模板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、大方砖": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢管、围网": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋笼": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋盘圆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋混凝土组合屋架、檩条": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土桥面": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土屋面板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土屋架、屋面板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土大槽板、钢模": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土、钢筋": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋混凝土、砖头": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "钢筋废料": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、钢管、混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、钢筋笼": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、钢模板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、脚手架、混凝土、预制板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、绑扎丝": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、环箍、12#铁丝": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、混凝土、砖墙": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、水泥浆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、水泥墙": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、水泥、模板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、水泥、彩钢板、空心砖": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、水泥": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、木条": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、工字钢梁、压型钢板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢筋、工字钢": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢窗": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢檩条": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢模板、钢筋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢模、钢管、脚手板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢梁（次梁）": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢梁、钢柱": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢梁、钢构": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢梁、沙袋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢架结构": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢架、钢索": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢架、现浇支架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢构": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢板组合梁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢板桩": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢板、角铁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢条、塔吊钢构": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢支撑、抱箍": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢带": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢屋架水平支撑": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢屋架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢化玻璃、金属副框": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "钢制网架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢制建材": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "钢丝绳、金属配重块": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "金属管子": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "金属架子": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "酸性机封油、发烟硫酸": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "配重": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "遮阳板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "道木、路基板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "造气炉盖": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "通风设备": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "通讯光缆": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "通水管道": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "过梁、跳板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "过梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "轻钢屋顶": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "轻质屋面板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "软土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "轨道梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "跳板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "路基箱": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "路基板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "起重工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "贝雷梁、槽钢、钢筋混凝土内支撑": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "贝雷架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "计量缸支架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "角铁、钢管、槽钢": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "角钢、缆风绳": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "角钢": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "裸线": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "装修材料": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "螺栓、钢板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "螺栓、支撑杆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "薄膜梁、大型板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "蒸汽、烧窑粉": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "蒸压加气混凝土条板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "草垫": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "苯板、钢筋、水泥": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "腻子粉": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "腻子": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "脚手架、钢筋、混凝土、三合板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "胶泥": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "聚氨酯夹芯板材": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "聚乙烯线管": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "联系梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "耐火砖、土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "网络线": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "结圈料": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "细石混凝土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "组合钢模板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "红砖、预制板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "红砖、灰浆": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "红石、泥土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "粘土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "粉煤灰": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "箱板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "管工、临时工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "管子": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "简易操作平台（脚手板）": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "竹胶板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "竹竿": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "竹板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "竹条板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "竹子": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "突泥、地下水": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "空调外机": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "空调出风口": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "空料车": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "空心砌块": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "空心楼板、屋面板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "空心板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "离心机转子": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "碴": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "碎砖、杂物": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "碎砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "硫化氢等有毒气体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "硫化氢气体、工业废水": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "硅酸盐砌块": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砼（混凝土）": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砼碴": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砼残渣、灰砂": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砼、小斗车": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砖胎膜（多孔砖）、回填土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖胎膜": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖胎模": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖砌边墙": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖砌女儿墙": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖砌体": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖石、混凝土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "砖头、水泥": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖头、土方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖墙、钢筋": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、预制板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、石灰": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、石板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、水泥、土方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、楼板、钢筋、混凝土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖块、工字钢、彩钢板、沙子": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、砂浆": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、电源线": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、沙土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、水泥砂浆、杂填土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、土石方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砖、土方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砌筑砂浆、多孔砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砌筑材料": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "砌块砖、小红砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "砌体砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砂轮": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "砂袋、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂砾石": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂浆、防水线": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "砂岩": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂层、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂子灰": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "砂": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "矿渣": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "石膏板、金属龙骨": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "石膏板、木板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "石膏板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "石粉料": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "石砌墙体": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石灰": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "石棉瓦、钢结构屋架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "石棉瓦、木板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "石材": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石子": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "石头、木板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石块、雷管、炸药": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石块、钢筋": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石块、泥土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石块、沙土、水泥": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "石块、土方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "白铁皮龙骨、石膏板、有机玻璃灯罩": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "白纱绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "白棕绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "电解槽端头": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "电缆、水泥横桩、土方": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "电缆": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "电线杆、玻璃": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "电源线、棚顶板材": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "甲烷": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "生瓦片": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "瓦片、铁制横梁": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "瓦片、脚手架模板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "瓦片、石棉瓦、彩条布、木板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "瓦楞板、清灰袋": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "瓦斯": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "珍珠岩保温板、彩钢板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "珍珠岩": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "玻纤瓦": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "玻璃胶": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "玻璃、油灰": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "玻璃、槽钢": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "现浇混凝土楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "环氧煤沥青防腐漆、H环氧稀释剂、二氧乙烷": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "燃气管道": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "煤气罐": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "焦碳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "焊帽": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "热轧带肋钢筋（分布筋、环向主筋）": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "烧结矿": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "烟道顶板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "烂泥、钢筋": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "炸药、导火线": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "炭碴": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "炉渣": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "灰车": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "灰盆、灰浆": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "灰桶": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "灰、砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "灯带": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "渣土、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "渣土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "混凝土预制件": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土结构": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土电杆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土楼板、砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土柱子": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土板材、混凝土梁柱": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土板块": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土屋面梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土屋面板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土余浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、预制板、水泥": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢结构": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢管、扣件、可调托撑": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢管、扣件、U型顶托": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢管、托撑": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、钢管、木板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、钢管": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、脚手架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、竹跳板、木材": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、砖块、预制板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、毛竹": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、楼承板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢筋、木材": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢模板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、钢架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、脚手架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、沙土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、水泥预制板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、水泥砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、水泥板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、枕木": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、木模板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、木模": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、木板等建筑垃圾": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、木材": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、建筑垃圾": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、土体": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、商品砼": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "混凝土、卵石弃土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "淤混凝土": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "淤泥质粉土、粉砂、中砂": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "淤泥、污水": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "液压油": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "液化气": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "消防管道吊架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "浆土块": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "泥砂": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "泥石流（泥水及杂物）": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "泥石流、泥浆": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "泥石、雷管": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "泥石、淤泥": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "泥瓦": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "泥沙、石头": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "泥土、水泥板": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "波形镀锌铁皮屋面板、石棉瓦": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "泄爆板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "沼气": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "油箱": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "沥青、沥青烟": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "沙袋、钢管支架": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙袋、沙子": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙子、水泥": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙子、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙土、红砖": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "沙": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "汽油桶、汽油": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "水管、钢结构管件": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "水稳砂石料": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水稳料": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水混凝土砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泵": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "水泥预制板、砖头": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥防撞墙": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥管、土方": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥管": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥砂浆、竹扫把": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥混合料、钢管脚手架、支板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥混凝土、钢筋": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥浆、钢筋": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥柱": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥板、砖块": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥板、水泥浆材料": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥方砖、砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥大梁、碎砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥块、铁架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥块、钢筋": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥、钢管、木板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥、花砖、砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥、石子": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥、沙石": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水泥、木板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "水沙": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "氧气瓶": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "氧气、液化石油气": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "正间大板、混凝土T型梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "檩条、螺栓、栓钉": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "檩条、瓦片": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "檐口板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "横梁（重77t，跨度64m）": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "横梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "模板木支撑": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "模板、钢管、混凝土": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "模板、水泥": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "模板、支木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "模板、扣件": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "槽钢、水泥板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "槽钢": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "楼顶板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "楼梯踏步、钢模板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "楼板、砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "楼板、旧砖": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "楼板、外墙": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "椿木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "棕绳、铅丝": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "棕绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "棉纱绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "桩锤": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "桥架、钢筋混凝土立柱": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "桥架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "桥体、钢拉索": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "桁车梁（钢筋混凝土预制构件）": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "桁架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "树脂瓦": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "柱子、预制构件": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "架管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "板车": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "板材、O型金属卡子、钉弹": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "板材": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "板岩、泥土": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "杠子": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "材料装载箱": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "杉木、支撑木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "杉木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "朽木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "机舱、塔筒": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "木质门头、水泥、金属框架": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木质盖板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木质模板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木质梁柱": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木电柱": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木炭": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木模板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木架栓": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木板、钢管": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木板、钢模板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木板、钢架": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木板、角钢、木方": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木材": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木杆、钢吊线": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木方子": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木方、钢管": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木料、混凝土": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木工材料、门字架": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木工支板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木工、架工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "木块": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "木制跳板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "有毒气体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "有毒有害气体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "曳引机": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "旧砖、钢筋、水泥": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "旧桥箱梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "方砖、钢管": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "方木柱子": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "方木": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "方形钢檩条": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "斜撑铁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "料石、片石": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "料斗": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "散装水泥": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "支模架、模板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "推拉门": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "挂桩": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "持力板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "抽淤管管头（铁质）": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "抹灰砂浆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "抹灰工、普工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "抹灰工": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "护栏(角钢与钢筋)": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "承重大梁": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "扣件、钢管、混凝土": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "打井钻杆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢瓦、透光瓦": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢板、阳光板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢板、钢架、石棉瓦": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢板、透光板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢板、PC采光板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩钢房顶": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "彩板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "建筑组件、铁架": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "建筑组件": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "建筑建材": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "建筑垃圾、回填土方、预制混凝土排水管": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "废钢条": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "废竹脚手板、劈柴杂物": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "废石": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "废弃风管": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "废弃金属管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "广告牌箱体": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "广告牌": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "广告字牌": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "工程材料": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "工字钢、钢模板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "工字钢、钢板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "工型梁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "工具袋": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "岩棉板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "岩棉彩板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "岩棉": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "岩土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "岩体、工字钢": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "岩体": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "山石": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "山体碎石、土方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "屋面瓦、木方": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "屋面板、阳台缺口板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "屋面板、钢筋混凝土连系梁": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "屋面板、屋架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "屋架梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "屋架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "尼龙绳子": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "小麦、玉米": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "小梁、法兰圈": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "导火线、炸药": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "宣传广告泡沫板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "实心砖、土方": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "定型模板、跳板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "安全网": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "安全绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "孤石、钢支撑": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "夹胶玻璃": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "天花板": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "天窗架、屋面板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "天然气": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "天沟模板、混凝土、石灰砂浆": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "天沟模板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "大米、购物车": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "大管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "大理石瓷砖、木板": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "大理石、管材、竹筏": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "大玻璃": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "大模板": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "大梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "大板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "大型风管架": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "大型屋面板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "多孔砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "多孔水泥板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "外墙瓷砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "复合碳源、可燃性气体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "墙砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "墙体碎石": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "墙体砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "塔吊底座": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "塑钢窗": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "塑料编织绳": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "塑料线": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "塑料板、木块、屏幕布、金属件": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "垫木板、水泥罐": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "垃圾": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "地下水、土体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "地下水": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "土石方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、钢筋混凝土雨水管": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、钢筋": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、老片石": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、砖模": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、砂土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、石头": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、混凝土块": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、波纹管": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、沙包、混凝土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、水泥板": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、排污管道": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、建筑垃圾": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、废混凝土板": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、天然气管道": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土方、圆砾": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土墙、土坯、木料": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "土坯": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "土体": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "圆孔板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "固化剂、甲缩醛": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "回填土、灰土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "四川省××县龙居建筑队": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "喷涂料余料、高温钢渣": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "商品砼输送泵管": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "商品混凝土、支模架": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "吊顶木板、木条": {
+    "code": "MAT05",
+    "count": 1
+  },
+  "可燃物": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "变频器": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "双T板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "原料渣土、耐火砖": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "压重": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "压缩机、高压线": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "压型钢板、保温玻璃丝绵": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "压型钢板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "卵石、土石方": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "危石": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "十字板针架钢梁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "加固涂料": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "分布盘": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "冻土": {
+    "code": "MAT02",
+    "count": 1
+  },
+  "冰": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "光缆": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "光伏板、采光板（PC材质）": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "保险杠": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "侧梁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "侧壁烧嘴炉砖": {
+    "code": "MAT04",
+    "count": 1
+  },
+  "作业人员": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "亚硝酸钠": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "乙炔气": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "乙炔、电石": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "临时建筑屋顶构件": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "中空玻璃": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "不锈钢钢板": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "不明气体": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "三角铁": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "三角架（角钢）": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "三角型臂杆": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "七孔预制楼板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "Φ6mm加固筋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "Φ28预应力筋": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "T梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "T形梁": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "PE管材、堵帽": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "C型钢": {
+    "code": "MAT03",
+    "count": 1
+  },
+  "ALC隔墙板": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "425#矿渣水泥、Φ25圆钢支承杆": {
+    "code": "MAT01",
+    "count": 1
+  },
+  "35kV电缆、电缆线盘": {
+    "code": "MAT07",
+    "count": 1
+  },
+  "2#岩石乳化炸药": {
+    "code": "MAT06",
+    "count": 1
+  },
+  "185平方毫米电线": {
+    "code": "MAT07",
+    "count": 1
+  }
+}

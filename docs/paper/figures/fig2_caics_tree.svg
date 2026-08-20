@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="528.673359pt" height="296.555512pt" viewBox="0 0 528.673359 296.555512" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-08-20T16:39:17.302998</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.0, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 296.555512 
+L 528.673359 296.555512 
+L 528.673359 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 49.963359 74.209852 
+L 114.691359 74.209852 
+Q 116.365359 74.209852 116.365359 72.546652 
+L 116.365359 38.173852 
+Q 116.365359 36.510652 114.691359 36.510652 
+L 49.963359 36.510652 
+Q 48.289359 36.510652 48.289359 38.173852 
+L 48.289359 72.546652 
+Q 48.289359 74.209852 49.963359 74.209852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #1b4f72; opacity: 0.16"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 121.387359 74.209852 
+L 186.115359 74.209852 
+Q 187.789359 74.209852 187.789359 72.546652 
+L 187.789359 38.173852 
+Q 187.789359 36.510652 186.115359 36.510652 
+L 121.387359 36.510652 
+Q 119.713359 36.510652 119.713359 38.173852 
+L 119.713359 72.546652 
+Q 119.713359 74.209852 121.387359 74.209852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #1b4f72; opacity: 0.16"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 192.811359 74.209852 
+L 257.539359 74.209852 
+Q 259.213359 74.209852 259.213359 72.546652 
+L 259.213359 38.173852 
+Q 259.213359 36.510652 257.539359 36.510652 
+L 192.811359 36.510652 
+Q 191.137359 36.510652 191.137359 38.173852 
+L 191.137359 72.546652 
+Q 191.137359 74.209852 192.811359 74.209852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #1b4f72; opacity: 0.16"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 264.235359 74.209852 
+L 328.963359 74.209852 
+Q 330.637359 74.209852 330.637359 72.546652 
+L 330.637359 38.173852 
+Q 330.637359 36.510652 328.963359 36.510652 
+L 264.235359 36.510652 
+Q 262.561359 36.510652 262.561359 38.173852 
+L 262.561359 72.546652 
+Q 262.561359 74.209852 264.235359 74.209852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #1b4f72; opacity: 0.16"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 335.659359 74.209852 
+L 400.387359 74.209852 
+Q 402.061359 74.209852 402.061359 72.546652 
+L 402.061359 38.173852 
+Q 402.061359 36.510652 400.387359 36.510652 
+L 335.659359 36.510652 
+Q 333.985359 36.510652 333.985359 38.173852 
+L 333.985359 72.546652 
+Q 333.985359 74.209852 335.659359 74.209852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #1b4f72; opacity: 0.16"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 49.963359 124.105852 
+L 132.547359 124.105852 
+Q 134.221359 124.105852 134.221359 122.442652 
+L 134.221359 88.069852 
+Q 134.221359 86.406652 132.547359 86.406652 
+L 49.963359 86.406652 
+Q 48.289359 86.406652 48.289359 88.069852 
+L 48.289359 122.442652 
+Q 48.289359 124.105852 49.963359 124.105852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #117a65; opacity: 0.16"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 139.243359 124.105852 
+L 221.827359 124.105852 
+Q 223.501359 124.105852 223.501359 122.442652 
+L 223.501359 88.069852 
+Q 223.501359 86.406652 221.827359 86.406652 
+L 139.243359 86.406652 
+Q 137.569359 86.406652 137.569359 88.069852 
+L 137.569359 122.442652 
+Q 137.569359 124.105852 139.243359 124.105852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #117a65; opacity: 0.16"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 228.523359 124.105852 
+L 311.107359 124.105852 
+Q 312.781359 124.105852 312.781359 122.442652 
+L 312.781359 88.069852 
+Q 312.781359 86.406652 311.107359 86.406652 
+L 228.523359 86.406652 
+Q 226.849359 86.406652 226.849359 88.069852 
+L 226.849359 122.442652 
+Q 226.849359 124.105852 228.523359 124.105852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #117a65; opacity: 0.16"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 317.803359 124.105852 
+L 400.387359 124.105852 
+Q 402.061359 124.105852 402.061359 122.442652 
+L 402.061359 88.069852 
+Q 402.061359 86.406652 400.387359 86.406652 
+L 317.803359 86.406652 
+Q 316.129359 86.406652 316.129359 88.069852 
+L 316.129359 122.442652 
+Q 316.129359 124.105852 317.803359 124.105852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #117a65; opacity: 0.16"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 49.963359 174.001852 
+L 132.547359 174.001852 
+Q 134.221359 174.001852 134.221359 172.338652 
+L 134.221359 137.965852 
+Q 134.221359 136.302652 132.547359 136.302652 
+L 49.963359 136.302652 
+Q 48.289359 136.302652 48.289359 137.965852 
+L 48.289359 172.338652 
+Q 48.289359 174.001852 49.963359 174.001852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #d35400; opacity: 0.16"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 139.243359 174.001852 
+L 221.827359 174.001852 
+Q 223.501359 174.001852 223.501359 172.338652 
+L 223.501359 137.965852 
+Q 223.501359 136.302652 221.827359 136.302652 
+L 139.243359 136.302652 
+Q 137.569359 136.302652 137.569359 137.965852 
+L 137.569359 172.338652 
+Q 137.569359 174.001852 139.243359 174.001852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #d35400; opacity: 0.16"/>
+   </g>
+   <g id="patch_13">
+    <path d="M 228.523359 174.001852 
+L 311.107359 174.001852 
+Q 312.781359 174.001852 312.781359 172.338652 
+L 312.781359 137.965852 
+Q 312.781359 136.302652 311.107359 136.302652 
+L 228.523359 136.302652 
+Q 226.849359 136.302652 226.849359 137.965852 
+L 226.849359 172.338652 
+Q 226.849359 174.001852 228.523359 174.001852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #d35400; opacity: 0.16"/>
+   </g>
+   <g id="patch_14">
+    <path d="M 317.803359 174.001852 
+L 400.387359 174.001852 
+Q 402.061359 174.001852 402.061359 172.338652 
+L 402.061359 137.965852 
+Q 402.061359 136.302652 400.387359 136.302652 
+L 317.803359 136.302652 
+Q 316.129359 136.302652 316.129359 137.965852 
+L 316.129359 172.338652 
+Q 316.129359 174.001852 317.803359 174.001852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #d35400; opacity: 0.16"/>
+   </g>
+   <g id="patch_15">
+    <path d="M 49.963359 223.897852 
+L 132.547359 223.897852 
+Q 134.221359 223.897852 134.221359 222.234652 
+L 134.221359 187.861852 
+Q 134.221359 186.198652 132.547359 186.198652 
+L 49.963359 186.198652 
+Q 48.289359 186.198652 48.289359 187.861852 
+L 48.289359 222.234652 
+Q 48.289359 223.897852 49.963359 223.897852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #7d3c98; opacity: 0.16"/>
+   </g>
+   <g id="patch_16">
+    <path d="M 139.243359 223.897852 
+L 221.827359 223.897852 
+Q 223.501359 223.897852 223.501359 222.234652 
+L 223.501359 187.861852 
+Q 223.501359 186.198652 221.827359 186.198652 
+L 139.243359 186.198652 
+Q 137.569359 186.198652 137.569359 187.861852 
+L 137.569359 222.234652 
+Q 137.569359 223.897852 139.243359 223.897852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #7d3c98; opacity: 0.16"/>
+   </g>
+   <g id="patch_17">
+    <path d="M 228.523359 223.897852 
+L 311.107359 223.897852 
+Q 312.781359 223.897852 312.781359 222.234652 
+L 312.781359 187.861852 
+Q 312.781359 186.198652 311.107359 186.198652 
+L 228.523359 186.198652 
+Q 226.849359 186.198652 226.849359 187.861852 
+L 226.849359 222.234652 
+Q 226.849359 223.897852 228.523359 223.897852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #7d3c98; opacity: 0.16"/>
+   </g>
+   <g id="patch_18">
+    <path d="M 317.803359 223.897852 
+L 400.387359 223.897852 
+Q 402.061359 223.897852 402.061359 222.234652 
+L 402.061359 187.861852 
+Q 402.061359 186.198652 400.387359 186.198652 
+L 317.803359 186.198652 
+Q 316.129359 186.198652 316.129359 187.861852 
+L 316.129359 222.234652 
+Q 316.129359 223.897852 317.803359 223.897852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #7d3c98; opacity: 0.16"/>
+   </g>
+   <g id="patch_19">
+    <path d="M 49.963359 271.021852 
+L 221.827359 271.021852 
+Q 223.501359 271.021852 223.501359 269.358652 
+L 223.501359 234.985852 
+Q 223.501359 233.322652 221.827359 233.322652 
+L 49.963359 233.322652 
+Q 48.289359 233.322652 48.289359 234.985852 
+L 48.289359 269.358652 
+Q 48.289359 271.021852 49.963359 271.021852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #b03a2e; opacity: 0.16"/>
+   </g>
+   <g id="patch_20">
+    <path d="M 228.523359 271.021852 
+L 400.387359 271.021852 
+Q 402.061359 271.021852 402.061359 269.358652 
+L 402.061359 234.985852 
+Q 402.061359 233.322652 400.387359 233.322652 
+L 228.523359 233.322652 
+Q 226.849359 233.322652 226.849359 234.985852 
+L 226.849359 269.358652 
+Q 226.849359 271.021852 228.523359 271.021852 
+z
+" clip-path="url(#pc628a0b2a4)" style="fill: #b03a2e; opacity: 0.16"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #1b4f72" x="66.703359" y="29.303452" transform="rotate(-0 66.703359 29.303452)">M — Management Foundation</text>
+   </g>
+   <g id="text_2">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="82.327359" y="57.338963" transform="rotate(-0 82.327359 57.338963)">M1 Deficient supervision</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="153.751359" y="57.338963" transform="rotate(-0 153.751359 57.338963)">M2 Failed hazard inspection</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="225.175359" y="57.338963" transform="rotate(-0 225.175359 57.338963)">M3 Insufficient training</text>
+   </g>
+   <g id="text_5">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="296.599359" y="57.338963" transform="rotate(-0 296.599359 57.338963)">M4 Procedural gaps</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="368.023359" y="57.338963" transform="rotate(-0 368.023359 57.338963)">M5 Irregular market conduct</text>
+   </g>
+   <g id="patch_21">
+    <path d="M 268.375071 25.547759 
+Q 168.537788 31.798287 69.704769 37.985942 
+" style="fill: none; opacity: 0.5; stroke: #1b4f72; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 73.821923 39.732094 
+L 69.704769 37.985942 
+L 73.571983 35.739911 
+" style="fill: none; opacity: 0.5; stroke: #1b4f72; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_7">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #117a65" x="139.243359" y="79.199452" transform="rotate(-0 139.243359 79.199452)">F — Protection Failure</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="91.255359" y="107.234963" transform="rotate(-0 91.255359 107.234963)">F1 Edge/opening protection</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="180.535359" y="107.234963" transform="rotate(-0 180.535359 107.234963)">F2 Support instability</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="269.815359" y="107.234963" transform="rotate(-0 269.815359 107.234963)">F3 Disabled safety devices</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="359.095359" y="107.234963" transform="rotate(-0 359.095359 107.234963)">F4 Unused PPE</text>
+   </g>
+   <g id="patch_22">
+    <path d="M 268.568561 26.284892 
+Q 204.807779 56.746529 141.954934 86.7744 
+" style="fill: none; opacity: 0.5; stroke: #117a65; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 146.426348 86.854711 
+L 141.954934 86.7744 
+L 144.702031 83.245455 
+" style="fill: none; opacity: 0.5; stroke: #117a65; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_12">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #d35400" x="211.783359" y="129.095452" transform="rotate(-0 211.783359 129.095452)">T — Trigger Conditions</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="91.255359" y="157.130963" transform="rotate(-0 91.255359 157.130963)">T1 Equipment failure</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="180.535359" y="157.130963" transform="rotate(-0 180.535359 157.130963)">T2 Material state</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="269.815359" y="157.130963" transform="rotate(-0 269.815359 157.130963)">T3 Geological change</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="359.095359" y="157.130963" transform="rotate(-0 359.095359 157.130963)">T4 Meteorological</text>
+   </g>
+   <g id="patch_23">
+    <path d="M 269.448951 27.198312 
+Q 241.078106 81.694738 213.171911 135.298639 
+" style="fill: none; opacity: 0.5; stroke: #d35400; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 216.792995 132.674187 
+L 213.171911 135.298639 
+L 213.245 130.8271 
+" style="fill: none; opacity: 0.5; stroke: #d35400; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_17">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #7d3c98" x="116.923359" y="178.991452" transform="rotate(-0 116.923359 178.991452)">H — Human Acts</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="91.255359" y="207.026963" transform="rotate(-0 91.255359 207.026963)">H1 Procedure violation</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="180.535359" y="207.026963" transform="rotate(-0 180.535359 207.026963)">H2 Improper command</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="269.815359" y="207.026963" transform="rotate(-0 269.815359 207.026963)">H3 Failed risk perception</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="359.095359" y="207.026963" transform="rotate(-0 359.095359 207.026963)">H4 Poor emergency response</text>
+   </g>
+   <g id="patch_24">
+    <path d="M 268.998922 26.877605 
+Q 193.646845 106.643855 118.985754 185.678641 
+" style="fill: none; opacity: 0.5; stroke: #7d3c98; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 123.18645 184.144316 
+L 118.985754 185.678641 
+L 120.278712 181.397489 
+" style="fill: none; opacity: 0.5; stroke: #7d3c98; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_22">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #b03a2e" x="189.463359" y="226.115452" transform="rotate(-0 189.463359 226.115452)">C — Consequence Amplification</text>
+   </g>
+   <g id="text_23">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="135.895359" y="254.150963" transform="rotate(-0 135.895359 254.150963)">C1 Delayed rescue</text>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 6.6px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="314.455359" y="254.150963" transform="rotate(-0 314.455359 254.150963)">C2 Concealed reporting</text>
+   </g>
+   <g id="patch_25">
+    <path d="M 269.653594 27.286899 
+Q 229.918829 130.203036 190.546484 232.180476 
+" style="fill: none; opacity: 0.5; stroke: #b03a2e; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 193.852957 229.169291 
+L 190.546484 232.180476 
+L 190.12142 227.728586 
+" style="fill: none; opacity: 0.5; stroke: #b03a2e; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_25">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="270.373359" y="15.997852" transform="rotate(-0 270.373359 15.997852)">CAICS</text>
+   </g>
+   <g id="text_26">
+    <text style="font-style: italic; font-size: 8.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #566573" x="270.373359" y="287.653852" transform="rotate(-0 270.373359 287.653852)">Causal leak model: M → F → T → H → C</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pc628a0b2a4">
+   <rect x="19.273359" y="11.562652" width="502.2" height="277.2"/>
+  </clipPath>
+ </defs>
+</svg>

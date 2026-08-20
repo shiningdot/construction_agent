@@ -1,0 +1,658 @@
+{
+  "钢结构": {
+    "code": "BLD01",
+    "count": 86
+  },
+  "砖混结构": {
+    "code": "BLD03",
+    "count": 50
+  },
+  "框架结构": {
+    "code": "BLD04",
+    "count": 33
+  },
+  "钢筋混凝土结构": {
+    "code": "BLD11",
+    "count": 24
+  },
+  "主体结构": {
+    "code": "BLD_NULL",
+    "count": 13
+  },
+  "装饰装修": {
+    "code": "BLD_NULL",
+    "count": 11
+  },
+  "钢架结构": {
+    "code": "BLD01",
+    "count": 9
+  },
+  "混凝土结构": {
+    "code": "BLD11",
+    "count": 8
+  },
+  "网架结构": {
+    "code": "BLD01",
+    "count": 7
+  },
+  "钢筋混凝土框架结构": {
+    "code": "BLD04",
+    "count": 6
+  },
+  "砖木结构": {
+    "code": "BLD03",
+    "count": 6
+  },
+  "桥梁": {
+    "code": "BLD_NULL",
+    "count": 6
+  },
+  "隧道": {
+    "code": "BLD_NULL",
+    "count": 5
+  },
+  "钢箱梁结构": {
+    "code": "BLD_NULL",
+    "count": 5
+  },
+  "钢筋混凝土": {
+    "code": "BLD11",
+    "count": 5
+  },
+  "彩钢板结构": {
+    "code": "BLD01",
+    "count": 5
+  },
+  "木结构": {
+    "code": "BLD09",
+    "count": 4
+  },
+  "预制板结构": {
+    "code": "BLD08",
+    "count": 3
+  },
+  "轻钢结构": {
+    "code": "BLD01",
+    "count": 3
+  },
+  "设备安装": {
+    "code": "BLD_NULL",
+    "count": 3
+  },
+  "混合结构": {
+    "code": "BLD10",
+    "count": 3
+  },
+  "框架剪力墙结构": {
+    "code": "BLD05",
+    "count": 3
+  },
+  "框剪结构": {
+    "code": "BLD05",
+    "count": 3
+  },
+  "门式钢架结构": {
+    "code": "BLD01",
+    "count": 2
+  },
+  "钢混结构": {
+    "code": "BLD02",
+    "count": 2
+  },
+  "钢排架结构": {
+    "code": "BLD01",
+    "count": 2
+  },
+  "砖墙结构": {
+    "code": "BLD03",
+    "count": 2
+  },
+  "砌体结构": {
+    "code": "BLD03",
+    "count": 2
+  },
+  "石棉瓦屋面": {
+    "code": "BLD_NULL",
+    "count": 2
+  },
+  "石拱桥": {
+    "code": "BLD_NULL",
+    "count": 2
+  },
+  "混凝土框架结构": {
+    "code": "BLD04",
+    "count": 2
+  },
+  "桥梁结构": {
+    "code": "BLD_NULL",
+    "count": 2
+  },
+  "木质结构": {
+    "code": "BLD09",
+    "count": 2
+  },
+  "排架结构": {
+    "code": "BLD04",
+    "count": 2
+  },
+  "彩钢结构": {
+    "code": "BLD01",
+    "count": 2
+  },
+  "地基与基础": {
+    "code": "BLD_NULL",
+    "count": 2
+  },
+  "高炉": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "高架箱梁": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "高压输电铁塔": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "预应力钢筋混凝土空心板桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "预应力混凝土屋架": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "预制箱梁桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "隧道结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "门式铁塔": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "门式钢架轻型结构": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "门式支架": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "铁塔/钢结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "钢结构（彩钢瓦+透光瓦屋面）": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢结构、框架结构": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "钢管混凝土系杆拱桥、预应力混凝土T梁": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "钢筋混凝土装配式结构": {
+    "code": "BLD08",
+    "count": 1
+  },
+  "钢筋混凝土空腹箱型斜拉桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "钢筋混凝土框架核心筒结构": {
+    "code": "BLD07",
+    "count": 1
+  },
+  "钢筋混凝土框架—剪力墙结构": {
+    "code": "BLD05",
+    "count": 1
+  },
+  "钢筋混凝土柱、钢屋架": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "钢筋混凝土无支撑悬挑式结构": {
+    "code": "BLD11",
+    "count": 1
+  },
+  "钢筋混凝土反井字梁结构": {
+    "code": "BLD11",
+    "count": 1
+  },
+  "钢筋混凝土双曲拱桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "钢筋混凝土剪力墙结构": {
+    "code": "BLD06",
+    "count": 1
+  },
+  "钢混框架结构": {
+    "code": "BLD02",
+    "count": 1
+  },
+  "钢混": {
+    "code": "BLD02",
+    "count": 1
+  },
+  "钢框架结构": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢桁架": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢架结构（舞台）": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢架砖混结构": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "钢架": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢板组合梁桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "钢木支架": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "钢屋架": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "钢塔筒结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "金属框架简易房": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "连拱石桥（空腹式无铰拱桥）": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "连拱石拱桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "轻钢结构（钢管立柱+混凝土顶板）": {
+    "code": "BLD02",
+    "count": 1
+  },
+  "轻板框架": {
+    "code": "BLD08",
+    "count": 1
+  },
+  "胶木拱形屋架": {
+    "code": "BLD09",
+    "count": 1
+  },
+  "维保/改造": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "简易钢结构（铁架）": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "简易钢结构（钢架木板茶馆）、砌体结构（百年堡坎）": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "简易结构（铝塑板）": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "简易结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "竹结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "砖结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖砌结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖砌墙体": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖砌圆形井室+彩钢房上部": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "砖砌围墙": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "砖瓦结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖混结构（预制板）": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖混结构（推测，中间6间打通无柱）": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖混结构（屋面为焊接球节点正放四角锥钢管网架）": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "砖混与耐火材料复合结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砖墙": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "砂土结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "石砌平房": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "石墙结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "石块砌筑": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "矮塔斜拉桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "盾构隧道": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "现浇混凝土结构": {
+    "code": "BLD11",
+    "count": 1
+  },
+  "现浇混凝土框架": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "现浇框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "独塔双索面斜拉桥（钢塔钢箱梁结构）": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "烟囱": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "温室大棚钢结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "混合结构（一层砖房、二层彩钢板房、三层钢架空心砖）": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "混凝土箱梁结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "混凝土烟囱": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "活动板房": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "泥墙结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "武汉××化工厂安装三队": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "楠竹工棚": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "梁桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "桩基础": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "桥梁（拱桥）": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "桥梁墩身": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "框架钢筋混凝土结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "框架结构、混合结构": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "框架混凝土结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "框架式结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "框架-核心筒结构": {
+    "code": "BLD07",
+    "count": 1
+  },
+  "框架-剪力墙结构": {
+    "code": "BLD05",
+    "count": 1
+  },
+  "框构桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "桁架结构": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "木楼板结构": {
+    "code": "BLD09",
+    "count": 1
+  },
+  "木架结构": {
+    "code": "BLD09",
+    "count": 1
+  },
+  "新闻报道": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "排架柱钢梁结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "挡土墙": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "拱形直墙带仰拱结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "拱形棚（轻钢结构）": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "拆除": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "悬索桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "底框空斗墙石灰黏土砌筑砖混结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "居民自建房": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "大跨度单层钢结构": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "大板结构": {
+    "code": "BLD08",
+    "count": 1
+  },
+  "多层钢筋混凝土框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "多层现浇混凝土结构": {
+    "code": "BLD11",
+    "count": 1
+  },
+  "塔楼、高层": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "塔桅结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "塑钢板顶棚": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "地下两层结构": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "地下两层三跨钢筋混凝土矩形框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "地下三层框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "土墙结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "土墙": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "土坯结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "围墙（砌体结构）": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "四边形角钢组合结构": {
+    "code": "BLD01",
+    "count": 1
+  },
+  "单层锯齿型装配式结构": {
+    "code": "BLD08",
+    "count": 1
+  },
+  "单层建筑": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "单层工业厂房，三角形钢屋架，370毫米粘土砖砌体承重墙": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "升板结构": {
+    "code": "BLD08",
+    "count": 1
+  },
+  "匝道桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  },
+  "剪力墙结构": {
+    "code": "BLD06",
+    "count": 1
+  },
+  "冰结构": {
+    "code": "BLD12",
+    "count": 1
+  },
+  "内框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "全框架结构": {
+    "code": "BLD04",
+    "count": 1
+  },
+  "二层砖混结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "三层砖混结构": {
+    "code": "BLD03",
+    "count": 1
+  },
+  "一层混凝土框架、二层砖柱工字钢棚顶": {
+    "code": "BLD10",
+    "count": 1
+  },
+  "Y型钢筋混凝土屋架、石棉瓦屋面": {
+    "code": "BLD11",
+    "count": 1
+  },
+  "T形梁桥": {
+    "code": "BLD_NULL",
+    "count": 1
+  }
+}

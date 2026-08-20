@@ -236,6 +236,8 @@ def run_cell(cell, prompts, sample, checkpoint_path):
         acc_id, title, text = rec
         out, err = call_llm(client, system, USER_PREFIX + text[:3500])
         parsed = extract_json(out) if out else None
+        if isinstance(parsed, list):
+            parsed = {'codes': parsed}
         codes = parsed.get('codes', []) if parsed else []
         return {'idx': i, 'accident_id': acc_id, 'title': title[:30],
                 'codes': codes, 'n_codes': len(codes),

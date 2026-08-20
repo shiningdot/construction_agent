@@ -10,7 +10,7 @@
 样本: 从当前 DB 分层抽取 100 条 (accident_type × severity)
 分析: 发射行为分布 (编码数/条、空输出率、各编码发射率) — 无需专家GT
 """
-import json, os, sys, time, sqlite3, random
+import json, os, sys, time, sqlite3, random, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -23,7 +23,7 @@ DB = '/home/suntianhao/construction_agent/data/caiems_v2.db'
 OUT_DIR = Path('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_gatekeeping')
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 MODEL = 'deepseek-v4-pro'
-MAX_TOKENS = 4096
+MAX_TOKENS = 16384  # 思考块会消耗输出预算，需留足空间给最终 JSON
 TEMPERATURE = 0.0
 WORKERS = 4
 MAX_RETRY = 1
@@ -154,16 +154,21 @@ def load_sample():
     return [(r[0], r[1], r[2]) for r in sample]
 
 
-def call_llm(client, prompt_text):
+def call_llm(client, system, user_text):
     for attempt in range(MAX_RETRY + 1):
         try:
             resp = client.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 temperature=TEMPERATURE,
-                messages=[{'role': 'user', 'content': prompt_text}],
+                system=system,
+                messages=[{'role': 'user', 'content': user_text}],
             )
-            return resp.content[0].text, None
+            raw = ''
+            for blk in resp.content:
+                if hasattr(blk, 'text'):
+                    raw += blk.text
+            return raw, None
         except Exception as e:
             if attempt < MAX_RETRY:
                 time.sleep(3)
@@ -172,14 +177,48 @@ def call_llm(client, prompt_text):
 
 
 def extract_json(text):
-    import re
-    m = re.search(r'\{[\s\S]*\}', text or '')
-    if not m:
+    """从混合输出(推理文字+JSON)中提取JSON — 与原始实验 runner 一致"""
+    if not text:
         return None
+    # 尝试直接解析
     try:
-        return json.loads(m.group(0))
+        return json.loads(text)
     except Exception:
-        return None
+        pass
+    # 找 ```json 代码块
+    m = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except Exception:
+            pass
+    # 从最后一行开始找 — 多数LLM把JSON放在最后
+    lines = text.strip().split('\n')
+    for line in reversed(lines):
+        if line.strip().startswith('{'):
+            try:
+                return json.loads(line.strip())
+            except Exception:
+                pass
+    # Smart brace: 从最后一个 { 开始匹配
+    last_brace = text.rfind('{')
+    if last_brace >= 0:
+        depth = 0
+        end = -1
+        for i in range(last_brace, len(text)):
+            if text[i] == '{':
+                depth += 1
+            elif text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        if end > 0:
+            try:
+                return json.loads(text[last_brace:end])
+            except Exception:
+                pass
+    return None
 
 
 def run_cell(cell, prompts, sample, checkpoint_path):
@@ -195,8 +234,7 @@ def run_cell(cell, prompts, sample, checkpoint_path):
         if i in done:
             return None
         acc_id, title, text = rec
-        prompt = USER_PREFIX + text[:3500]
-        out, err = call_llm(client, prompt)
+        out, err = call_llm(client, system, USER_PREFIX + text[:3500])
         parsed = extract_json(out) if out else None
         codes = parsed.get('codes', []) if parsed else []
         return {'idx': i, 'accident_id': acc_id, 'title': title[:30],
@@ -247,19 +285,19 @@ def analyze(results, label):
 def main():
     sample = load_sample()
     client_test = Anthropic()
-    # 冒烟测试: 每单元 2 条
-    print('冒烟测试 (每单元2条)...')
-    test_sample = sample[:2]
+    # 冒烟测试: 每单元 1 条
+    print('冒烟测试 (每单元1条)...', flush=True)
+    test_sample = sample[:1]
     for cell in PROMPTS:
         spec = PROMPTS[cell]
         system = f"你是建筑施工安全事故分析专家。使用CAICS框架按M→F→T→H→C因果链逐层分析。\n\n{spec['body']}\n\n{spec['policy']}\n\n{JSON_SPEC}"
         ok = 0
         for i, (acc_id, title, text) in enumerate(test_sample):
-            out, err = call_llm(client_test, USER_PREFIX + text[:3500])
+            out, err = call_llm(client_test, system, USER_PREFIX + text[:3500])
             parsed = extract_json(out) if out else None
             if parsed:
                 ok += 1
-        print(f'  {cell} ({spec["label"]}): {ok}/2 解析成功', flush=True)
+        print(f'  {cell} ({spec["label"]}): {ok}/1 解析成功', flush=True)
     # 正式运行
     print('\n正式运行 4 单元 × 100 条...')
     all_stats = {}

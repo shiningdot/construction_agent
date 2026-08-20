@@ -63,7 +63,7 @@ LLM 通过无需任务特定训练、直接从文本推断结构（Brown et al.,
 
 ### 3.1 问题形式化
 
-我们将建筑施工事故信息抽取任务形式化如下。令 $T = \{t_1, t_2, \dots, t_N\}$ 表示非结构化事故报告文本语料，每条 $t_i$ 为长度不等的中文自由叙述（本语料中位数为 1,200 字符）。目标是将每条 $t_i$ 转化为结构化记录 $r_i = (b_i, c_i)$，包含两个组成部分：(1) 基础信息向量 $b_i \in \mathcal{B}$，覆盖 33 个预定义字段，包括时间属性（日期、时间）、空间属性（省、市、区县、地点详情）、后果属性（事故类型、等级、死亡人数、受伤人数、被困人数、直接经济损失）和情境属性（工序、涉事设备、涉事材料、工种、建筑结构、施工阶段、天气、参建单位）；(2) 致因标注 $c_i = \{(x_{ij}, e_{ij}, \iota_{ij})\}_{j=1}^{k_i}$，其中 $x_{ij}$ 为取自 CAICS 体系的致因编码，$e_{ij}$ 为支持该编码的原文逐字证据，$\iota_{ij}$ 为连接证据与编码的推理链。每个编码必须携带证据：没有可引用原文语句支撑的致因编码在构造上即被视为幻觉。
+我们将建筑施工事故信息抽取任务形式化如下。令 $T = \{t_1, t_2, \dots, t_N\}$ 表示非结构化事故报告文本语料，每条 $t_i$ 为长度不等的中文自由叙述（本语料中位数为 517 字符）。目标是将每条 $t_i$ 转化为结构化记录 $r_i = (b_i, c_i)$，包含两个组成部分：(1) 基础信息向量 $b_i \in \mathcal{B}$，覆盖 33 个预定义字段，包括时间属性（日期、时间）、空间属性（省、市、区县、地点详情）、后果属性（事故类型、等级、死亡人数、受伤人数、被困人数、直接经济损失）和情境属性（工序、涉事设备、涉事材料、工种、建筑结构、施工阶段、天气、参建单位）；(2) 致因标注 $c_i = \{(x_{ij}, e_{ij}, \iota_{ij})\}_{j=1}^{k_i}$，其中 $x_{ij}$ 为取自 CAICS 体系的致因编码，$e_{ij}$ 为支持该编码的原文逐字证据，$\iota_{ij}$ 为连接证据与编码的推理链。每个编码必须携带证据：没有可引用原文语句支撑的致因编码在构造上即被视为幻觉。
 
 该形式化与既有工作的区别有三点。第一，抽取受证据约束：每个致因编码必须可追溯到明确的原文语句，使所得数据库可审计——这一性质是仅做分类的管道（Ahmadi et al., 2024; Kim and Han, 2024）所不具备的。第二，输出模式字段标准化：五个自由文本字段（工序、设备、材料、工种、建筑结构）被规范化为互斥穷举（MECE）的枚举集合，使下游统计分析在封闭集合而非开放词表上进行。第三，管道端到端贯通：将采集、过滤、抽取、编码、增强与存储连接为单一可运行系统，区别于止步于抽取（Togan et al., 2025）或止步于静态知识产物（Liu and Luo, 2025; Jiang et al., 2026）的既有系统。
 
@@ -381,7 +381,7 @@ Huang, Y., Yan, R., Zhang, Z. (2026). Automated knowledge extraction from marine
 
 Jiang, Y., Nie, B., Wang, J., et al. (2026). Large language model-driven knowledge graph and intelligent analysis for coal mine accidents. Measurement, 277, 121558.
 
-Kim, D., Han, S. (2024). Systemic Analysis of Fall Accidents Caused by Worker Inattention at Construction Sites: An Integrated Approach using HFACS and LLM. KIBIM Magazine, 14(4), 23–35.
+Kim, D., Han, S. (2024). Systemic Analysis of Fall Accidents Caused by Worker Inattention at Construction Sites: An Integrated Approach using HFACS and LLM. KIBIM Magazine, 14(4), 23–34.
 
 Kojima, T., Gu, S.S., Reid, M., et al. (2022). Large Language Models are Zero-Shot Reasoners. NeurIPS, 35, 22199–22213.
 

@@ -226,6 +226,10 @@ def run_cell(cell, prompts, sample, checkpoint_path):
     done = {}
     if os.path.exists(checkpoint_path):
         done = {d['idx']: d for d in json.load(open(checkpoint_path))}
+        # 旧 checkpoint 的 codes 可能含 dict，归一化
+        for d in done.values():
+            d['codes'] = norm_codes(d.get('codes', []))
+            d['n_codes'] = len(d['codes'])
     client = Anthropic()
     spec = PROMPTS[cell]
     system = f"你是建筑施工安全事故分析专家。使用CAICS框架按M→F→T→H→C因果链逐层分析。\n\n{spec['body']}\n\n{spec['policy']}\n\n{JSON_SPEC}"
@@ -238,7 +242,8 @@ def run_cell(cell, prompts, sample, checkpoint_path):
         parsed = extract_json(out) if out else None
         if isinstance(parsed, list):
             parsed = {'codes': parsed}
-        codes = parsed.get('codes', []) if parsed else []
+        raw_codes = parsed.get('codes', []) if parsed else []
+        codes = norm_codes(raw_codes)
         return {'idx': i, 'accident_id': acc_id, 'title': title[:30],
                 'codes': codes, 'n_codes': len(codes),
                 'parse_error': not bool(parsed), 'api_error': err}
@@ -255,6 +260,26 @@ def run_cell(cell, prompts, sample, checkpoint_path):
                     print(f'  [{cell}] {len(results)}/100', flush=True)
     json.dump(results, open(checkpoint_path, 'w'), ensure_ascii=False)
     return results
+
+
+def norm_codes(codes):
+    """归一化 codes：兼容字符串列表、[{code:...}] 字典列表、{code:...} 键值对"""
+    out = []
+    if isinstance(codes, dict):
+        for k in codes:
+            if isinstance(k, str) and re.match(r'^[MFTHC]\d$', k):
+                out.append(k)
+    elif isinstance(codes, list):
+        for c in codes:
+            if isinstance(c, str) and re.match(r'^[MFTHC]\d$', c):
+                out.append(c)
+            elif isinstance(c, dict):
+                for key in ('code', 'Code', 'code_id'):
+                    v = c.get(key)
+                    if isinstance(v, str) and re.match(r'^[MFTHC]\d$', v):
+                        out.append(v)
+                        break
+    return list(dict.fromkeys(out))
 
 
 def analyze(results, label):

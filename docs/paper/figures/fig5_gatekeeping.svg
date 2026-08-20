@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="412.092187pt" height="265.758145pt" viewBox="0 0 412.092187 265.758145" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="663.192187pt" height="280.879727pt" viewBox="0 0 663.192187 280.879727" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-08-20T16:39:17.863380</dc:date>
+    <dc:date>2026-08-21T01:04:32.132651</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -21,130 +21,130 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 265.758145 
-L 412.092187 265.758145 
-L 412.092187 0 
-L 0 0 
+   <path d="M -0 280.879727 
+L 663.192187 280.879727 
+L 663.192187 0 
+L -0 0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 42.192188 242.558145 
-L 404.892187 242.558145 
-L 404.892187 20.798145 
-L 42.192188 20.798145 
+    <path d="M 42.192188 242.158242 
+L 321.192187 242.158242 
+L 321.192187 20.398242 
+L 42.192188 20.398242 
 z
 " style="fill: #ffffff"/>
    </g>
    <g id="patch_3">
-    <path d="M 58.678551 242.558145 
-L 89.868969 242.558145 
-L 89.868969 158.408145 
-L 58.678551 158.408145 
+    <path d="M 54.874006 242.158242 
+L 78.866635 242.158242 
+L 78.866635 158.008242 
+L 54.874006 158.008242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #b03a2e; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #b03a2e; opacity: 0.85"/>
    </g>
    <g id="patch_4">
-    <path d="M 147.79403 242.558145 
-L 178.984448 242.558145 
-L 178.984448 179.396145 
-L 147.79403 179.396145 
+    <path d="M 123.424374 242.158242 
+L 147.417003 242.158242 
+L 147.417003 178.996242 
+L 123.424374 178.996242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #b03a2e; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #b03a2e; opacity: 0.85"/>
    </g>
    <g id="patch_5">
-    <path d="M 236.909509 242.558145 
-L 268.099927 242.558145 
-L 268.099927 214.244145 
-L 236.909509 214.244145 
+    <path d="M 191.974743 242.158242 
+L 215.967372 242.158242 
+L 215.967372 213.844242 
+L 191.974743 213.844242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #b03a2e; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #b03a2e; opacity: 0.85"/>
    </g>
    <g id="patch_6">
-    <path d="M 326.024988 242.558145 
-L 357.215406 242.558145 
-L 357.215406 183.158145 
-L 326.024988 183.158145 
+    <path d="M 260.525111 242.158242 
+L 284.51774 242.158242 
+L 284.51774 182.758242 
+L 260.525111 182.758242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #b03a2e; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #b03a2e; opacity: 0.85"/>
    </g>
    <g id="patch_7">
-    <path d="M 89.868969 242.558145 
-L 121.059387 242.558145 
-L 121.059387 108.710145 
-L 89.868969 108.710145 
+    <path d="M 78.866635 242.158242 
+L 102.859264 242.158242 
+L 102.859264 108.310242 
+L 78.866635 108.310242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #1e8449; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #1e8449; opacity: 0.85"/>
    </g>
    <g id="patch_8">
-    <path d="M 178.984448 242.558145 
-L 210.174866 242.558145 
-L 210.174866 89.702145 
-L 178.984448 89.702145 
+    <path d="M 147.417003 242.158242 
+L 171.409632 242.158242 
+L 171.409632 89.302242 
+L 147.417003 89.302242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #1e8449; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #1e8449; opacity: 0.85"/>
    </g>
    <g id="patch_9">
-    <path d="M 268.099927 242.558145 
-L 299.290345 242.558145 
-L 299.290345 56.240145 
-L 268.099927 56.240145 
+    <path d="M 215.967372 242.158242 
+L 239.960001 242.158242 
+L 239.960001 55.840242 
+L 215.967372 55.840242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #1e8449; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #1e8449; opacity: 0.85"/>
    </g>
    <g id="patch_10">
-    <path d="M 357.215406 242.558145 
-L 388.405824 242.558145 
-L 388.405824 240.578145 
-L 357.215406 240.578145 
+    <path d="M 284.51774 242.158242 
+L 308.510369 242.158242 
+L 308.510369 240.178242 
+L 284.51774 240.178242 
 z
-" clip-path="url(#p275f61317d)" style="fill: #1e8449; opacity: 0.85"/>
+" clip-path="url(#peba40f7076)" style="fill: #1e8449; opacity: 0.85"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="xtick_1">
      <g id="line2d_1">
       <defs>
-       <path id="mf92b1df0eb" d="M 0 0 
+       <path id="md564daa0ac" d="M 0 0 
 L 0 3.5 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#mf92b1df0eb" x="89.868969" y="242.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md564daa0ac" x="78.866635" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_1">
-      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="89.868969" y="256.756387" transform="rotate(-0 89.868969 256.756387)">F1</text>
+      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="78.866635" y="256.356484" transform="rotate(-0 78.866635 256.356484)">F1</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2">
       <g>
-       <use xlink:href="#mf92b1df0eb" x="178.984448" y="242.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md564daa0ac" x="147.417003" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_2">
-      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="178.984448" y="256.756387" transform="rotate(-0 178.984448 256.756387)">Recall</text>
+      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="147.417003" y="256.356484" transform="rotate(-0 147.417003 256.356484)">Recall</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3">
       <g>
-       <use xlink:href="#mf92b1df0eb" x="268.099927" y="242.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md564daa0ac" x="215.967372" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_3">
-      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="268.099927" y="256.756387" transform="rotate(-0 268.099927 256.756387)">M1 recall</text>
+      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="215.967372" y="256.356484" transform="rotate(-0 215.967372 256.356484)">M1 recall</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_4">
       <g>
-       <use xlink:href="#mf92b1df0eb" x="357.215406" y="242.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md564daa0ac" x="284.51774" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_4">
-      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="357.215406" y="256.756387" transform="rotate(-0 357.215406 256.756387)">Empty output</text>
+      <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="284.51774" y="256.356484" transform="rotate(-0 284.51774 256.356484)">Empty output</text>
      </g>
     </g>
    </g>
@@ -152,150 +152,498 @@ L 0 3.5
     <g id="ytick_1">
      <g id="line2d_5">
       <defs>
-       <path id="mb33580cf87" d="M 0 0 
+       <path id="md70e0741e2" d="M 0 0 
 L -3.5 0 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="242.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_5">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="246.557168" transform="rotate(-0 35.192188 246.557168)">0.0</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="246.157266" transform="rotate(-0 35.192188 246.157266)">0.0</text>
      </g>
     </g>
     <g id="ytick_2">
      <g id="line2d_6">
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="202.958145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="202.558242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_6">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="206.957168" transform="rotate(-0 35.192188 206.957168)">0.2</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="206.557266" transform="rotate(-0 35.192188 206.557266)">0.2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_7">
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="163.358145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="162.958242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_7">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="167.357168" transform="rotate(-0 35.192188 167.357168)">0.4</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="166.957266" transform="rotate(-0 35.192188 166.957266)">0.4</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_8">
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="123.758145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="123.358242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_8">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="127.757168" transform="rotate(-0 35.192188 127.757168)">0.6</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="127.357266" transform="rotate(-0 35.192188 127.357266)">0.6</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_9">
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="84.158145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="83.758242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_9">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="88.157168" transform="rotate(-0 35.192188 88.157168)">0.8</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="87.757266" transform="rotate(-0 35.192188 87.757266)">0.8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_10">
       <g>
-       <use xlink:href="#mb33580cf87" x="42.192188" y="44.558145" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#md70e0741e2" x="42.192188" y="44.158242" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_10">
-      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="48.557168" transform="rotate(-0 35.192188 48.557168)">1.0</text>
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="35.192188" y="48.157266" transform="rotate(-0 35.192188 48.157266)">1.0</text>
      </g>
     </g>
     <g id="text_11">
-     <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="14.398242" y="131.678145" transform="rotate(-90 14.398242 131.678145)">Value</text>
+     <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="14.398242" y="131.278242" transform="rotate(-90 14.398242 131.278242)">Value</text>
     </g>
    </g>
    <g id="patch_11">
-    <path d="M 42.192188 242.558145 
-L 42.192188 20.798145 
+    <path d="M 42.192188 242.158242 
+L 42.192188 20.398242 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="patch_12">
-    <path d="M 42.192188 242.558145 
-L 404.892187 242.558145 
+    <path d="M 42.192187 242.158242 
+L 321.192187 242.158242 
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="89.868969" y="102.770145" transform="rotate(-0 89.868969 102.770145)">+59%</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="78.866635" y="102.370242" transform="rotate(-0 78.866635 102.370242)">+59%</text>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="178.984448" y="83.762145" transform="rotate(-0 178.984448 83.762145)">+142%</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="147.417003" y="83.362242" transform="rotate(-0 147.417003 83.362242)">+142%</text>
    </g>
    <g id="text_14">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="268.099927" y="50.300145" transform="rotate(-0 268.099927 50.300145)">+558%</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="215.967372" y="49.900242" transform="rotate(-0 215.967372 49.900242)">+558%</text>
    </g>
    <g id="text_15">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="357.215406" y="177.218145" transform="rotate(-0 357.215406 177.218145)">+-97%</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="284.51774" y="176.818242" transform="rotate(-0 284.51774 176.818242)">+-97%</text>
    </g>
    <g id="text_16">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="74.27376" y="155.422777" transform="rotate(-0 74.27376 155.422777)">0.425</text>
-   </g>
-   <g id="text_17">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="163.389239" y="176.410777" transform="rotate(-0 163.389239 176.410777)">0.319</text>
-   </g>
-   <g id="text_18">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="252.504718" y="211.258777" transform="rotate(-0 252.504718 211.258777)">0.143</text>
-   </g>
-   <g id="text_19">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="341.620197" y="180.172777" transform="rotate(-0 341.620197 180.172777)">0.3</text>
-   </g>
-   <g id="text_20">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="105.464178" y="105.724777" transform="rotate(-0 105.464178 105.724777)">0.676</text>
-   </g>
-   <g id="text_21">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="194.579657" y="86.716777" transform="rotate(-0 194.579657 86.716777)">0.772</text>
-   </g>
-   <g id="text_22">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="283.695136" y="53.254777" transform="rotate(-0 283.695136 53.254777)">94%</text>
-   </g>
-   <g id="text_23">
-    <text style="font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="372.810615" y="237.592777" transform="rotate(-0 372.810615 237.592777)">0.01</text>
-   </g>
-   <g id="text_24">
-    <text style="font-size: 9.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="223.542188" y="14.798145" transform="rotate(-0 223.542188 14.798145)">The Lexical Gatekeeping Effect and its two-step judgment remedy</text>
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.692187" y="14.398242" transform="rotate(-0 181.692187 14.398242)">(a) v1→v2 recovery (original experiment)</text>
    </g>
    <g id="legend_1">
     <g id="patch_13">
-     <path d="M 49.392188 34.396582 
-L 65.392188 34.396582 
-L 65.392188 28.796582 
-L 49.392188 28.796582 
+     <path d="M 48.942188 33.146777 
+L 63.942188 33.146777 
+L 63.942188 27.896777 
+L 48.942188 27.896777 
 z
 " style="fill: #b03a2e; opacity: 0.85"/>
     </g>
-    <g id="text_25">
-     <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="71.792188" y="34.396582" transform="rotate(-0 71.792188 34.396582)">v1 conditional-check</text>
+    <g id="text_17">
+     <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="69.942188" y="33.146777" transform="rotate(-0 69.942188 33.146777)">v1 conditional-check</text>
     </g>
     <g id="patch_14">
-     <path d="M 49.392188 46.396582 
-L 65.392188 46.396582 
-L 65.392188 40.796582 
-L 49.392188 40.796582 
+     <path d="M 48.942188 44.396777 
+L 63.942188 44.396777 
+L 63.942188 39.146777 
+L 48.942188 39.146777 
 z
 " style="fill: #1e8449; opacity: 0.85"/>
     </g>
-    <g id="text_26">
-     <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="71.792188" y="46.396582" transform="rotate(-0 71.792188 46.396582)">v2 two-step judgment</text>
+    <g id="text_18">
+     <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="69.942188" y="44.396777" transform="rotate(-0 69.942188 44.396777)">v2 two-step judgment</text>
+    </g>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_15">
+    <path d="M 376.992187 242.158242 
+L 655.992188 242.158242 
+L 655.992188 20.398242 
+L 376.992187 20.398242 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_16">
+    <path d="M 389.674006 242.158242 
+L 416.37257 242.158242 
+L 416.37257 186.113442 
+L 389.674006 186.113442 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: #b03a2e; opacity: 0.75"/>
+   </g>
+   <g id="patch_17">
+    <path d="M 456.420417 242.158242 
+L 483.118982 242.158242 
+L 483.118982 119.988642 
+L 456.420417 119.988642 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: #2471a3; opacity: 0.75"/>
+   </g>
+   <g id="patch_18">
+    <path d="M 523.166829 242.158242 
+L 549.865393 242.158242 
+L 549.865393 141.963042 
+L 523.166829 141.963042 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: #d35400; opacity: 0.75"/>
+   </g>
+   <g id="patch_19">
+    <path d="M 589.91324 242.158242 
+L 616.611805 242.158242 
+L 616.611805 52.654242 
+L 589.91324 52.654242 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: #1e8449; opacity: 0.75"/>
+   </g>
+   <g id="patch_20">
+    <path d="M 416.37257 242.158242 
+L 443.071135 242.158242 
+L 443.071135 235.303842 
+L 416.37257 235.303842 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: url(#h98b3d2a90f); opacity: 0.45; stroke: #ffffff; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_21">
+    <path d="M 483.118982 242.158242 
+L 509.817546 242.158242 
+L 509.817546 222.804642 
+L 483.118982 222.804642 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: url(#h4f4c7fe959); opacity: 0.45; stroke: #ffffff; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_22">
+    <path d="M 549.865393 242.158242 
+L 576.563958 242.158242 
+L 576.563958 230.868642 
+L 549.865393 230.868642 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: url(#h8e7630d1fd); opacity: 0.45; stroke: #ffffff; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_23">
+    <path d="M 616.611805 242.158242 
+L 643.310369 242.158242 
+L 643.310369 222.401442 
+L 616.611805 222.401442 
+z
+" clip-path="url(#pada46cbdb8)" style="fill: url(#hbd466a7290); opacity: 0.45; stroke: #ffffff; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_3">
+    <g id="xtick_5">
+     <g id="line2d_11">
+      <g>
+       <use xlink:href="#md564daa0ac" x="416.37257" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_19">
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(412.4755 255.493691)">v1</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(404.909875 263.66752)">checks</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(402.59132 271.841348)">conserv.</text>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#md564daa0ac" x="483.118982" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_20">
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(477.200427 255.493691)">v2a</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(469.11449 263.66752)">two-step</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(469.337732 271.841348)">conserv.</text>
+     </g>
+    </g>
+    <g id="xtick_7">
+     <g id="line2d_13">
+      <g>
+       <use xlink:href="#md564daa0ac" x="549.865393" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_21">
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(543.946839 255.493691)">v2b</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(538.402698 263.66752)">checks</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(535.260315 271.841348)">coverage</text>
+     </g>
+    </g>
+    <g id="xtick_8">
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#md564daa0ac" x="616.611805" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_22">
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(612.714734 255.493691)">v2</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(602.607313 263.66752)">two-step</text>
+      <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif" transform="translate(602.006727 271.841348)">coverage</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_4">
+    <g id="ytick_7">
+     <g id="line2d_15">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="242.158242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_23">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="246.157266" transform="rotate(-0 369.992187 246.157266)">0</text>
+     </g>
+    </g>
+    <g id="ytick_8">
+     <g id="line2d_16">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="201.838242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_24">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="205.837266" transform="rotate(-0 369.992187 205.837266)">2</text>
+     </g>
+    </g>
+    <g id="ytick_9">
+     <g id="line2d_17">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="161.518242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_25">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="165.517266" transform="rotate(-0 369.992187 165.517266)">4</text>
+     </g>
+    </g>
+    <g id="ytick_10">
+     <g id="line2d_18">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="121.198242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_26">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="125.197266" transform="rotate(-0 369.992187 125.197266)">6</text>
+     </g>
+    </g>
+    <g id="ytick_11">
+     <g id="line2d_19">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="80.878242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_27">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="84.877266" transform="rotate(-0 369.992187 84.877266)">8</text>
+     </g>
+    </g>
+    <g id="ytick_12">
+     <g id="line2d_20">
+      <g>
+       <use xlink:href="#md70e0741e2" x="376.992187" y="40.558242" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_28">
+      <text style="font-size: 10px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end" x="369.992187" y="44.557266" transform="rotate(-0 369.992187 44.557266)">10</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_24">
+    <path d="M 376.992187 242.158242 
+L 376.992187 20.398242 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_25">
+    <path d="M 376.992187 242.158242 
+L 655.992188 242.158242 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_29">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="403.023288" y="183.089442" transform="rotate(-0 403.023288 183.089442)">2.78</text>
+   </g>
+   <g id="text_30">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="469.769699" y="116.964642" transform="rotate(-0 469.769699 116.964642)">6.06</text>
+   </g>
+   <g id="text_31">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="536.516111" y="138.939042" transform="rotate(-0 536.516111 138.939042)">4.97</text>
+   </g>
+   <g id="text_32">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="603.262522" y="49.630242" transform="rotate(-0 603.262522 49.630242)">9.4</text>
+   </g>
+   <g id="text_33">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="429.721853" y="232.279842" transform="rotate(-0 429.721853 232.279842)">0.34</text>
+   </g>
+   <g id="text_34">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="496.468264" y="219.780642" transform="rotate(-0 496.468264 219.780642)">0.96</text>
+   </g>
+   <g id="text_35">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="563.214676" y="227.844642" transform="rotate(-0 563.214676 227.844642)">0.56</text>
+   </g>
+   <g id="text_36">
+    <text style="font-size: 8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2c3e50" x="629.961087" y="219.377442" transform="rotate(-0 629.961087 219.377442)">0.98</text>
+   </g>
+   <g id="text_37">
+    <text style="font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle" x="516.492188" y="14.398242" transform="rotate(-0 516.492188 14.398242)">(b) 2×2 ablation (n = 100, emission behavior)</text>
+   </g>
+   <g id="legend_2">
+    <g id="patch_26">
+     <path d="M 383.742187 33.146777 
+L 398.742187 33.146777 
+L 398.742187 27.896777 
+L 383.742187 27.896777 
+z
+" style="fill: #b03a2e; opacity: 0.75"/>
+    </g>
+    <g id="text_38">
+     <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="404.742187" y="33.146777" transform="rotate(-0 404.742187 33.146777)">Avg. codes/record</text>
+    </g>
+    <g id="patch_27">
+     <path d="M 383.742187 44.396777 
+L 398.742187 44.396777 
+L 398.742187 39.146777 
+L 383.742187 39.146777 
+z
+" style="fill: url(#h98b3d2a90f); opacity: 0.45; stroke: #ffffff; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_39">
+     <text style="font-size: 7.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start" x="404.742187" y="44.396777" transform="rotate(-0 404.742187 44.396777)">M1 emission rate</text>
     </g>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p275f61317d">
-   <rect x="42.192188" y="20.798145" width="362.7" height="221.76"/>
+  <clipPath id="peba40f7076">
+   <rect x="42.192188" y="20.398242" width="279" height="221.76"/>
   </clipPath>
+  <clipPath id="pada46cbdb8">
+   <rect x="376.992187" y="20.398242" width="279" height="221.76"/>
+  </clipPath>
+ </defs>
+ <defs>
+  <pattern id="h98b3d2a90f" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
+   <rect x="0" y="0" width="73" height="73" fill="#b03a2e"/>
+   <path d="M -36 36 
+L 36 -36 
+M -30 42 
+L 42 -30 
+M -24 48 
+L 48 -24 
+M -18 54 
+L 54 -18 
+M -12 60 
+L 60 -12 
+M -6 66 
+L 66 -6 
+M 0 72 
+L 72 0 
+M 6 78 
+L 78 6 
+M 12 84 
+L 84 12 
+M 18 90 
+L 90 18 
+M 24 96 
+L 96 24 
+M 30 102 
+L 102 30 
+M 36 108 
+L 108 36 
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter; stroke-opacity: 0.45"/>
+  </pattern>
+  <pattern id="h4f4c7fe959" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
+   <rect x="0" y="0" width="73" height="73" fill="#2471a3"/>
+   <path d="M -36 36 
+L 36 -36 
+M -30 42 
+L 42 -30 
+M -24 48 
+L 48 -24 
+M -18 54 
+L 54 -18 
+M -12 60 
+L 60 -12 
+M -6 66 
+L 66 -6 
+M 0 72 
+L 72 0 
+M 6 78 
+L 78 6 
+M 12 84 
+L 84 12 
+M 18 90 
+L 90 18 
+M 24 96 
+L 96 24 
+M 30 102 
+L 102 30 
+M 36 108 
+L 108 36 
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter; stroke-opacity: 0.45"/>
+  </pattern>
+  <pattern id="h8e7630d1fd" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
+   <rect x="0" y="0" width="73" height="73" fill="#d35400"/>
+   <path d="M -36 36 
+L 36 -36 
+M -30 42 
+L 42 -30 
+M -24 48 
+L 48 -24 
+M -18 54 
+L 54 -18 
+M -12 60 
+L 60 -12 
+M -6 66 
+L 66 -6 
+M 0 72 
+L 72 0 
+M 6 78 
+L 78 6 
+M 12 84 
+L 84 12 
+M 18 90 
+L 90 18 
+M 24 96 
+L 96 24 
+M 30 102 
+L 102 30 
+M 36 108 
+L 108 36 
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter; stroke-opacity: 0.45"/>
+  </pattern>
+  <pattern id="hbd466a7290" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
+   <rect x="0" y="0" width="73" height="73" fill="#1e8449"/>
+   <path d="M -36 36 
+L 36 -36 
+M -30 42 
+L 42 -30 
+M -24 48 
+L 48 -24 
+M -18 54 
+L 54 -18 
+M -12 60 
+L 60 -12 
+M -6 66 
+L 66 -6 
+M 0 72 
+L 72 0 
+M 6 78 
+L 78 6 
+M 12 84 
+L 84 12 
+M 18 90 
+L 90 18 
+M 24 96 
+L 96 24 
+M 30 102 
+L 102 30 
+M 36 108 
+L 108 36 
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter; stroke-opacity: 0.45"/>
+  </pattern>
  </defs>
 </svg>

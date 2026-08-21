@@ -187,16 +187,16 @@ def fig4_sampling():
 
 
 # ============================================================
-# Fig. 5 门控效应诊断（v1/v2 对比 + 2×2 消融发射分解）
+# Fig. 5 门控效应诊断（v1/v2 恢复 + 2×2 消融 F1 分解）
 # ============================================================
 def fig5_gatekeeping():
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
-    # 左面板: v1 → v2 原始实验恢复
+    # 左面板: v1 → v2 恢复（多数投票 GT）
     ax = axes[0]
     metrics = ['F1', 'Recall', 'M1 recall', 'Empty output']
-    v1 = [0.425, 0.319, 0.143, 0.30]
-    v2 = [0.676, 0.772, 0.941, 0.01]
+    v1 = [0.503, 0.423, 0.141, 0.21]
+    v2 = [0.656, 0.872, 0.988, 0.00]
     x = np.arange(len(metrics))
     w = 0.35
     b1 = ax.bar(x - w / 2, v1, w, label='v1 conditional-check', color=C['v1'], alpha=0.85)
@@ -205,34 +205,39 @@ def fig5_gatekeeping():
         pct = (b - a) / max(a, 1e-6) * 100
         ax.annotate(f'+{pct:.0f}%', xy=(xi, max(a, b) + 0.03), ha='center',
                     fontsize=8, color=C['text'], fontweight='bold')
+    for bars, vals in ((b1, v1), (b2, v2)):
+        for bar, val in zip(bars, vals):
+            lbl = f'{val:.0%}' if val < 0.9 else f'{val:.2f}'
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.012,
+                    lbl, ha='center', fontsize=7, va='bottom', color=C['text'])
     ax.set_xticks(x)
     ax.set_xticklabels(metrics, fontsize=9)
     ax.set_ylabel('Value', fontsize=9)
-    ax.set_ylim(0, 1.12)
+    ax.set_ylim(0, 1.15)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
     ax.legend(fontsize=7.5, frameon=False, loc='upper left')
-    ax.set_title('(a) v1→v2 recovery (original experiment)', fontsize=9)
+    ax.set_title('(a) v1→v2 recovery (majority-vote GT)', fontsize=9)
 
-    # 右面板: 2×2 消融发射分解
+    # 右面板: 2×2 消融 F1 与 M1 召回
     ax = axes[1]
     cells = ['v1\nchecks\nconserv.', 'v2a\ntwo-step\nconserv.', 'v2b\nchecks\ncoverage', 'v2\ntwo-step\ncoverage']
-    avg_codes = [2.78, 6.06, 4.97, 9.40]
-    m1_rate = [0.34, 0.96, 0.56, 0.98]
+    f1 = [0.503, 0.665, 0.653, 0.656]
+    m1r = [0.141, 0.941, 0.329, 0.988]
     colors = [C['v1'], C['midblue'], C['orange'], C['v2']]
     x = np.arange(4)
-    ax.bar(x - 0.2, avg_codes, 0.4, label='Avg. codes/record', color=colors, alpha=0.75)
-    ax.bar(x + 0.2, m1_rate, 0.4, label='M1 emission rate', color=colors, alpha=0.45,
+    ax.bar(x - 0.2, f1, 0.4, label='Ave+ F1', color=colors, alpha=0.75)
+    ax.bar(x + 0.2, m1r, 0.4, label='M1 recall', color=colors, alpha=0.45,
            hatch='//', edgecolor='white')
-    for xi, v in zip(x, avg_codes):
-        ax.text(xi - 0.2, v + 0.15, f'{v}', ha='center', fontsize=8, color=C['text'])
-    for xi, v in zip(x, m1_rate):
-        ax.text(xi + 0.2, v + 0.15, f'{v:.2f}', ha='center', fontsize=8, color=C['text'])
+    for xi, v in zip(x, f1):
+        ax.text(xi - 0.2, v + 0.015, f'{v:.3f}', ha='center', fontsize=7.5, color=C['text'])
+    for xi, v in zip(x, m1r):
+        ax.text(xi + 0.2, v + 0.015, f'{v:.3f}', ha='center', fontsize=7.5, color=C['text'])
     ax.set_xticks(x)
     ax.set_xticklabels(cells, fontsize=7.5)
-    ax.set_ylim(0, 11)
+    ax.set_ylim(0, 1.15)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
     ax.legend(fontsize=7.5, frameon=False, loc='upper left')
-    ax.set_title('(b) 2×2 ablation (n = 100, emission behavior)', fontsize=9)
+    ax.set_title('(b) 2×2 ablation (n = 100, majority-vote GT)', fontsize=9)
 
     save(fig, 'fig5_gatekeeping')
 

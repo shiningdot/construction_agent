@@ -381,7 +381,7 @@ This paper presented CAIEMS, an end-to-end LLM-driven pipeline that converts uns
 
 **Ethics declaration.** This study analyzes publicly available news reports and government-published accident briefings. No human subjects, personal data of identifiable individuals, or clinical data are involved.
 
-**CRediT author statement.** First author (graduate student): Conceptualization, Methodology, Software, Data Curation, Formal Analysis, Writing — Original Draft. Corresponding author (supervisor): Conceptualization, Supervision, Validation, Writing — Review & Editing.
+**CRediT author statement.** Tianhao Sun (Nanjing Tech University): Conceptualization, Methodology, Software, Data Curation, Formal Analysis, Investigation, Writing — Original Draft. [Supervisor name] (Nanjing Tech University): Conceptualization, Supervision, Validation, Writing — Review & Editing, Funding acquisition.
 
 **Declaration of competing interest.** The authors declare no competing interests.
 

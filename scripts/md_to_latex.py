@@ -14,11 +14,21 @@ text = re.sub(r'<!--[\s\S]*?-->', '', text)
 # 图片路径
 FIGDIR = 'figures/'
 
+def esc_cell(s):
+    s = s.replace('%', r'\%').replace('&', r'\&').replace('#', r'\#').replace('_', r'\_')
+    s = s.replace('κ', r'$\kappa$').replace('Δ', r'$\Delta$')
+    s = s.replace('→', r'$\rightarrow$').replace('×', r'$\times$')
+    s = s.replace('≈', r'$\approx$').replace('–', '--').replace('—', '---')
+    s = s.replace('’', "'").replace('“', "``").replace('”', "''")
+    s = re.sub(r'([一-鿿]+)', r'{\\cjkfont \1}', s)
+    return s
+
+
 def md_table_to_latex(lines):
     """Markdown 表格 → LaTeX tabular"""
     rows = []
     for ln in lines:
-        cells = [c.strip() for c in ln.strip().strip('|').split('|')]
+        cells = [esc_cell(c.strip()) for c in ln.strip().strip('|').split('|')]
         rows.append(cells)
     if len(rows) < 2:
         return ''
@@ -54,8 +64,14 @@ def inline(s):
     # 数学与特殊字符
     s = re.sub(r'\*\*(.+?)\*\*', r'\\textbf{\1}', s)
     s = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\\textit{\1}', s)
-    s = s.replace('%', r'\%').replace('&', r'\&').replace('#', r'\#')
+    s = s.replace('%', r'\%').replace('&', r'\&').replace('#', r'\#').replace('_', r'\_')
     s = s.replace('κ', r'$\kappa$').replace('Δ', r'$\Delta$')
+    s = s.replace('→', r'$\rightarrow$').replace('×', r'$\times$')
+    s = s.replace('≈', r'$\approx$').replace('≥', r'$\geq$').replace('≤', r'$\leq$')
+    s = s.replace('–', '--').replace('—', '---')
+    s = s.replace('’', "'").replace('“', "``").replace('”', "''")
+    # 中文片段用 CJK 字体
+    s = re.sub(r'([\u4e00-\u9fff]+)', r'{\\cjkfont \1}', s)
     # 保留 $...$ 数学
     return s
 
@@ -73,6 +89,8 @@ preamble = r"""\documentclass[11pt]{article}
 \usepackage[hidelinks]{hyperref}
 \usepackage{microtype}
 \usepackage{float}
+\usepackage{fontspec}
+\newfontfamily\cjkfont{Noto Sans SC}[Scale=0.92]
 \title{CAIEMS: An LLM-Driven Pipeline for Construction Accident Information Extraction, Causal Coding, and Online Database Construction}
 \author{Tianhao Sun\textsuperscript{1}, [Supervisor name]\textsuperscript{1,*}}
 \date{}
@@ -104,7 +122,9 @@ while i < len(lines):
         elif s.startswith('## References'):
             out.append(r'\section*{References}' + '\n' + r'\begin{enumerate}')
             i += 1
-            # 收集参考文献条目
+            # 跳过空行，收集参考文献条目
+            while i < len(lines) and lines[i].strip() == '':
+                i += 1
             while i < len(lines) and lines[i].strip() != '':
                 ref = lines[i].strip()
                 if ref.startswith('['):

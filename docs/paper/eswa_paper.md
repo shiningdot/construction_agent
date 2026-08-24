@@ -161,6 +161,10 @@ Table 3 summarizes the database. The severity distribution follows the Chinese c
 
 ![](figures/fig3_code_dist.png)
 
+**Figure 4.** The CAIEMS web platform: interactive browsing of the database (2,623 records).
+
+![](figures/web_dataset.png)
+
 ---
 
 
@@ -181,11 +185,11 @@ The evaluation addresses three questions in sequence: which backbone model shoul
 2. *Strategy comparison sample* ($n=100$). Drawn from the silver standard covering all 12 accident types and all 19 CAICS categories; the causal ground truth was built by majority vote of three construction-safety experts labeling independently on the LabelStudio platform, with Fleiss' Kappa between 0.859 and 1.000 across the five CAICS layers (verified from the recovered annotations; the ground truth carries 5.1 codes per record on average).
 3. *Agreement sample* ($n=289$). Two-stage stratified random sampling (accident type × severity, proportional allocation with a floor of two per cell) from the full 2,623-record population; the resulting sample distribution deviates from the population by less than 1.5%. A safety-engineering graduate student annotated six basic features (accident type, severity, province, deaths, injuries, date) via LabelStudio. Eleven records drawn from the original 300 were excluded as multi-accident texts, yielding the final $n=289$.
 
-Figure 4 summarizes the sample hierarchy.
+Figure 5 summarizes the sample hierarchy.
 
-**Figure 4.** Dataset hierarchy and the three evaluation samples.
+**Figure 5.** Dataset hierarchy and the three evaluation samples.
 
-![](figures/fig4_sampling.png)
+![](figures/fig5_sampling.png)
 
 ### 4.2 Evaluation Metrics
 
@@ -256,11 +260,11 @@ The initial version of S4 (v1) embedded domain knowledge as conditional checks: 
 
 We name this failure mode the **Lexical Gatekeeping Effect**: in conditional-check CoT prompts, an LLM converts illustrative keyword lists into necessary conditions for code emission, and paraphrased evidence that fails the literal gate is discarded, producing systematic recall collapse concentrated on the highest-frequency implicit categories.
 
-The remedy replaces the gate with a two-step judgment: (1) explicit matching — does the text directly support this code, with any paraphrase? (2) authorized inference — given the accident's nature and construction-safety knowledge, is this cause necessarily present even without explicit phrasing? The conservative instruction was also replaced by a coverage preference appropriate to safety analysis, where missing a cause costs more than adding one. The combined v1→v2 effects were large: F1 rose from 0.503 to 0.656, recall from 0.423 to 0.872, M1 recall from 0.141 to 0.988, and empty outputs fell from 21% to 0. Figure 5 visualizes the recovery. Because the v1→v2 transition changed two prompt properties at once (phrasing and output policy), we isolate their separate contributions with a controlled ablation below.
+The remedy replaces the gate with a two-step judgment: (1) explicit matching — does the text directly support this code, with any paraphrase? (2) authorized inference — given the accident's nature and construction-safety knowledge, is this cause necessarily present even without explicit phrasing? The conservative instruction was also replaced by a coverage preference appropriate to safety analysis, where missing a cause costs more than adding one. The combined v1→v2 effects were large: F1 rose from 0.503 to 0.656, recall from 0.423 to 0.872, M1 recall from 0.141 to 0.988, and empty outputs fell from 21% to 0. Figure 6 visualizes the recovery. Because the v1→v2 transition changed two prompt properties at once (phrasing and output policy), we isolate their separate contributions with a controlled ablation below.
 
-**Figure 5.** The Lexical Gatekeeping Effect: (a) v1→v2 recovery on the original strategy sample; (b) the 2×2 ablation isolating the phrasing and output-policy contributions to emission behavior.
+**Figure 6.** The Lexical Gatekeeping Effect: (a) v1→v2 recovery on the strategy sample; (b) the 2×2 ablation decomposing the phrasing and output-policy contributions to F1 and M1 recall.
 
-![](figures/fig5_gatekeeping.png)
+![](figures/fig6_gatekeeping.png)
 
 The mechanism behind the effect is instructive. Interrogative phrasing ("does the text mention X?") activates the model's literal pattern-matching mode: attention concentrates on fragments containing the exact keywords, and paraphrases receive low weight. Declarative cue phrasing ("cues include a, b, c; even without these words, infer from the accident's nature") activates the reasoning mode, in which keywords define an open semantic family and the model judges membership autonomously. This asymmetry generalizes beyond construction: in any domain requiring recall-over-precision annotation (safety analysis, medical screening), CoT prompts should phrase conditions as clue guidance rather than condition checks; condition-check phrasing suits zero-false-positive settings such as legal citation.
 
@@ -308,11 +312,11 @@ Table 7 reports the results. For accident type, the LLM-human kappa is 0.9136 (9
 | Injuries | ICC(2,1) | 0.9853 [0.9426, 0.9995] | 0.9738–1.0 | MAE 0.087 |
 | Date (year-month) | Match rate | 0.9965 | — | 99.7% |
 
-Figure 6 places each human-AI kappa against its expert range.
+Figure 7 places each human-AI kappa against its expert range.
 
-**Figure 6.** Human-AI agreement versus expert inter-rater ranges.
+**Figure 7.** Human-AI agreement versus expert inter-rater ranges.
 
-![](figures/fig6_kappa.png)
+![](figures/fig7_kappa.png)
 
 The sample size was fixed before data collection by the Fleiss' kappa standard-error formula: for expected kappa near 0.90 with a target 95% confidence-interval half-width of 0.063, the required $n$ is approximately 300, and the observed CIs confirm the design (maximum observed half-width 0.045). The remaining disagreements are concentrated in semantically adjacent accident-type boundaries (e.g., earthwork collapse versus general collapse), where experts disagree with each other at comparable rates, indicating that the residual human-AI divergence reflects genuine task ambiguity rather than systematic LLM error.
 

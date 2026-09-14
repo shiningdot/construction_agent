@@ -1,0 +1,429 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{microtype}
+\usepackage{float}
+\usepackage{fontspec}
+\usepackage{xcolor}
+\newfontfamily\cjkfont{Noto Sans SC}[Scale=0.92]
+\title{CAIEMS：面向施工事故叙述结构化处理的探索性 LLM 数据工程管道}
+\author{Tianhao Sun\textsuperscript{1}, [Supervisor name]\textsuperscript{1,*}}
+\date{2026-09-14}
+\begin{document}
+\maketitle
+
+\section{{\cjkfont 摘要}}
+{\cjkfont 建筑施工事故报告是安全知识中规模大而利用不足的资源，将其转化为可分析记录至今仍依赖大量人工。本文提出} CAIEMS------{\cjkfont 一条探索性} LLM {\cjkfont 数据工程管道，将公开可获取的中文施工事故叙述加工为可查询的数据库原型：}2,623 {\cjkfont 条记录、}33 {\cjkfont 个字段、}17,364 {\cjkfont 条致因标注。标注采用三层证据分级方案：逐字证据编码、语义归纳编码与领域先验推断编码，三者分字段存储、分口径统计。管道集成了多源采集、}LLM {\cjkfont 文本分类、结构化字段抽取、基于} CAICS {\cjkfont 操作性编码方案（}5 {\cjkfont 层} 19 {\cjkfont 类）的致因编码、}MECE {\cjkfont 字段标准化与交互式} Web/REST {\cjkfont 界面。三项支撑实验均以明确限定的口径报告。其一，}4 {\cjkfont 个} LLM {\cjkfont 在} 200 {\cjkfont 条记录上的约束性比较：所选模型基础字段准确率} 91.2\%{\cjkfont ，且为候选模型中成本最低者；需说明的是各模型运行条件并不对等（温度约束与输出预算不同），因此这是面向选型的系统级比较，而非一般性能力排名。其二，}100 {\cjkfont 条记录、三专家多数投票真值上的六策略提示对比（少样本最优，}F1=0.669{\cjkfont ），期间观察到一种提示措辞敏感性}------{\cjkfont 我们称之为词汇门控效应：疑问式条件检查措辞抑制了隐性类别的同义证据（}M1 {\cjkfont 召回} 0.141{\cjkfont ），同一设置下两步判断改写将} M1 {\cjkfont 召回提升至} 0.941{\cjkfont 。我们将其报告为带实用补救的观察性现象，而非已分离的因果机制。其三，协议研究（}n=289{\cjkfont ）：}LLM {\cjkfont 与一名受训标注者在六项基础字段上达到高一致性（分类字段} Cohen's kappa 0.91--0.97{\cjkfont ；计数字段} ICC 0.985{\cjkfont ；日期年}-{\cjkfont 月匹配率} 99.7\%{\cjkfont ）。全文对结果的边界作显式声明：银标准部分由模型输出构建，提示开发与最终测试共用同一样本，数据库覆盖的是公开可检索的事故报道而非全部施工事故的代表性样本。}
+
+\textbf{{\cjkfont 关键词}}{\cjkfont ：大语言模型；建筑施工安全；信息抽取；提示工程；事故数据库；致因标注；标注者一致性}
+
+\section{1. {\cjkfont 引言}}
+{\cjkfont 建筑业仍是全球最危险的行业之一。每起施工亡人事故都会产生调查报告与新闻报道，记录发生了什么、如何发生、为何发生。这些文本承载着数十年间积累的致因信息，却以非结构化自然语言存在，难以系统分析。在中国，事故叙述分散于安全信息门户、地方应急管理局与新闻媒体，人工汇编成本高昂，自动汇编则是一个反复出现的工程挑战（}Kong and Ahn, 2024{\cjkfont ）。}
+
+{\cjkfont 针对这一转化问题的既有计算路径可分为三类。}BERT {\cjkfont 及其蒸馏变体等监督分类器依赖标注语料，而该领域的标注语料生产成本高昂（}Togan et al., 2025{\cjkfont ）。基于} LLM {\cjkfont 的研究已演示了从} OSHA {\cjkfont 叙述中提取事故属性（}Ahmadi et al., 2024{\cjkfont ）、对韩国坠落事故做} HFACS {\cjkfont 分类（}Kim and Han, 2024{\cjkfont ）、从施工报告构建知识图谱（}Liu and Luo, 2025{\cjkfont ）的可行性。但这些成果大多止步于单项研究：抽取服务于某一次分析或静态图谱，而非可检查、可更新的数据库。}
+
+{\cjkfont 本文报告的是} CAIEMS------{\cjkfont 一项探索性数据工程工作，而非理论证实性研究。唯一的组织性问题是实践性的：一个小团队能否利用通用} LLM API {\cjkfont 与有限算力，将公开可获取的中文事故叙述转化为可查询的数据库，并使标签在明确界定的置信层级上可追溯到原文？我们报告管道产出了什么、我们对其可靠性测量了什么、以及我们尚不能确立什么。}
+
+{\cjkfont 这一框架对应三项贡献。}(C1) {\cjkfont 数据工程管道与数据库原型：}2,623 {\cjkfont 条记录、}33 {\cjkfont 字段、}17,364 {\cjkfont 条三层分级致因标注，配} Web {\cjkfont 界面与} REST API{\cjkfont ；数据与代码于论文发表后开放检查。}(C2) CAICS {\cjkfont 操作性编码方案}------{\cjkfont 面向施工事故致因的} 5 {\cjkfont 层} 19 {\cjkfont 类操作定义，明确将其定位为本数据库的操作性方案，而非新的致因理论。}(C3) {\cjkfont 一个经验记录的提示措辞敏感性}------{\cjkfont 词汇门控效应}------{\cjkfont 在提示开发过程中观察到，并配有带边界声明的两步判断补救。}
+
+{\cjkfont 三项支撑实验锚定可靠性讨论。实验一在} 200 {\cjkfont 条记录上比较} 4 {\cjkfont 个} LLM {\cjkfont 以支持骨干选型，并显式声明运行条件不对等的保留。实验二在} 100 {\cjkfont 条记录、三专家多数投票真值上比较六种提示策略；该实验发现了上述措辞敏感性。实验三在} 289 {\cjkfont 条记录上测量} LLM {\cjkfont 与一名受训标注者在六项基础字段上的一致性。各实验所用样本的已知局限}------{\cjkfont 银标准部分由模型产出、策略样本同时承担开发与最终报告}------{\cjkfont 均在每次使用处声明，而非集中于一段笼统的保留说明。}
+
+{\cjkfont 论文其余部分组织如下：第} 2 {\cjkfont 节综述相关工作；第} 3 {\cjkfont 节描述证据分级方案、}CAICS {\cjkfont 操作定义、管道架构与数据库；第} 4 {\cjkfont 节按声明口径报告三项实验；第} 5 {\cjkfont 节讨论意义与局限；第} 6 {\cjkfont 节总结。}
+
+\section{2. {\cjkfont 相关工作}}
+\subsection{2.1 {\cjkfont 施工事故文档的文本分析}}
+{\cjkfont 施工安全文档的计算分析早于} LLM{\cjkfont 。对人工编码记录做关联规则挖掘识别了事故类型与致因因素间的可解释关联（}Rafindadi et al., 2023{\cjkfont ）；对} OSHA {\cjkfont 屋面工人记录做决策树建模产出了伤害预测规则（}Onuchukwu et al., 2024{\cjkfont ）。}Ayhan and Tokdemir (2019) {\cjkfont 在专家编码事件集上结合回归与模糊逻辑。这些研究的共同约束是循环性的：分析质量受制于结构化输入，而结构化输入本身产自昂贵的人工编码。}Togan et al. (2025) {\cjkfont 直面转化环节，在} 5,224 {\cjkfont 条施工事故案例上对比} TF-IDF{\cjkfont 、}BERT{\cjkfont 、}RoBERTa{\cjkfont 、}XLNet {\cjkfont 与} DistilBERT {\cjkfont 的安全属性提取，发现} DistilBERT {\cjkfont 以约一半的计算成本取得相近性能。其结果是监督范式的典型写照：可用的准确率（等级分类} F1=0.72{\cjkfont ）以大规模标注语料为代价。}
+
+\subsection{2.2 LLM {\cjkfont 事故信息抽取}}
+LLM {\cjkfont 通过无需任务特定训练、直接从文本推断结构改变了瓶颈位置（}Brown et al., 2020; OpenAI, 2023{\cjkfont ）。}Ahmadi et al. (2024) {\cjkfont 评测} GPT-3.5{\cjkfont 、}GPT-4.0{\cjkfont 、}Gemini Pro {\cjkfont 与} LLaMA 3.1 {\cjkfont 对} OSHA {\cjkfont 施工报告的分类。}Zhang, Hou, et al. (2025a) {\cjkfont 构建了基于} GPT {\cjkfont 的地铁施工报告分析对话系统} AIR Agent{\cjkfont 。}Liu, Ding, et al. (2025b) {\cjkfont 将零样本} GPT-4o {\cjkfont 抽取应用于} 1,097 {\cjkfont 条高处坠落报告，实体识别} F1=0.94{\cjkfont 。相邻领域中，}Huang et al. (2026) {\cjkfont 为海事事故构建了带质量评估框架的} LLM {\cjkfont 知识图谱管道，}Jiang et al. (2026) {\cjkfont 构建了带本体建模与交互可视化的煤矿事故知识图谱。这些系统已在不同程度上组合了采集、}LLM {\cjkfont 抽取与图谱存储；差异在于数据质量报告的深度、是否存在人工验证的参考标准、以及产物是否作为可更新服务维护。}
+
+\subsection{2.3 {\cjkfont 基于} HFACS {\cjkfont 的} LLM {\cjkfont 致因分类}}
+{\cjkfont 人因分析与分类系统（}Shappell and Wiegmann, 2000{\cjkfont ）主导高风险行业的致因分类。思维链提示（}Wei et al., 2022{\cjkfont ）及其变体}------{\cjkfont 零样本推理（}Kojima et al., 2022{\cjkfont ）、自洽解码（}Wang et al., 2023{\cjkfont ）与从易到难分解（}Zhou et al., 2023{\cjkfont ）}------{\cjkfont 构成基于提示的分类方法的方法论基座。}Liu et al. (2025a) {\cjkfont 提出} HFACS-CoT{\cjkfont ，在} 113 {\cjkfont 条通用航空叙述上以} GPT-4o {\cjkfont 比较六种提示策略，发现领域} CoT {\cjkfont 更优（召回} 74.9\%{\cjkfont 、精确} 46.2\%{\cjkfont ）。}Kim and Han (2024) {\cjkfont 将} HFACS {\cjkfont 与} Claude 3.5 Sonnet {\cjkfont 结合分析} 1,816 {\cjkfont 条韩国施工坠落案例。}Yan et al. (2025) {\cjkfont 跨七个} LLM {\cjkfont 应用} HFACS {\cjkfont 引导提示。}Ahmadi et al. (2025) {\cjkfont 探索了} Llama-3.1 8B {\cjkfont 的} GRPO {\cjkfont 微调路线。纵观该文献，策略排名均在单一模型}-{\cjkfont 任务组合内建立，提示设计被报告为}"{\cjkfont 可用配置}"{\cjkfont ，鲜有系统考察嵌入知识的措辞如何约束模型行为。}
+
+\subsection{2.4 {\cjkfont 知识图谱与事故数据库}}
+Kong and Ahn (2024) {\cjkfont 系统综述了施工安全管理知识图谱，并指出研究原型与运营平台之间的差距。}Liu and Luo (2025) {\cjkfont 以迭代} CoT {\cjkfont 提示生成施工事故知识图谱。}Yang and Park (2025) {\cjkfont 构建了道路事故新闻知识图谱。}Zhang, Wei, et al. (2025b) {\cjkfont 开发了面向流程工业事故知识的图检索增强问答系统} GRAG-ProSafe{\cjkfont 。}Shi et al. (2025) {\cjkfont 将故障树、贝叶斯网络与本体推理结合用于基坑坍塌分析。}Xiao et al. (2026) {\cjkfont 将知识图谱作为} LLM {\cjkfont 人因可靠性分析的检索层集成。这些系统各自构建了某种知识产物；本工作的差异在于侧重而非类别}------{\cjkfont 优先可追溯的分级证据标注与可更新的查询接口，并以测量的边界报告标注的可靠性。}
+
+\section{3. {\cjkfont 系统}}
+\subsection{3.1 {\cjkfont 问题形式化与证据分级标注方案}}
+{\cjkfont 令} $T = \{t\_1, t\_2, \dots, t\_N\}$ {\cjkfont 表示非结构化事故叙述语料（本语料中位数} 517 {\cjkfont 字符）。管道将每条} $t\_i$ {\cjkfont 转化为结构化记录} $r\_i = (b\_i, c\_i)${\cjkfont ：基础信息向量} $b\_i$ {\cjkfont 覆盖} 33 {\cjkfont 个预定义字段；致因标注集} $c\_i = \{(x\_{ij}, e\_{ij}, \iota\_{ij}, q\_{ij})\}${\cjkfont ，其中} $x\_{ij}$ {\cjkfont 为} CAICS {\cjkfont 方案中的致因编码，}$e\_{ij}$ {\cjkfont 为支撑文本，}$\iota\_{ij}$ {\cjkfont 为推理链，}$q\_{ij} \in \{\text{explicit}, \text{inferred}, \text{prior}\}$ {\cjkfont 为证据层级。}
+
+{\cjkfont 三个层级承担不同的认识论承诺，数据库分开存储、分开报告：}
+
+\begin{itemize}
+\item \textbf{explicit{\cjkfont （逐字证据）}}{\cjkfont ：原文含直接支撑该编码的表述，}$e\_{ij}$ {\cjkfont 为逐字引文。}Web {\cjkfont 界面中仅此类编码呈现为}"{\cjkfont 有证据支撑}"{\cjkfont 。}
+\item \textbf{inferred{\cjkfont （语义归纳）}}{\cjkfont ：编码由叙述经同义改写归纳得出（如}"{\cjkfont 安全管理不到位}"{\cjkfont 在未引用任何固定关键词的情况下支撑} M1{\cjkfont ）。推理链已记录。}
+\item \textbf{prior{\cjkfont （领域先验）}}{\cjkfont ：编码来自提示中授权的领域假设（如亡人事故视为隐含监管缺失，即使文本未提）。此类编码带先验标签展示，并排除在}"{\cjkfont 有证据支撑}"{\cjkfont 统计之外。}
+\end{itemize}
+{\cjkfont 该方案取代了早期草稿中}"{\cjkfont 每个编码均带可引用证据、无证据即幻觉}"{\cjkfont 的更强声明。分层方案才是对生产提示实际行为的准确描述：直接抽取、同义归纳与领域先验推断对下游分析都有用，但混为一谈会把模型先验呈现为经验发现。全库} 17,364 {\cjkfont 条标注中，}explicit 15,809 {\cjkfont 条（}91.0\%{\cjkfont ）、}inferred 1,131 {\cjkfont 条（}6.5\%{\cjkfont ）、}prior 424 {\cjkfont 条（}2.4\%{\cjkfont ）；本文报告总量，并在相关处给出分层细目。}
+
+\subsection{3.2 CAICS{\cjkfont ：操作性编码方案}}
+{\cjkfont 建筑施工事故综合致因系统（}CAICS{\cjkfont ）是面向施工事故叙述的} 5 {\cjkfont 层} 19 {\cjkfont 类编码方案。其层级遵循因果泄漏模型：管理层（}M{\cjkfont ）回答为何该工地易出事故；防线层（}F{\cjkfont ）回答为何物理屏障失效；触发层（}T{\cjkfont ）回答何种物质条件引发事件；人的行为层（}H{\cjkfont ）回答何种不安全行为在前；后果层（}C{\cjkfont ）回答为何后果超出预期。表} 1 {\cjkfont 列出十九类及其操作定义与典型证据关键词。}
+
+\textbf{{\cjkfont 表} 1. CAICS {\cjkfont 编码方案：操作定义}}
+
+[{\cjkfont 表}1{\cjkfont 占位：待手绘} --- 5 {\cjkfont 层} 19 {\cjkfont 类操作定义表}]
+
+CAICS {\cjkfont 与源自航空领域的} HFACS {\cjkfont 改编（}Shappell and Wiegmann, 2000; Liu et al., 2025a{\cjkfont ）有两个设计差异：}F {\cjkfont 层刻画施工领域普遍的物理防护失效，}C {\cjkfont 层记录迟报瞒报等后果放大因素。方案经泄漏模型指导下的语料驱动归纳得出：从语料抽取因果表述、聚类为候选类别、整合为五层，频次低于下限的类别合并或删除；保留类别均配有操作定义与语料归纳的证据关键词。我们强调该声明的范围：推导协议是迭代式工程流程而非正式的内容效度研究，且尚未在独立数据上与} 24Model{\cjkfont （}Xuecai et al., 2024{\cjkfont ）、}Accimap {\cjkfont 或} HFACS {\cjkfont 做对比验证。因此本文将} CAICS {\cjkfont 定位为本数据库的操作性方案}------{\cjkfont 面向} LLM {\cjkfont 的有限编码框架，配显式定义}------{\cjkfont 而非已经确立的致因理论。其可用性证据包括} 100 {\cjkfont 条策略样本上的专家标注一致性（}Fleiss' kappa {\cjkfont 各层} 0.859--1.000{\cjkfont ，见} 4.1 {\cjkfont 节）。}
+
+\subsection{3.3 {\cjkfont 管道架构}}
+{\cjkfont 图} 1 {\cjkfont 展示总体架构。管道由六个处理阶段与随后的存储、访问层构成。}
+
+\textbf{{\cjkfont 图} 1. CAIEMS {\cjkfont 系统架构}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}1{\cjkfont 占位：待手绘} --- {\cjkfont 系统架构图}]}}\end{center}
+
+\textbf{{\cjkfont 阶段} 1{\cjkfont ：多源采集。}} {\cjkfont 爬虫从公共安全信息门户（}safehoo.com{\cjkfont 、}esafety.cn{\cjkfont ）与地方应急管理局网站采集事故报告，原始} HTML {\cjkfont 解析为候选记录。语料由两个时间块构成：历史块（}1978--1990{\cjkfont ，}698 {\cjkfont 条，占} 26.6\%{\cjkfont ），数字化自公开事故汇编；当代块（}2005--2026{\cjkfont ，}1,925 {\cjkfont 条，占} 73.4\%{\cjkfont ），采集自新闻门户；}1991--2004 {\cjkfont 年无记录。中国承包商海外工地事故（}22 {\cjkfont 条境外记录）保留于库但排除在省级统计之外。由于来源为公开网页，数据库覆盖的是公开可检索的事故报道，不应解读为全部施工事故的代表性样本：严重事故相对总体被过度代表，同一事故可能以多篇镜像报道出现。}
+
+\textbf{{\cjkfont 阶段} 2{\cjkfont ：}LLM {\cjkfont 文本分类。}} {\cjkfont 候选页面异质性显著。轻量} LLM {\cjkfont 分类器以五个标注示例的少样本提示为每条记录分配} single / multi / other {\cjkfont 三种类型。该阶段移除了} 895 {\cjkfont 条教材记录及全部广告、导航页面。需说明的是分类器并不完美：一致性研究的} 300 {\cjkfont 条抽样中仍有} 11 {\cjkfont 条在标注时因含多起事故被排除，说明文本分类存在残留错误，当前管道尚未对其完全审计；多事故拆分规则与镜像报道的跨源去重仍部分依赖人工。}
+
+\textbf{{\cjkfont 阶段} 3{\cjkfont ：基础字段抽取（}Step 1{\cjkfont ）。}} {\cjkfont 对每条通过分类的记录，}LLM {\cjkfont 在严格} JSON {\cjkfont 工具模式下抽取} 33 {\cjkfont 字段基础信息向量。评测运行中} 100\% {\cjkfont 记录获得符合} schema {\cjkfont 的输出。抽取器同时产出规范化标题摘要用于搜索增强。}
+
+\textbf{{\cjkfont 阶段} 4{\cjkfont ：}CAICS {\cjkfont 致因编码（}Step 2{\cjkfont ）。}} {\cjkfont 编码器应用两步判断流程}------{\cjkfont 显性匹配后授权推断}------{\cjkfont 并为每个编码记录证据层级、支撑文本与推理链（}3.1 {\cjkfont 节）。图} 2 {\cjkfont 以一条真实记录的示例展示五层结构。}
+
+\textbf{{\cjkfont 图} 2. CAICS {\cjkfont 五层结构与示例证据链}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}2{\cjkfont 占位：待手绘} --- CAICS {\cjkfont 五层结构与示例证据链}]}}\end{center}
+
+\textbf{{\cjkfont 阶段} 5{\cjkfont ：}LLM {\cjkfont 优先的} MECE {\cjkfont 枚举标准化。}} {\cjkfont 五个自由文本字段（工序、设备、材料、工种、建筑结构）经} LLM {\cjkfont 优先流程规范化：}LLM {\cjkfont 审视字段取值分布、设计} MECE {\cjkfont 框架、映射全部观察值。表} 2 {\cjkfont 报告所得枚举，并显式给出非空分母。}
+
+\textbf{{\cjkfont 表} 2. LLM {\cjkfont 优先流程产出的} MECE {\cjkfont 枚举}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lllll}
+\hline
+{\cjkfont 字段} & {\cjkfont 类别数} & {\cjkfont 非空记录（占} 2,623{\cjkfont ）} & {\cjkfont 最大类别（占非空）} & {\cjkfont 残余}"{\cjkfont 其他}"{\cjkfont （占非空）} \\
+\hline
+{\cjkfont 工序（}WT{\cjkfont ）} & 11 & 2,202{\cjkfont （}83.9\%{\cjkfont ）} & WT02 {\cjkfont 主体结构工程（}397{\cjkfont ，}18.0\%{\cjkfont ）} & 2.9\% \\
+{\cjkfont 涉事设备（}EQP{\cjkfont ）} & 13 & 1,373{\cjkfont （}52.3\%{\cjkfont ）} & EQP01 {\cjkfont 起重机械（}335{\cjkfont ，}24.4\%{\cjkfont ）} & 1.9\% \\
+{\cjkfont 涉事材料（}MAT{\cjkfont ）} & 7 & 1,465{\cjkfont （}55.9\%{\cjkfont ）} & MAT01 {\cjkfont 混凝土及水泥制品（}423{\cjkfont ，}28.9\%{\cjkfont ）} & 11.1\% \\
+{\cjkfont 工种（}WKR{\cjkfont ）} & 13 & 1,905{\cjkfont （}72.6\%{\cjkfont ）} & WKR01 {\cjkfont 通用劳务工（}928{\cjkfont ，}48.7\%{\cjkfont ）} & 6.3\% \\
+{\cjkfont 建筑结构（}BLD{\cjkfont ）} & 12 & 359{\cjkfont （}13.7\%{\cjkfont ）} & BLD01 {\cjkfont 钢结构（}127{\cjkfont ，}35.4\%{\cjkfont ）} & 3.6\% \\
+\hline
+\end{tabular}
+\end{table}
+\textbf{{\cjkfont 阶段} 6{\cjkfont ：存储与访问。}} {\cjkfont 全部产物存储于含九张表的} SQLite {\cjkfont 数据库。交互式} Web {\cjkfont 平台与} REST API {\cjkfont 开放访问：用户可按事故类型、等级、地区、工序与致因编码筛选，并查看每条标注背后的证据（证据层级分开展示）。数据库与代码于论文发表后开放检查；此前可向作者索取。}
+
+\subsection{3.4 {\cjkfont 多模态扩展}}
+{\cjkfont 文本之外，管道通过三个展示型模块增强记录：聚合搜索} API {\cjkfont 的搜索增强（}1,636 {\cjkfont 条，}62.4\%{\cjkfont ）、零样本} CLIP {\cjkfont 分类器过滤的图片采集（}226 {\cjkfont 张高于} 0.5 {\cjkfont 相似度阈值）、以及} GLM-5V-Turbo {\cjkfont 的两阶段} VLM {\cjkfont 描述（}282 {\cjkfont 条分析覆盖} 176 {\cjkfont 起事故）。这些模块是扩展而非经评估的贡献：图片源头质量约束} VLM {\cjkfont 分析的贡献，描述作为补充材料呈现，而非经验证标注。}
+
+\subsection{3.5 {\cjkfont 数据库统计}}
+{\cjkfont 表} 3 {\cjkfont 汇总数据库，全部计数与总量闭合。}
+
+\textbf{{\cjkfont 表} 3. {\cjkfont 数据库统计}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{ll}
+\hline
+{\cjkfont 维度} & {\cjkfont 数值} \\
+\hline
+{\cjkfont 事故记录} & 2,623 \\
+{\cjkfont 时间跨度} & 1978-08 {\cjkfont 至} 2026-06{\cjkfont （}1991--2004 {\cjkfont 无记录）} \\
+{\cjkfont 事故类型} & 12 {\cjkfont 类，}2,617 {\cjkfont 条有标注（坍塌} 1,092{\cjkfont ；高处坠落} 570{\cjkfont ；起重伤害} 225{\cjkfont ；土方坍塌} 222{\cjkfont ；触电} 160{\cjkfont ；物体打击} 119{\cjkfont ；其他} 50{\cjkfont ；火灾爆炸} 47{\cjkfont ；机械伤害} 46{\cjkfont ；中毒窒息} 41{\cjkfont ；车辆伤害} 38{\cjkfont ；淹溺} 7{\cjkfont ）；}6 {\cjkfont 条未标注} \\
+{\cjkfont 事故等级} & {\cjkfont 一般} 1,889{\cjkfont ；较大} 672{\cjkfont ；重大} 53{\cjkfont ；特别重大} 8{\cjkfont ；}1 {\cjkfont 条未标注} \\
+{\cjkfont 伤亡} & {\cjkfont 死亡} 5,894{\cjkfont ；受伤} 5,796 \\
+{\cjkfont 致因标注} & 17,364 {\cjkfont 条（}explicit 15,809 / inferred 1,131 / prior 424{\cjkfont ）} \\
+{\cjkfont 搜索增强记录} & 1,636 \\
+CLIP {\cjkfont 过滤图片} & 226 \\
+VLM {\cjkfont 分析} & 282 {\cjkfont 条} / 176 {\cjkfont 起事故} \\
+\hline
+\end{tabular}
+\end{table}
+{\cjkfont 图} 3 {\cjkfont 展示十九个} CAICS {\cjkfont 类别的标注分布；高频编码（}M1 {\cjkfont 监管缺失、}H1 {\cjkfont 违章操作、}H3 {\cjkfont 风险辨识失败）部分反映生产提示授权的先验推断，这也是总量旁并列分层细目的原因。}
+
+\textbf{{\cjkfont 图} 3. {\cjkfont 十九个} CAICS {\cjkfont 类别的致因标注分布}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}3{\cjkfont 占位：待手绘} --- CAICS {\cjkfont 编码分布条形图}]}}\end{center}
+
+\section{4. {\cjkfont 实验评估}}
+{\cjkfont 评估以明确声明口径回答三个问题：管道在其实际成本约束下应采用哪个骨干模型（}4.3 {\cjkfont 节）；致因编码提示应如何措辞（}4.4 {\cjkfont 节）；}LLM {\cjkfont 的基础字段标注是否与受训人工标注者一致（}4.5 {\cjkfont 节）。}4.1 {\cjkfont 与} 4.2 {\cjkfont 节定义数据集与指标。}
+
+\subsection{4.1 {\cjkfont 数据集与抽样}}
+\textbf{{\cjkfont 全量语料。}} {\cjkfont 管道产出} 2,623 {\cjkfont 条单事故记录，跨} 1978--2026 {\cjkfont 年，含} 33 {\cjkfont 字段与} 17,364 {\cjkfont 条分层致因标注。}
+
+\textbf{{\cjkfont 银标准。}} 972 {\cjkfont 条银标准由管道版本一致构建，而非独立人工重标注：基础字段在两版本一致时直接采纳、不一致时规则裁决；致因维度标签取两版本输出的合并去重。我们显式陈述这一构建方式，因为它界定了银标准能认证什么：其可靠程度取决于两个来源版本的可靠程度，它不是独立人工金标准。银标准中致因维度为空表示该维度在原文未提及。一个} 100 {\cjkfont 条子集获得了完全独立的人工验证：三位施工安全领域专家在} LabelStudio {\cjkfont 平台上标注} CAICS {\cjkfont 编码，}Fleiss' kappa {\cjkfont 在五层上介于} 0.859 {\cjkfont 与} 1.000{\cjkfont ；该子集真值为三专家多数投票，平均每条} 5.1 {\cjkfont 个编码。}
+
+\textbf{{\cjkfont 评测样本。}}
+
+1. \textit{{\cjkfont 模型比较样本}}{\cjkfont （}n=200{\cjkfont ）。按事故类型分层（}11 {\cjkfont 类，每类至少} 3 {\cjkfont 条）从银标准抽取。} 2. \textit{{\cjkfont 策略比较样本}}{\cjkfont （}n=100{\cjkfont ）。从银标准抽取，覆盖全部} 12 {\cjkfont 种事故类型与} 19 {\cjkfont 个} CAICS {\cjkfont 类别；致因真值为上述三专家多数投票。}\textbf{{\cjkfont 口径声明}}{\cjkfont ：该样本承担了提示开发}------{\cjkfont 发现} v1 {\cjkfont 召回问题、分析错误类别、设计} v2{\cjkfont 、运行消融、选定生产配置。开发与最终报告共用同一样本，因此策略结果带有开发集复用风险；三个少样本示例取自同一银标准，未按显式流程与测试记录隔离。所报数字最好解读为开发评估，而非冻结测试集认证。} 3. \textit{{\cjkfont 一致性样本}}{\cjkfont （}n=289{\cjkfont ）。两阶段分层抽样（事故类型} $\times$ {\cjkfont 等级，比例分配、每格保底} 2 {\cjkfont 条）从} 2,623 {\cjkfont 条全量语料抽取}------{\cjkfont 而非银标准。一名受训标注者（安全工程研究生）经} LabelStudio {\cjkfont 标注六项基础特征（事故类型、等级、省份、死亡人数、受伤人数、日期），标注过程未接触管道的抽取值。原} 300 {\cjkfont 条中} 11 {\cjkfont 条因多事故文本被排除。}
+
+{\cjkfont 图} 4 {\cjkfont 汇总样本层级。}
+
+\textbf{{\cjkfont 图} 4. {\cjkfont 数据集层级与三个评测样本}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}4{\cjkfont 占位：待手绘} --- {\cjkfont 样本关系流程图}]}}\end{center}
+
+\subsection{4.2 {\cjkfont 评测指标}}
+{\cjkfont 基础字段抽取采用逐字段精确匹配准确率，地点字段做行政后缀归一化。致因编码按维度（管理、防线、触发、人的行为）计算精确率、召回率与} F1{\cjkfont ，采用} Liu et al. (2025a) {\cjkfont 的维度级匹配定义；六策略对比另报百分位} bootstrap 95\% {\cjkfont 置信区间（}1,000 {\cjkfont 次重采样）。标注者一致性方面：分类字段用带} 95\% {\cjkfont 置信区间的} Cohen's kappa{\cjkfont ，计数字段用} ICC(2,1){\cjkfont ，日期用年}-{\cjkfont 月匹配率}------{\cjkfont 三种统计量按各自名称报告，不以单一标签统称。}
+
+\subsection{4.3 {\cjkfont 实验一：显式约束下的骨干选型}}
+{\cjkfont 四个候选模型在模型比较样本上评测：}DeepSeek V4{\cjkfont 、}Qwen 3.7{\cjkfont 、}GLM 5.2{\cjkfont 、}Kimi K2.6{\cjkfont ，使用相同系统提示与三个少样本示例。各模型运行条件并非完全对等：}Kimi K2.6 {\cjkfont 按} API {\cjkfont 规范强制} temperature 1.0{\cjkfont ；}GLM 5.2 {\cjkfont 因推理痕迹需} 16,384 token {\cjkfont 输出预算；}DeepSeek V4 {\cjkfont 经提供商自动档位路由访问，运行日志中的请求标识覆盖其档位家族。由于这些差异，且每种配置仅运行一次，本实验定位为支持选型决策的约束性系统比较，而非一般性模型能力排名。}
+
+{\cjkfont 表} 4 {\cjkfont 报告逐字段准确率。三个最强模型总体达} 91.2--91.5\%{\cjkfont ，事故等级、死亡人数、省级地点普遍高准确。城市提取最难（}81.5--88.0\%{\cjkfont ）：中文报道常点名县级市而参考记录为上级地级市。}Kimi K2.6 {\cjkfont 大幅落后（}63.9\%{\cjkfont ），与其强制温度带来的输出不稳定一致。}
+
+\textbf{{\cjkfont 表} 4. {\cjkfont 基础字段提取准确率（}\%{\cjkfont ），实验一}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lllll}
+\hline
+{\cjkfont 字段} & DeepSeek V4 & Qwen 3.7 & GLM 5.2 & Kimi K2.6 \\
+\hline
+{\cjkfont 事故类型} & 86.0 & 85.0 & 84.5 & 61.5 \\
+{\cjkfont 事故等级} & 98.0 & 90.5 & 97.5 & 69.5 \\
+{\cjkfont 死亡人数} & 96.0 & 96.0 & 97.0 & 68.5 \\
+{\cjkfont 受伤人数} & 90.0 & 91.0 & 91.0 & 58.5 \\
+{\cjkfont 省份} & 96.0 & 98.5 & 96.0 & 67.0 \\
+{\cjkfont 城市} & 81.5 & 88.0 & 83.0 & 58.5 \\
+\textbf{{\cjkfont 总体}} & \textbf{91.2} & \textbf{91.5} & \textbf{91.5} & \textbf{63.9} \\
+\hline
+\end{tabular}
+\end{table}
+{\cjkfont 表} 5 {\cjkfont 报告按维度的致因编码表现。}DeepSeek V4 {\cjkfont 平均精确率最高（}89.5\%{\cjkfont ）、强模型间召回率最低（}52.7\%{\cjkfont ）；}Qwen 3.7 {\cjkfont 呈镜像取舍（精确} 78.0\%{\cjkfont 、召回} 80.5\%{\cjkfont ）。成本与延迟补全选型图景：}200 {\cjkfont 条记录成本} 0.13 {\cjkfont 美元（}DeepSeek V4{\cjkfont ）、}0.43{\cjkfont （}Qwen 3.7{\cjkfont ）、}2.91{\cjkfont （}GLM 5.2{\cjkfont ）、}2.84{\cjkfont （}Kimi K2.6{\cjkfont ）；单条延迟} 9.8 {\cjkfont 秒、}8.6 {\cjkfont 秒、}27.0 {\cjkfont 秒、}74.9 {\cjkfont 秒。管道采用} DeepSeek V4{\cjkfont 。}
+
+\textbf{{\cjkfont 表} 5. {\cjkfont 致因编码精确率} / {\cjkfont 召回率} / F1{\cjkfont （}\%{\cjkfont ），按维度，实验一}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lllll}
+\hline
+{\cjkfont 维度} & DeepSeek V4 & Qwen 3.7 & GLM 5.2 & Kimi K2.6 \\
+\hline
+{\cjkfont 管理} & 89.9 / 54.9 / 68.1 & 67.5 / 95.6 / 79.1 & 92.3 / 63.7 / 75.4 & 97.6 / 36.3 / 52.9 \\
+{\cjkfont 防线} & 91.9 / 41.9 / 57.6 & 88.8 / 64.0 / 74.4 & 87.6 / 67.6 / 76.3 & 96.4 / 39.0 / 55.5 \\
+{\cjkfont 触发} & 81.0 / 69.4 / 74.7 & 72.4 / 85.7 / 78.5 & 73.9 / 69.4 / 71.6 & 81.5 / 44.9 / 57.9 \\
+{\cjkfont 人的行为} & 95.0 / 44.7 / 60.8 & 83.3 / 76.5 / 79.8 & 83.9 / 61.2 / 70.7 & 88.2 / 35.3 / 50.4 \\
+\textbf{{\cjkfont 平均}} & \textbf{89.5 / 52.7 / 65.3} & \textbf{78.0 / 80.5 / 78.0} & \textbf{84.4 / 65.5 / 73.5} & \textbf{90.9 / 38.9 / 54.2} \\
+\hline
+\end{tabular}
+\end{table}
+\subsection{4.4 {\cjkfont 实验二：提示策略对比与词汇门控观察}}
+{\cjkfont 六种提示策略在策略样本（}n=100{\cjkfont ，三专家多数投票真值）上以} DeepSeek V4{\cjkfont （}temperature 0.0{\cjkfont ）对比评测：}S0 {\cjkfont 基础零样本、}S1 {\cjkfont 基础少样本（三个专家标注示例）、}S2 Auto-CoT{\cjkfont 、}S3 {\cjkfont 计划与求解、}S4 CAICS-CoT{\cjkfont （两步判断领域知识} CoT{\cjkfont ）、}S5 CAICS-CoT+{\cjkfont （带层间摘要注入的串行逐层调用）。附录} A {\cjkfont 以压缩形式收录各提示。}
+
+\textbf{{\cjkfont 表} 6. {\cjkfont 六种提示策略性能（多数投票真值，}n=100{\cjkfont ）}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llllllll}
+\hline
+{\cjkfont 策略} & {\cjkfont 平均} F1 [95\% CI] & {\cjkfont 平均召回} & {\cjkfont 平均精确} & {\cjkfont 类型准确率} & {\cjkfont 等级准确率} & {\cjkfont 有效输出率} & {\cjkfont 耗时}(s) \\
+\hline
+S0 {\cjkfont 零样本} & 0.600 [0.520, 0.644] & 0.515 & 0.808 & 0.630 & 0.960 & 96\% & 1,382 \\
+S1 {\cjkfont 少样本} & \textbf{0.669 [0.615, 0.722]} & 0.634 & 0.753 & 0.840 & 0.970 & 100\% & 1,302 \\
+S2 Auto-CoT & 0.634 [0.564, 0.691] & 0.564 & 0.772 & 0.860 & 0.980 & 85\% & 2,401 \\
+S3 {\cjkfont 计划与求解} & 0.598 [0.529, 0.652] & 0.540 & 0.741 & 0.850 & 0.990 & 92\% & 1,735 \\
+S4 CAICS-CoT & 0.656 [0.603, 0.695] & \textbf{0.872} & 0.565 & 0.830 & 0.990 & 99\% & 1,843 \\
+S5 CAICS-CoT+ & 0.665 [0.606, 0.719] & 0.750 & 0.618 & 0.830 & 0.980 & 100\% & 5,430 \\
+\hline
+\end{tabular}
+\end{table}
+\textit{\textit{{\cjkfont 注。}} {\cjkfont 真值为三位独立专家标注者的多数投票。置信区间为百分位} bootstrap{\cjkfont （}1,000 {\cjkfont 次重采样）。}S2 {\cjkfont 的编码指标与类型}/{\cjkfont 等级准确率均经后处理恢复计算（}96/100 {\cjkfont 输出发生层级格式漂移）；其他策略未做后处理，因此} S2 {\cjkfont 的得分描述的是后处理管道而非原始输出。全部配置在} temperature 0.0 {\cjkfont 下各运行一次。}S1{\cjkfont 、}S4{\cjkfont 、}S5 {\cjkfont 的} F1 {\cjkfont 差异处于重叠的置信区间内，故将} S1 {\cjkfont 描述为最高点估计，而非经统计确认的胜者。}}\\
+S1 {\cjkfont 的示例实现格式}-{\cjkfont 内容联合校准：示范输出} schema{\cjkfont 、期望编码密度、编码组合模式与推理深度。}S1 {\cjkfont 的平均编码密度与真值接近（}5.0 {\cjkfont 对} 5.1{\cjkfont ），}S0 {\cjkfont 偏少（}3.6{\cjkfont ）、}S4 {\cjkfont 偏多（}6.5{\cjkfont ）。与} Liu et al. (2025a) {\cjkfont 的比较有信息量但存在混淆：两项研究在模型（}GPT-4o {\cjkfont 对} DeepSeek V4{\cjkfont ）、任务（航空} HFACS {\cjkfont 对施工} CAICS{\cjkfont ）、语料与评测条件上同时不同。因此观测到的排名差异与模型依赖、任务依赖或两者兼有一致；我们不声称分离出了模型依赖，实践解读仅为：新模型}-{\cjkfont 任务组合的最优策略不能从单一已发表排名推定。}
+
+S4 {\cjkfont 初版提示（}v1{\cjkfont ）将领域知识嵌入为条件检查：每个编码配一个疑问式门控（}"{\cjkfont 文本提到}'{\cjkfont 无人监管}''{\cjkfont 监理失职}'{\cjkfont 吗？}"{\cjkfont ）加保守指令。在策略样本上，}v1 {\cjkfont 的} F1=0.503{\cjkfont 、召回}=0.423{\cjkfont 、}21\% {\cjkfont 空输出、}M1 {\cjkfont 召回} 0.141------{\cjkfont 而} M1 {\cjkfont 是真值中最高频编码（}100 {\cjkfont 条中出现} 85 {\cjkfont 次）。多数事故叙述从不使用这些精确措辞，而是写}"{\cjkfont 安全管理不到位}""{\cjkfont 未及时发现制止}"{\cjkfont 。在条件检查措辞下，模型似乎将所列关键词当作强制性门槛而非示例线索。}
+
+{\cjkfont 我们将这一观测模式命名为}\textbf{{\cjkfont 词汇门控效应}}{\cjkfont ：疑问式条件检查} CoT {\cjkfont 措辞抑制隐性类别的同义证据，召回损失集中于最高频的隐性编码。该术语描述的是观察；它本身并不识别机制。}
+
+{\cjkfont 补救以两步判断取代门控：}(1) {\cjkfont 显性匹配}------{\cjkfont 文本是否以任何同义表述直接支持该编码？}(2) {\cjkfont 授权推断}------{\cjkfont 根据事故性质与施工安全常识，该致因即使没有显式措辞是否必然存在？保守指令亦替换为全覆盖偏好。}v1$\rightarrow$v2 {\cjkfont 的组合变化将} F1 {\cjkfont 从} 0.503 {\cjkfont 提至} 0.656{\cjkfont ，召回从} 0.423 {\cjkfont 提至} 0.872{\cjkfont ，}M1 {\cjkfont 召回从} 0.141 {\cjkfont 提至} 0.988{\cjkfont ，空输出从} 21\% {\cjkfont 降至} 0{\cjkfont 。图} 5 {\cjkfont 可视化该变化。}
+
+\textbf{{\cjkfont 图} 5. {\cjkfont 词汇门控观察及其补救}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}5{\cjkfont 占位：待手绘} --- {\cjkfont 门控效应观察与补救双面板图}]}}\end{center}
+
+v1$\rightarrow$v2 {\cjkfont 的转变同时改变了多个提示属性}------{\cjkfont 疑问句式、两步判断的加入、推断的显式授权、输出政策指令。因此我们在同一样本上运行了四格比较：}v1{\cjkfont （条件检查}+{\cjkfont 保守）、}v2a{\cjkfont （两步判断}+{\cjkfont 保守）、}v2b{\cjkfont （条件检查}+{\cjkfont 全覆盖）、}v2{\cjkfont （两步判断}+{\cjkfont 全覆盖）。表} 7 {\cjkfont 报告结果。保持保守指令不变，仅措辞改变（}v1 $\rightarrow$ v2a{\cjkfont ）将} M1 {\cjkfont 召回从} 0.141 {\cjkfont 提至} 0.941------M1 {\cjkfont 总恢复量} 0.847 {\cjkfont 中的} 0.800------{\cjkfont 而保持措辞不变，仅政策改变（}v1 $\rightarrow$ v2b{\cjkfont ）只提至} 0.329{\cjkfont 。聚合层面两种操纵贡献相当（}F1 +0.161 {\cjkfont 对} +0.150{\cjkfont ）。}
+
+{\cjkfont 两条范围边界随之而来。其一，这些是简单逐对差值，不是带交互项估计的正式因子分析，且四个格子在共享开发样本上各运行一次。其二，结果描述的是输出行为而非模型内部机制：疑问措辞究竟影响注意力、表征还是生成，超出本行为实验可确立的范围。可辩护的解读是：在当前模型与} CAICS {\cjkfont 任务上，提示措辞实质性地改变隐性类别的召回，两步判断是实用补救。我们不声称已分离因果机制。}
+
+\textbf{{\cjkfont 表} 7. {\cjkfont 措辞与输出政策的四格比较（}n=100{\cjkfont ，多数投票真值，}DeepSeek V4{\cjkfont ，}temperature 0.0{\cjkfont ）}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llllllllll}
+\hline
+{\cjkfont 单元} & {\cjkfont 措辞} & {\cjkfont 输出政策} & F1 & {\cjkfont 召回} & {\cjkfont 精确} & {\cjkfont 空输出} & M1 {\cjkfont 召回} & M3 {\cjkfont 召回} & H3 {\cjkfont 召回} \\
+\hline
+v1 & {\cjkfont 条件检查} & {\cjkfont 保守} & 0.503 & 0.423 & 0.856 & 21\% & 0.141 & 0.250 & 0.111 \\
+v2a & {\cjkfont 两步判断} & {\cjkfont 保守} & 0.665 & 0.677 & 0.709 & 2\% & 0.941 & 0.667 & 0.511 \\
+v2b & {\cjkfont 条件检查} & {\cjkfont 全覆盖偏好} & 0.653 & 0.641 & 0.724 & 5\% & 0.329 & 0.444 & 0.533 \\
+v2 & {\cjkfont 两步判断} & {\cjkfont 全覆盖偏好} & \textbf{0.656} & \textbf{0.872} & 0.565 & 0\% & 0.988 & 0.972 & 1.000 \\
+ & $\Delta$({\cjkfont 措辞}) = v2a − v1 &  & +0.161 & +0.254 & −0.147 & −19 pp & +0.800 & +0.417 & +0.400 \\
+ & $\Delta$({\cjkfont 政策}) = v2b − v1 &  & +0.150 & +0.218 & −0.132 & −16 pp & +0.188 & +0.194 & +0.422 \\
+\hline
+\end{tabular}
+\end{table}
+{\cjkfont 生产编码器采用} S4 {\cjkfont 两步判断设计而非} S1{\cjkfont 。该选择偏向召回（}0.872 {\cjkfont 对} 0.634{\cjkfont ）与数据库所需的分层证据输出，代价是精确率（}0.565{\cjkfont ），与} S1 {\cjkfont 的} F1 {\cjkfont 差距小且置信区间重叠。三层证据分级方案（}3.1 {\cjkfont 节）即补偿设计：低精确编码按层级标注，下游用户得以区分逐字证据编码与先验推断编码，而非将每条标注视为同等支撑。}
+
+\subsection{4.5 {\cjkfont 实验三：}LLM {\cjkfont 与一名受训标注者的一致性}}
+{\cjkfont 第三个实验测量} LLM {\cjkfont 的基础字段标注是否与受训人工标注者一致。口径精确表述：这是一项单一} LLM {\cjkfont 配置与一名标注者、六项字段（}33 {\cjkfont 项中）的一致性研究，不是专家级准确性的认证，也不涉及致因编码。}
+
+{\cjkfont 在一致性样本（}n=289{\cjkfont ）上，}LLM {\cjkfont 与标注者独立标注六项字段。表} 8 {\cjkfont 报告结果。三个分类字段的} Cohen's kappa {\cjkfont 为} 0.9136{\cjkfont （事故类型）、}0.9477{\cjkfont （等级）、}0.9746{\cjkfont （省份）；两个计数字段的} ICC(2,1) {\cjkfont 为} 0.9849{\cjkfont （死亡）与} 0.9853{\cjkfont （受伤），平均绝对误差每条} 0.118 {\cjkfont 与} 0.087{\cjkfont ；日期年}-{\cjkfont 月匹配率} 99.7\%{\cjkfont 。三种统计量针对三种字段，我们按各自名称报告，不以单一} kappa {\cjkfont 标签统称。}
+
+\textbf{{\cjkfont 表} 8. LLM {\cjkfont 与一名受训标注者在六项基础字段上的一致性（}n=289{\cjkfont ）}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{llll}
+\hline
+{\cjkfont 特征} & {\cjkfont 指标} & {\cjkfont 数值} [95\% CI] & {\cjkfont 一致率} \\
+\hline
+{\cjkfont 事故类型} & Cohen's $\kappa$ & 0.9136 [0.8747, 0.9466] & 93.4\% \\
+{\cjkfont 事故等级} & Cohen's $\kappa$ & 0.9477 [0.9024, 0.9841] & 97.6\% \\
+{\cjkfont 省份} & Cohen's $\kappa$ & 0.9746 [0.9563, 0.9927] & 97.6\% \\
+{\cjkfont 死亡人数} & ICC(2,1) & 0.9849 [0.9292, 0.9991] & MAE 0.118 \\
+{\cjkfont 受伤人数} & ICC(2,1) & 0.9853 [0.9426, 0.9995] & MAE 0.087 \\
+{\cjkfont 日期（年}-{\cjkfont 月）} & {\cjkfont 匹配率} & 0.9965 & 99.7\% \\
+\hline
+\end{tabular}
+\end{table}
+{\cjkfont 另两条边界。其一，一致性不等于准确性：双方可能共同犯错，该样本无独立仲裁标签。其二，比较仅覆盖六项基础字段；论文的核心标注对象致因编码没有同规模的一致性研究，三专家标注仅覆盖} 100 {\cjkfont 条策略子集。早期草稿曾引用另一批} 100 {\cjkfont 条三专家样本的专家间区间作为等效界限；因该样本与} 289 {\cjkfont 条样本在构成与难度上不同，本版不再将其作为界限呈现，仅按自身数值报告一致性。图} 6 {\cjkfont 绘制各} kappa {\cjkfont 值及其置信区间。}
+
+\textbf{{\cjkfont 图} 6. LLM {\cjkfont 与一名标注者在六项字段上的一致性}}
+\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}6{\cjkfont 占位：待手绘} --- {\cjkfont 一致性森林图}]}}\end{center}
+
+\section{5. {\cjkfont 讨论}}
+\subsection{5.1 {\cjkfont 意义}}
+{\cjkfont 对数据工程实践有三重推论，均在各自范围内陈述。其一，三层证据分级方案为}"{\cjkfont 每个编码必须带逐字支撑}"{\cjkfont 的全有或全无声明提供了可用的替代：先验推断编码对下游分析有用，前提是分字段存储、展示与报告}------{\cjkfont 管道正是如此。其二，措辞观察概括为一条设计告诫：在本模型与本任务上，疑问式条件检查措辞抑制了隐性类别的同义证据，两步判断措辞恢复了其中大部分（}M1 {\cjkfont 恢复总量} 0.847 {\cjkfont 中的} 0.800{\cjkfont ）。设计召回关键抽取提示的实践者应测试措辞变体，而非假定所列关键词天然作为示例线索起作用。其三，一致性结果支持一项有限的声明：在六项基础字段上，单一} LLM {\cjkfont 配置与一名受训标注者达到高协议一致性}------{\cjkfont 这支持以} LLM {\cjkfont 在人工监督下}\textbf{{\cjkfont 减轻}}{\cjkfont （而非取代）这些字段的标注工作量。}
+
+\subsection{5.2 {\cjkfont 与既有工作的对比}}
+{\cjkfont 表} 9 {\cjkfont 沿可据已发表报告比较的维度}------{\cjkfont 数据来源、记录规模、人工验证、证据绑定、系统可访问性}------{\cjkfont 将} CAIEMS {\cjkfont 与代表性既有系统并置。我们将其呈现为描述性对比，而非排他性新颖性的证据；若干既有系统已组合了采集、}LLM {\cjkfont 抽取与图谱}/{\cjkfont 数据库存储，本工作的侧重在分层证据标注与可更新查询接口。}
+
+\textbf{{\cjkfont 表} 9. {\cjkfont 与代表性既有系统的描述性对比}}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lllllll}
+\hline
+{\cjkfont 系统} & {\cjkfont 领域} & LLM & {\cjkfont 编码方案} & {\cjkfont 证据绑定} & {\cjkfont 人工验证} & {\cjkfont 交互访问} \\
+\hline
+Liu et al. (2025a) & {\cjkfont 航空} & GPT-4o & HFACS & {\cjkfont 无} & {\cjkfont 专家标注数据集} & {\cjkfont 无} \\
+Kim and Han (2024) & {\cjkfont 施工（韩）} & Claude 3.5 & HFACS & {\cjkfont 无} & {\cjkfont 无} & {\cjkfont 无} \\
+Ahmadi et al. (2024) & {\cjkfont 施工（美）} & GPT-4.0 & {\cjkfont 无} & {\cjkfont 无} & {\cjkfont 无} & {\cjkfont 无} \\
+Liu and Luo (2025) & {\cjkfont 施工} & GPT-4o & Accimap & {\cjkfont 无} & {\cjkfont 无} & {\cjkfont 无} \\
+Jiang et al. (2026) & {\cjkfont 煤矿} & LLM & {\cjkfont 自定本体} & {\cjkfont 无} & {\cjkfont 无} & {\cjkfont 仅可视化} \\
+\textbf{CAIEMS{\cjkfont （本文）}} & \textbf{{\cjkfont 施工（中）}} & \textbf{DeepSeek V4} & \textbf{CAICS{\cjkfont （操作性）}} & \textbf{{\cjkfont 分层}} & \textbf{{\cjkfont 部分（}100 {\cjkfont 条子集）}} & \textbf{Web + API} \\
+\hline
+\end{tabular}
+\end{table}
+\subsection{5.3 {\cjkfont 局限性}}
+{\cjkfont 以下按严重程度列出界定主要结论的局限性。}
+
+(1) \textit{{\cjkfont 参考标准独立性。}} 972 {\cjkfont 条银标准部分由模型产出（管道版本一致加规则裁决）；仅} 100 {\cjkfont 条致因子集承载独立三专家验证。基于银标准得出的结论继承该边界；完全独立的人工金标准}------{\cjkfont 含公开标注指南、标注者背景、盲法、仲裁规则与逐类样本量}------{\cjkfont 仍是未来工作。}
+
+(2) \textit{{\cjkfont 开发}-{\cjkfont 测试重叠。}} 100 {\cjkfont 条策略样本同时承担提示开发（}v1 {\cjkfont 诊断、}v2 {\cjkfont 设计、消融）与最终报告，三个少样本示例未按显式流程与测试记录隔离。策略结果因此带有开发集复用风险，应解读为开发评估；与全部提示设计决策隔离的冻结测试集计划于下一迭代建立。}
+
+(3) \textit{{\cjkfont 提示措辞推断。}} {\cjkfont 四格比较在单一样本上报告简单逐对差值且各运行一次；未估计正式交互效应，也不支持模型内部机制层面的声明。词汇门控效应作为带实用补救的观察报告，而非已分离的因果机制。}
+
+(4) \textit{{\cjkfont 模型比较条件。}} {\cjkfont 四模型运行条件不对等（强制温度、输出预算、档位路由），各配置仅运行一次，模型标识记录在家族粒度。该比较支持此约束下的选型决策，而非一般性能力排名。}
+
+(5) \textit{{\cjkfont 一致性范围。}} {\cjkfont 一致性研究覆盖一名标注者、六项字段（}33 {\cjkfont 项中）、无独立仲裁；致因编码缺大规模一致性研究。结果支持人工监督下基础字段的工作量减轻，而非专家替代。}
+
+(6) \textit{{\cjkfont 数据库审计。}} {\cjkfont 语料存在已知质量缺口：分类器的多事故残留错误未完全审计，跨源镜像报道未系统去重，字段缺失率跨字段差异大（五个枚举字段非空率} 13.7\%--83.9\%{\cjkfont ），且因来源为公共新闻门户，语料过度代表严重事故。数据库覆盖公开可检索的事故报道；它不是全部施工事故的代表性样本。}
+
+(7) \textit{{\cjkfont 数据治理。}} {\cjkfont 管道采集并计划再分发新闻门户与政府网站的文本与图片。公开可访问本身不足以解决再发布权利问题；逐源许可、撤回机制与创伤影像访问控制见第} 7 {\cjkfont 节，须在公开前完成。}
+
+(8) \textit{{\cjkfont 可复现性。}} {\cjkfont 数据、代码与完整提示承诺发表后公开而非投稿时公开；单次运行配置与家族粒度模型标识限制精确复现。我们承诺在重投前提供匿名只读数据库、逐字提示、最小复现包与系统演示。}
+
+\section{6. {\cjkfont 结论}}
+{\cjkfont 本文报告了} CAIEMS------{\cjkfont 一条探索性} LLM {\cjkfont 管道，将公开可获取的中文施工事故叙述转化为可查询的数据库原型：}2,623 {\cjkfont 条记录、}33 {\cjkfont 字段、}17,364 {\cjkfont 条三层分级致因标注，经} Web {\cjkfont 界面与} REST API {\cjkfont 服务。三项各带口径声明的支撑实验锚定可靠性讨论：支持采用} DeepSeek V4 {\cjkfont 的约束性四模型比较（}91.2\% {\cjkfont 基础字段准确率、最低成本）；发现词汇门控观察及其两步判断补救的六策略提示对比；以及显示} LLM {\cjkfont 与一名受训标注者在六项基础字段上高一致性的协议研究。全文对结果边界作显式声明：银标准部分由模型产出、开发与测试样本重叠、不声称因果机制或专家替代。本工作的下一迭代遵循明确顺序：致因编码的独立人工金标准、与提示开发隔离的冻结测试集、措辞问题的正式因子设计、匹配条件下的多模型重复、以及公开前的完整数据审计与治理。}
+
+\section{7. {\cjkfont 声明}}
+\textbf{{\cjkfont 数据可用性。}} {\cjkfont 数据库的匿名只读快照、字段字典、来源清单与} CAICS {\cjkfont 操作定义将在审稿期间应要求提供，并于论文发表后公开。六种提示模板以压缩形式见附录} A{\cjkfont ；逐字提示包含于复现包。}
+
+\textbf{{\cjkfont 代码可用性。}} {\cjkfont 管道、评测脚本与实验运行器将于论文发表后以开源许可证随数据发布；审稿期间可向作者索取最小复现包。}
+
+\textbf{{\cjkfont 伦理与数据治理。}} {\cjkfont 本研究分析公开新闻报道与政府发布的事故通报；结构化记录中不涉及人类受试者或可识别个人信息。但公开可访问并不自动授权批量采集、长期存储与再分发。任何公开发布前须完成：逐来源许可或合理使用评估；为每条记录保留原始} URL {\cjkfont 与抓取时间；对图片中的姓名与可识别面部做移除或遮蔽；应请求提供撤回删除机制；对创伤性影像设访问控制。无法确立再发布权利的第三方图片将从任何公开发布中排除。}
+
+\textbf{{\cjkfont 作者贡献（}CRediT{\cjkfont ）。}} {\cjkfont 孙天浩（南京工业大学）：概念化、方法、软件、数据整理、形式分析、调研、初稿撰写。}[{\cjkfont 导师姓名}]{\cjkfont （南京工业大学）：概念化、指导、验证、审阅与修订。}
+
+\textbf{{\cjkfont 利益冲突声明。}} {\cjkfont 作者声明无利益冲突。}
+
+\textbf{{\cjkfont 基金资助。}} {\cjkfont 本研究未获得公共、商业或非营利部门资助机构的专项资助。}
+
+\textbf{AI {\cjkfont 工具使用声明。}} {\cjkfont 大语言模型既是本研究的对象，也是核心技术工具：第} 3-4 {\cjkfont 节报告的全部抽取、分类与编码结果均由所评测模型经记录在案的管道产出。论文撰写过程中使用了} LLM {\cjkfont 写作辅助进行语言润色；全部科学内容、实验设计与数据出自作者工作并经作者核验。}
+
+\section*{{\cjkfont 参考文献}}
+\begin{enumerate}
+\item {\cjkfont （与英文主源一致，列表见} eswa\_paper\_v2.md References {\cjkfont 节）}
+\end{enumerate}
+Ahmadi, A., Sharif, S., Banad, Y. (2025). Improving Aviation Safety Analysis: Automated HFACS Classification Using Reinforcement Learning with Group Relative Policy Optimization. arXiv:2508.21201.
+
+Ahmadi, E., Muley, S., Wang, C. (2024). Automatic Construction Accident Report Analysis Using Large Language Models (LLMs). Journal of Intelligent Construction, 3(1).
+
+Ayhan, B.U., Tokdemir, O.B. (2019). Predicting the outcome of construction incidents. Safety Science, 113, 91--104.
+
+Brown, T., Mann, B., Ryder, N., et al. (2020). Language Models are Few-Shot Learners. NeurIPS, 33, 1877--1901.
+
+Devlin, J., Chang, M.-W., Lee, K., Toutanova, K. (2019). BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding. NAACL-HLT 2019, 4171--4186.
+
+Huang, Y., Yan, R., Zhang, Z. (2026). Automated knowledge extraction from marine accident reports using large language models. Ocean \& Coastal Management, 272, 108015.
+
+Jiang, Y., Nie, B., Wang, J., et al. (2026). Large language model-driven knowledge graph and intelligent analysis for coal mine accidents. Measurement, 277, 121558.
+
+Kim, D., Han, S. (2024). Systemic Analysis of Fall Accidents Caused by Worker Inattention at Construction Sites. KIBIM Magazine, 14(4), 23--34.
+
+Kojima, T., Gu, S.S., Reid, M., et al. (2022). Large Language Models are Zero-Shot Reasoners. NeurIPS, 35, 22199--22213.
+
+Kong, F., Ahn, S. (2024). Use of Knowledge Graphs for Construction Safety Management: A Systematic Literature Review. Information, 15(7), 390.
+
+Liu, Q., Ding, Y., Luo, X. (2025b). Automated knowledge graph-based risk assessment for fall-from-height accidents in construction. Automation in Construction, 179, 106482.
+
+Liu, Q., Li, F., Ng, K.K.H., et al. (2025a). Accident investigation via LLMs reasoning: HFACS-guided Chain-of-Thoughts enhance general aviation safety. Expert Systems with Applications, 269, 126422.
+
+Liu, Q., Luo, X. (2025). Large language model-based knowledge graph construction of unstructured accident reports. EG-ICE 2025.
+
+Onuchukwu, I.S., Gholizadeh, P., et al. (2024). Nature of Occupational Incidents among Roofing Contractors. Buildings, 14(3), 595.
+
+OpenAI (2023). GPT-4 Technical Report. arXiv:2303.08774.
+
+Rafindadi, A.D., Shafiq, N., Othman, I., et al. (2023). Data mining of the essential causes of different types of fatal construction accidents. Heliyon, 9(2), e13389.
+
+Shappell, S.A., Wiegmann, D.A. (2000). The Human Factors Analysis and Classification System--HFACS. Report DOT/FAA/AM-00/7.
+
+Shi, D., Gan, S., Zurada, J., et al. (2025). A multi-model approach to construction site safety. Expert Systems with Applications, 288, 127817.
+
+Togan, V., Mostofi, F., Tokdemir, O.B., et al. (2025). Efficient Management of Safety Documents Using Text-Based Analytics. IEEE Access, 13, 99758--99777.
+
+Wang, X., Wei, J., Schuurmans, D., et al. (2023). Self-Consistency Improves Chain of Thought Reasoning in Language Models. ICLR 2023.
+
+Wei, J., Wang, X., Schuurmans, D., et al. (2022). Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. NeurIPS, 35, 24824--24837.
+
+Xiao, X., Chen, P., Qi, B., et al. (2026). KRAIL: A knowledge-driven framework for human reliability analysis. Reliability Engineering \& System Safety, 265, 111585.
+
+Xuecai, X., Gui, F., Shifei, S., et al. (2024). Accident case data-accident causation model driven safety training method. Process Safety and Environmental Protection, 182, 1208--1226.
+
+Yan, Y., Li, B., Lodewijks, G. (2025). UAV Accident Forensics via HFACS-LLM Reasoning. Drones, 9(10), 704.
+
+Yang, J., Park, S. (2025). LLM-Assisted Knowledge Graph Construction for Managing Road Accident Information. IEEE Access, 13, 217846--217865.
+
+Zhang, L., Hou, Y., Ren, F. (2025a). AIR Agent---A GPT-Based Subway Construction Accident Investigation Report Analysis Chatbot. Buildings, 15(4), 527.
+
+Zhang, J., Zhang, W., Wei, Q., et al. (2025b). GRAG-ProSafe QAS. Expert Systems with Applications.
+
+Zhou, D., Schärli, N., Hou, L., et al. (2023). Least-to-Most Prompting Enables Complex Reasoning in Large Language Models. ICLR 2023.
+
+\appendix
+\section{{\cjkfont 附录} A. {\cjkfont 提示模板}}
+{\cjkfont 六种提示策略概述如下；逐字提示包含于复现包。}
+
+\textbf{A.1 S0 {\cjkfont 基础零样本}}{\cjkfont ：}CAICS {\cjkfont 体系（十九类定义）}+ JSON {\cjkfont 输出格式，无推理引导。}
+
+\textbf{A.2 S1 {\cjkfont 基础少样本}}{\cjkfont ：}S0 {\cjkfont 加三个专家标注示例（文本} $\rightarrow$ {\cjkfont 带证据编码），取自银标准。}
+
+\textbf{A.3 S2 Auto-CoT}{\cjkfont ：}S0 {\cjkfont 加}"{\cjkfont 按} M$\rightarrow$F$\rightarrow$T$\rightarrow$H$\rightarrow$C {\cjkfont 因果链先自组织推理再编码}"{\cjkfont 指令。}
+
+\textbf{A.4 S3 {\cjkfont 计划与求解}}{\cjkfont ：}S0 {\cjkfont 加}"{\cjkfont 先制定分析计划再执行}"{\cjkfont 指令。}
+
+\textbf{A.5 S4 CAICS-CoT}{\cjkfont ：共测试两版。}v1 {\cjkfont 将每个编码表述为疑问式条件检查（}"{\cjkfont 文本提到}……{\cjkfont 吗？}"{\cjkfont ）加保守指令。}v2 {\cjkfont 以两步判断（显性匹配} + {\cjkfont 授权推断，含从亡人结果推断监管缺失等先验规则）取代检查，并加全覆盖偏好。}
+
+\textbf{A.6 S5 CAICS-CoT+}{\cjkfont ：五次独立逐层} API {\cjkfont 调用（层间摘要注入），加最终汇总调用。}
+
+\textit{V2 {\cjkfont 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订}------①{\cjkfont 主线确定为}"{\cjkfont 探索性数据工程系统与数据资源}"{\cjkfont ，删除}"{\cjkfont 首次}/{\cjkfont 推翻}/{\cjkfont 证明模型依赖}/{\cjkfont 因果机制}/{\cjkfont 专家级}/{\cjkfont 替代人工}/{\cjkfont 全部编码有证据}"{\cjkfont 等结论；}②{\cjkfont 致因标注重构为} explicit/inferred/prior {\cjkfont 三层证据分级（对应数据库} evidence\_quality {\cjkfont 字段），全文统一分层统计口径；}③{\cjkfont 银标准构建方式如实描述并标注独立性边界；}④{\cjkfont 开发集与测试集重叠风险在} 4.1 {\cjkfont 显式声明；}⑤2$\times$2 {\cjkfont 消融降级为}"{\cjkfont 措辞敏感性观察}+{\cjkfont 实用补救}"{\cjkfont ，删除机制性归因与}"{\cjkfont 排除替代解释}"{\cjkfont 表述；}⑥{\cjkfont 人机一致性限定为}"{\cjkfont 一名标注者、六项字段、协议一致性}"{\cjkfont ，}$\kappa$/ICC/{\cjkfont 匹配率分列不再统称} Kappa{\cjkfont ；}⑦{\cjkfont 全部计数对账闭合（类型} 2,617+{\cjkfont 未标注}6{\cjkfont 、等级} 2,622+{\cjkfont 未标注}1{\cjkfont 、表}2 {\cjkfont 补非空分母列）；}⑧M1 {\cjkfont 数字全文统一为} 0.847/0.800{\cjkfont ；}⑨{\cjkfont 表引用勘误（}4.5 {\cjkfont 节表} 7$\rightarrow${\cjkfont 表} 8{\cjkfont ）、表} 6 {\cjkfont 脚注与数值矛盾修正；}⑩{\cjkfont 数据治理声明扩充（逐源许可}/{\cjkfont 撤回机制}/{\cjkfont 创伤影像访问控制）；}⑪{\cjkfont 局限性扩为} 8 {\cjkfont 项分级。图片为占位符，待作者手绘后替换。}}
+
+\end{document}

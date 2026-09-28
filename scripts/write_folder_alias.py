@@ -200,6 +200,36 @@ new_aliases = {
         "tooltip": "v3 管道完整运行记录，2.1 MB"
     },
 
+    # ============ 包内次级模块 ============
+    f'{MAIN}/construction_agent/input': {
+        "description": "① 源头 · 📄 文献 PDF 数字化",
+        "tooltip": "pdf_processor 切分 + llm_splitter 逐条拆分（文献轨的代码入口）"
+    },
+    f'{MAIN}/construction_agent/search': {
+        "description": "② 采集 · 🔍 搜索模块",
+        "tooltip": "baidu_search / bing_search / image_search / search_integration"
+    },
+    f'{MAIN}/construction_agent/utils': {
+        "description": "③ 清洗 · 🧰 归一化工具",
+        "tooltip": "date_utils 日期归一化 / location 地点解析"
+    },
+    f'{MAIN}/construction_agent/models': {
+        "description": "🗂️ 数据模型定义",
+        "tooltip": "accident.py — 事故记录字段模型"
+    },
+    f'{MAIN}/construction_agent/database': {
+        "description": "⑤ 存储 · 🗃️ 数据访问层",
+        "tooltip": "sqlite_repository / dataset_manager / models + migrations"
+    },
+    f'{MAIN}/construction_agent/output': {
+        "description": "⑤ 存储 · 📤 导出格式化",
+        "tooltip": "json_formatter / csv_formatter"
+    },
+    f'{MAIN}/construction_agent/evaluation': {
+        "description": "⑦ 实验 · 📊 评测框架",
+        "tooltip": "evaluator / metrics / reporter / hfacs_evaluator + experiment1-3"
+    },
+
     # ============ 入口与依赖 ============
     f'{MAIN}/construction_agent/main.py': {
         "description": "🚀 主程序入口",

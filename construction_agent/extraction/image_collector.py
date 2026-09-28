@@ -3,9 +3,10 @@
 管道:
   1. 获取事故的 source_urls (原始 + 搜索增强)
   2. 访问每个网页 → 提取 <img> 标签
-  3. 过滤: 去logo/二维码/图标/小图(宽高<100px或<10KB)
+  3. 规则过滤: 去logo/二维码/图标/小图(URL与alt关键词、宽高<120px、<8KB)
   4. 下载 → data/images/{accident_id}/
-  5. VLM 两阶段分析 → 入库 image_analyses
+  5. CLIP 语义过滤: 剔除规则漏网的 logo/二维码/图标（阈值 0.5）
+  6. VLM 两阶段分析 → 入库 image_analyses
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import hashlib
 import logging
 import os
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -22,11 +24,14 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from construction_agent.extraction.clip_filter import get_clip_filter
 from construction_agent.extraction.image_analyzer import ImageAnalyzer, ImageAnalysisResult
 
 logger = logging.getLogger(__name__)
 
 IMAGE_DIR = "data/images"
+# CLIP 判定为非事故照片的图片移到这里（保留以便审计，不直接删除）
+REJECT_DIR = "data/images/_rejected"
 
 # 过滤规则：URL/alt文本含这些关键词 → 跳过
 SKIP_KEYWORDS = [
@@ -70,6 +75,9 @@ class ImageCollector:
     def __init__(self):
         self.analyzer = ImageAnalyzer()
         os.makedirs(IMAGE_DIR, exist_ok=True)
+        # CLIP 语义过滤（设 CLIP_FILTER_ENABLED=0 可关闭）
+        self.clip_filter = get_clip_filter()
+        self.clip_enabled = os.getenv("CLIP_FILTER_ENABLED", "1").lower() not in ("0", "false")
 
     # ══════════════════════════════════════════════════════════
     # 公共 API
@@ -110,6 +118,18 @@ class ImageCollector:
             if page_images:
                 logger.info(f"  从该页提取 {len(page_images)} 张图片")
 
+        # ── CLIP 语义过滤：剔除规则漏网的 logo / 二维码 / 图标 ──
+        if all_images and self.clip_enabled:
+            kept = []
+            for img in all_images:
+                if self.clip_filter.is_accident_photo(img.local_path) is False:
+                    self._discard(img, accident_id)
+                    continue
+                kept.append(img)
+            if len(kept) != len(all_images):
+                logger.info(f"CLIP 过滤: {len(all_images)} → {len(kept)} 张")
+            all_images = kept
+
         # 截断到 max_images
         selected = all_images[:max_images]
 
@@ -122,6 +142,16 @@ class ImageCollector:
                 img.analysis = vlm_r
 
         return selected
+
+    def _discard(self, img: CollectedImage, accident_id: str) -> None:
+        """把被 CLIP 判为非事故照片的图片移出正常目录（保留以便审计）。"""
+        try:
+            dst_dir = os.path.join(REJECT_DIR, accident_id)
+            os.makedirs(dst_dir, exist_ok=True)
+            shutil.move(img.local_path, os.path.join(dst_dir, os.path.basename(img.local_path)))
+            logger.debug(f"CLIP 剔除 [{accident_id}]: {os.path.basename(img.local_path)}")
+        except OSError as e:
+            logger.debug(f"剔除图片移动失败 [{img.local_path}]: {e}")
 
     # ══════════════════════════════════════════════════════════
     # 网页图片提取

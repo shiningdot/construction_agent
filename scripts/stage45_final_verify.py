@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Stage 4.5 最终完整性验证：修订版论文关键数字 vs 数据源（从零独立）"""
+"""Stage 4.5 最终完整性验证：修订版论文关键数字 vs 数据源（从零独立）
+
+⚠️ 冻结状态：本脚本核验的是 V1 存档稿 docs/paper/eswa_paper.md，该稿按约定不再修改。
+   稿中"致因编码 17,364"为 2026-09-23 清理前口径，当前库为 16,323，故第 D 节该断言
+   会失败——属预期现象，不代表数据异常。V2 的数字核验以 docs/paper_v2/修订对账记录.md 为准。
+"""
 import json, re, sys, sqlite3
 
 PAPER = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'

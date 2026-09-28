@@ -84,8 +84,8 @@ new_aliases = {
 
     # ============ ④ 提取与编码 ============
     f'{MAIN}/construction_agent/extraction': {
-        "description": "④ 提取 · 📝 Step1 + Step2",
-        "tooltip": "33 字段结构化提取 + CAICS 5 层 19 类致因编码"
+        "description": "④ 提取 · 📝 Step1 + Step2 + CLIP",
+        "tooltip": "33 字段提取 + CAICS 5 层 19 类编码 + 图片 CLIP 过滤（clip_filter.py）"
     },
     f'{MAIN}/construction_agent/extraction/step1_basic_extractor.py': {
         "description": "④ 提取 · 📝 Step1 基础字段提取器",

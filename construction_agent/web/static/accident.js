@@ -33,6 +33,13 @@
     supervision_company: '监理单位', weather: '天气',
   };
 
+  // 正文级长文本。字段明细是三列网格（`app.css` 的 `.field-list`），这几列塞进
+  // 单格里会把那一行撑到十几行高，同行的短字段右边留一大片空白，后面的字段又被
+  // 挤下去——**每一格的高度由同行最高的一格决定**。给它们整行宽度（`is-wide`）。
+  // 摘要与直接原因另有首屏专卡（`textBlock`），但字段明细是「接口返回了什么」的
+  // 完整对照表，不能因为别处展示过就漏列。
+  const LONG_TEXT = new Set(['summary', 'direct_cause', 'search_enriched_text']);
+
   // 不列 `source_count`：主库 2,623 条**全部等于 1**，是恒量不是信息，
   // 摆出来只会让人以为「每条事故只有一个来源」——那是这张表的填充方式，
   // 不是数据的性质（来源数要看 source_urls 表）。蓝图 05 待决项 H 的结论。
@@ -251,7 +258,7 @@
       ]);
     }
 
-    return el('div', { cls: 'field-row' }, [
+    return el('div', { cls: 'field-row' + (LONG_TEXT.has(col) ? ' is-wide' : '') }, [
       el('span', { cls: 'field-key', text: FIELD_LABELS[col] || col }),
       el('span', { cls: 'field-val' }, [cell]),
     ]);

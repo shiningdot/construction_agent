@@ -13,8 +13,13 @@
 
 数据接真货：最终库取**主仓库**的 `caiems_v2.db`（2,623 条），工作库与图片根也
 默认指主仓库——在主仓库跑不用管，在 worktree 跑会自动指回主仓库（见
-`_common.py`）。详情页的样本是从 `image_manifest` 里挑「图最多、且有 CAICS 编码」
-的真实事故，字段齐、编码齐、图多，覆盖面最大。
+`_common.py`）。
+
+详情页的样本分两级挑（`pick_sample`）：先从 `image_manifest` 里挑「图最多、且有
+CAICS 编码」的，字段齐、编码齐、图多，覆盖面最大；工作库不可用时**退回到从最终库
+直接挑**，只要求有编码、有摘要、有伤亡、`collapse_subtype` 非哨兵——图片区会是空的，
+但文字区、致因树、四档折叠都照常渲染，仍是有效核查。**详情页不许因为工作库没建好
+就从核查里消失**：2026-10-01 实测就是这种情况，而当时详情页刚改过三列展示。
 
 用法：
     .venv/bin/python3 scripts/screenshot_web.py
@@ -37,6 +42,51 @@ from _serve import point_at, serve                            # noqa: E402
 
 
 def pick_sample(main_db: str, staging_db: Path) -> tuple[str | None, str]:
+    """挑一个详情页样本：优先「有图 + 有编码」的，退而求其次只要求有编码。
+
+    **详情页不依赖工作库也能渲染**（图片区给空清单 + `images_available=false`），
+    所以工作库不可用只是让样本少覆盖一个区域，不该让整页从核查里消失。原先是
+    `_pick_with_images` 挑不出来就整个跳过详情页——2026-10-01 实测主仓库工作库是
+    空壳，于是详情页成了**唯一一个从没被截过图的页面**，而这期间详情页恰恰改过
+    三列展示。两级挑选修的就是这个：有图更好，没图也得截。
+    """
+    aid, note = _pick_with_images(main_db, staging_db)
+    if aid:
+        return aid, note
+    aid, why = _pick_from_main(main_db)
+    if aid:
+        return aid, f"{why}　〔图片区为空：{note}〕"
+    return None, f"{note}；主库里也没挑出样本：{why}"
+
+
+def _pick_from_main(main_db: str) -> tuple[str | None, str]:
+    """直接从最终库挑，不看工作库。
+
+    条件按「能覆盖最多详情页区域」定：必须**有 CAICS 编码**（否则致因树整块是空
+    的，等于没验），优先**非坍塌类填了真实子类**的坍塌事故（这样 `collapse_subtype`
+    有值区与哨兵归一两条路径都过得到），再要有 `summary` 与 `deaths`。按编码数
+    降序取第一条——编码多，致因区的层分布、多证据合并、证据三级都更容易碰上。
+    """
+    con = sqlite3.connect(f"file:{main_db}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        row = con.execute(
+            "SELECT a.id, a.title, a.severity, COUNT(c.code) AS n"
+            "  FROM accidents a JOIN caics_causes c ON c.accident_id = a.id"
+            " WHERE a.summary IS NOT NULL AND TRIM(a.summary) <> ''"
+            "   AND a.deaths IS NOT NULL"
+            "   AND a.collapse_subtype IS NOT NULL"
+            "   AND a.collapse_subtype <> '不适用'"
+            " GROUP BY a.id ORDER BY n DESC LIMIT 1").fetchone()
+    finally:
+        con.close()
+    if not row:
+        return None, "没有「有编码 + 有摘要 + 有伤亡 + 坍塌子类非哨兵」的事故"
+    return row["id"], (f"{(row['title'] or '')[:28]}… / {row['severity']} / "
+                       f"{row['n']} 条编码　（主库直选）")
+
+
+def _pick_with_images(main_db: str, staging_db: Path) -> tuple[str | None, str]:
     """挑一个既有图、又有 CAICS 编码的真实事故。
 
     挑不出来时**要说清卡在哪一步**。三种情况的处理办法完全不同：工作库不存在
@@ -46,7 +96,7 @@ def pick_sample(main_db: str, staging_db: Path) -> tuple[str | None, str]:
     最终库里一个都对不上，若只回一句「没找到」会被读成「没数据」。
     """
     if not staging_db.exists():
-        return None, "（工作库不存在，详情页跳过）"
+        return None, "工作库不存在"
     con_s = sqlite3.connect(f"file:{staging_db}?mode=ro", uri=True)
     try:
         with_img = [r[0] for r in con_s.execute(
@@ -57,14 +107,14 @@ def pick_sample(main_db: str, staging_db: Path) -> tuple[str | None, str]:
         n_tab = con_s.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
         if not n_tab:
-            return None, ("（工作库是个空文件，一张表都没有——跑 "
-                          "scripts/create_staging_db.py 建表，详情页跳过）")
-        return None, f"（工作库缺 image_manifest 表：{e}，详情页跳过）"
+            return None, ("工作库是个空文件，一张表都没有——跑 "
+                          "scripts/create_staging_db.py 建表")
+        return None, f"工作库缺 image_manifest 表：{e}"
     finally:
         con_s.close()
 
     if not with_img:
-        return None, "（工作库 image_manifest 是空表，详情页跳过）"
+        return None, "工作库 image_manifest 是空表"
 
     con = sqlite3.connect(f"file:{main_db}?mode=ro", uri=True)
     con.row_factory = sqlite3.Row
@@ -79,14 +129,15 @@ def pick_sample(main_db: str, staging_db: Path) -> tuple[str | None, str]:
             n = con.execute("SELECT COUNT(*) FROM caics_causes WHERE accident_id = ?",
                             (aid,)).fetchone()[0]
             if n:
-                return aid, f"{row['title'][:28]}… / {row['severity']} / {n} 条编码"
+                return aid, (f"{(row['title'] or '')[:28]}… / {row['severity']} / "
+                             f"{n} 条编码　（清单里挑的）")
     finally:
         con.close()
 
     if not n_in_main:
-        return None, (f"（清单里 {len(with_img)} 个事故在最终库一个都对不上——清单是"
-                      f"旧口径，跑 scripts/build_image_manifest.py 重建，详情页跳过）")
-    return None, f"（{n_in_main} 个有图事故在最终库存在，但都还没 CAICS 编码，详情页跳过）"
+        return None, (f"清单里 {len(with_img)} 个事故在最终库一个都对不上——清单是"
+                      f"旧口径，跑 scripts/build_image_manifest.py 重建")
+    return None, f"{n_in_main} 个有图事故在最终库存在，但都还没 CAICS 编码"
 
 
 def main() -> int:

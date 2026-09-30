@@ -644,6 +644,11 @@ code { font-family: var(--mono); font-size: .88em;
 .field-val { flex: 1; color: var(--text-2); word-break: break-word; }
 .field-val .mono { font-family: var(--mono); font-size: 12.5px; }
 .field-val .wrap { white-space: normal; word-break: break-all; }
+/* 正文级长文本（摘要 / 直接原因 / 检索增强文本）占满一行。
+   挤在单格里时，网格的行高由这一格决定：摘要能把整行撑到十几行，同行短字段
+   右边全空，后续字段被推到很下面。跨整行后它独占一行，短字段重新排整齐。
+   见 `accident.js` 的 `LONG_TEXT`。 */
+.field-row.is-wide { grid-column: 1 / -1; }
 .enum-code {
   margin-left: 6px; font-family: var(--mono); font-size: 11px;
   color: var(--muted);

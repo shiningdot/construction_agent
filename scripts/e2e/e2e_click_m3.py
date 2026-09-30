@@ -17,16 +17,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))     # 同目录的 _common
+
+from _common import main_db_path  # noqa: E402
 
 # 每次跑另起临时目录：这几个脚本会真建库、真并入、真写备份，复用同一目录
 # 会让上一轮的库和备份混进这一轮。目录不主动删——跑挂了正好留着查现场。
 TMP = Path(tempfile.mkdtemp(prefix="caiems_e2e_"))
 DB = TMP / "e2e_click_m3.db"
-# 主库只被**读**（取 CAICS 类名与枚举口径），不被写。路径仍要显式给出：
-# worktree 里的 data/ 没有 caiems_v2.db，默认成相对路径会让提取静默拿到
-# 空的分类体系——不报错，只是所有编码都判不出来。
-MAIN_DB = os.environ.get("CAIEMS_MAIN_DB",
-                         str(ROOT.parents[2] / "data" / "caiems_v2.db"))
+# 主库只被**读**（取 CAICS 类名与枚举口径），不被写。路径解析见
+# `_common.main_db_path()`：默认从仓库根上溯找主仓库的 data/，两种运行位置
+# 都对；`CAIEMS_MAIN_DB` 可显式覆盖。拿到空库会让提取静默判不出任何编码。
+MAIN_DB = main_db_path()
 for suffix in ("", "-wal", "-shm"):
     p = Path(str(DB) + suffix)
     if p.exists():

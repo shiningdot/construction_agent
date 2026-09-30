@@ -45,6 +45,9 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))     # 同目录的 _common
+
+from _common import main_db_path  # noqa: E402
 
 # 每次跑另起临时目录：本脚本会真建两个库、真并入、真写备份。复用同一目录
 # 会让上一轮的库混进这一轮。目录不主动删——跑挂了正好留着查现场。
@@ -52,10 +55,9 @@ TMP = Path(tempfile.mkdtemp(prefix="caiems_e2e_pipeline_"))
 STAGING = TMP / "pipeline_staging.db"
 FINAL = TMP / "pipeline_final.db"
 
-# 主库只被**读**。路径要显式给出：worktree 的 data/ 里没有 caiems_v2.db，
-# 让默认值落到相对路径上，本脚本会静默拿不到样本数据。
-MAIN_DB = os.environ.get(
-    "CAIEMS_MAIN_DB", str(ROOT.parents[2] / "data" / "caiems_v2.db"))
+# 主库只被**读**。路径解析见 `_common.main_db_path()`：默认从仓库根上溯找
+# 主仓库的 data/，两种运行位置都对；`CAIEMS_MAIN_DB` 可显式覆盖。
+MAIN_DB = main_db_path()
 
 # 主库里一条形态齐全的真实事故：48 列中 36 列非空、4 条编码跨 M/F 两层、
 # 证据等级含 direct_quote 与 indirect_infer 两种。

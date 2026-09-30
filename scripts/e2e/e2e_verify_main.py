@@ -38,9 +38,11 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))     # 同目录的 _common
 
-MAIN_DB = os.environ.get(
-    "CAIEMS_MAIN_DB", str(ROOT.parents[2] / "data" / "caiems_v2.db"))
+from _common import main_db_path  # noqa: E402
+
+MAIN_DB = main_db_path()
 
 # 工作库给个临时路径：本脚本不碰采集/提取/审核，但 app 需要一个可解析的
 # 路径才不会在读 staging 的端点上炸掉。不建库——那些端点会如实地回

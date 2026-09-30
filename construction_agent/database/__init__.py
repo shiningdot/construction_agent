@@ -6,9 +6,11 @@
 `data/caiems_v2.db` 的读写走 `construction_agent.review.promote`（并入）、
 `construction_agent.web.staging_db`（暂存区）与各批处理脚本里的裸 sqlite3。
 
-`sqlite_repository.py` 与 `models.py` 是 SQLAlchemy ORM 时代的产物，实测已无
-任何模块从生产入口可达——留着是为了不让 `models/accident.py` 那批 dataclass
-的引用一次性断掉，不是它们还有用。
+`sqlite_repository.py` 与 `models.py` 是 SQLAlchemy ORM 时代的产物，**已删除**
+（2026-10-01 核对：本目录下只剩本文件与 `dataset_manager.py`）。删除时漏改了
+`tests/test_legacy_isolation.py` 的 LEGACY 名单，于是那两条"不该被生产加载"的
+检查变成恒真的空转——名单本身不可信这件事，现在由
+`test_legacy_list_has_no_ghosts` 兜住。
 
 ## 为什么改成惰性导出
 

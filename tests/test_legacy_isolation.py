@@ -29,6 +29,7 @@ pytest 进程里 `sys.modules` 早就被别的测试塞满了，同进程测什�
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -46,8 +47,9 @@ LEGACY = {
     "construction_agent.output.csv_formatter": "CSVFormatter",
     "construction_agent.output.json_formatter": "JSONFormatter",
     "construction_agent.models.accident": "V1 四维度 dataclass",
-    "construction_agent.database.sqlite_repository": "SQLAlchemy ORM 仓储",
-    "construction_agent.database.models": "SQLAlchemy ORM 模型",
+    # `database/sqlite_repository.py` 与 `database/models.py` 曾列在这里，但两个
+    # 文件早已删除——名单没跟着改，那两条检查就变成恒真的空转。删掉名字，并加
+    # `test_legacy_list_has_no_ghosts` 兜底。
 }
 
 # 生产入口：用户真会走到的地方
@@ -77,6 +79,8 @@ def _run(code: str) -> subprocess.CompletedProcess:
 
 @pytest.mark.parametrize("label,module", PROBES, ids=[p[0] for p in PROBES])
 def test_production_entry_does_not_load_legacy(label, module):
+    """（见下方 `test_legacy_list_has_no_ghosts`：LEGACY 里的名字必须先真实存在，
+    否则这一条会变成恒真的空转。）"""
     r = _run(_LOADED.format(root=str(ROOT), mod=module,
                             legacy=set(LEGACY)))
     assert r.returncode == 0, f"{label} 导入失败：{r.stderr[-500:]}"
@@ -84,6 +88,24 @@ def test_production_entry_does_not_load_legacy(label, module):
     assert not hits, (
         f"{label} 顺带加载了 {len(hits)} 个旧模块：\n"
         + "\n".join(f"  · {h}  —— {LEGACY[h]}" for h in hits))
+
+
+def test_legacy_list_has_no_ghosts():
+    """LEGACY 里列的模块必须真实存在，否则对应那条检查是空转的。
+
+    `test_production_entry_does_not_load_legacy` 的判据是"这个模块名在不在
+    `sys.modules`"——**不存在的模块当然永远不在**，那一条就永远绿。这个坑真的
+    踩过：`database/sqlite_repository.py` 与 `database/models.py` 早已删除，
+    LEGACY 却还列着它们，于是 9 条检查里有 2 条是空的（宣称覆盖 9 个，实际 7 个，
+    而且没有任何提示）。
+
+    用 `find_spec` 而不是 `import`：只查不执行，不会把旧模块拉进本进程。
+    """
+    ghosts = [name for name in LEGACY if importlib.util.find_spec(name) is None]
+    assert not ghosts, (
+        "LEGACY 列了不存在的模块——这些检查是空转的"
+        "（要么把名字删掉，要么它是真丢了）：\n"
+        + "\n".join(f"  · {g} —— {LEGACY[g]}" for g in ghosts))
 
 
 _LAZY = """

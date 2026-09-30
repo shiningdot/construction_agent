@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from construction_agent.config import settings
+from construction_agent.llm_usage import usage_of
 
 logger = logging.getLogger(__name__)
 
@@ -413,6 +414,13 @@ class Step1Result:
     developer: Optional[str] = None
     supervision_company: Optional[str] = None
 
+    # 用量记账（蓝图 02 §3.4）。此前 `response.usage` 被直接丢弃，实际消耗
+    # 无法回溯。**刻意不进 `to_dict()`**——那个 dict 同时被
+    # `run_batch_pipeline` 拿去数「非空字段数」（`processing_log.step1_fields_extracted`），
+    # 多两个键就会把这个既有统计改掉。用量走对象属性，需要的人自己取。
+    tokens_in: int = 0
+    tokens_out: int = 0
+
     # 内部
     _raw_response: Optional[dict] = field(default=None, repr=False)
     _processing_time: float = 0.0
@@ -505,6 +513,7 @@ class Step1BasicExtractor:
                 result = Step1Result(**normalized)
                 result._raw_response = parsed
                 result._processing_time = time.time() - t0
+                result.tokens_in, result.tokens_out = usage_of(response)
                 return result
 
             logger.warning("tool_use 解析失败，重试纯JSON模式")
@@ -521,6 +530,11 @@ class Step1BasicExtractor:
                 result = Step1Result(**normalized)
                 result._raw_response = parsed
                 result._processing_time = time.time() - t0
+                # 重试路径的用量**累加**第一次失败的调用：token 是真花出去的，
+                # 只记成功那一次会让账单对不上。
+                r_in, r_out = usage_of(retry)
+                f_in, f_out = usage_of(response)
+                result.tokens_in, result.tokens_out = f_in + r_in, f_out + r_out
                 return result
 
         except Exception as e:

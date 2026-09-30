@@ -7,6 +7,13 @@ sys.path.insert(0, "/home/suntianhao/construction_agent")
 from construction_agent.extraction.step1_basic_extractor import Step1BasicExtractor
 from construction_agent.extraction.step2_caics_encoder import Step2CaicsEncoder
 from construction_agent.extraction.search_enhancer import SearchEnhancer
+# 证据等级与排序号原先在本文件内联计算，现已上收为共享出口
+# （construction_agent/extraction/evidence_quality.py）。口径与主库 16,323 条
+# 逐条核对过，行为不变——不要再改回内联，那正是复制品分叉的起点。
+from construction_agent.extraction.evidence_quality import (
+    compute_evidence_quality,
+    compute_sort_order,
+)
 
 DB = sys.argv[1] if len(sys.argv) > 1 else "data/caiems_v2.db"
 RAW = sys.argv[2] if len(sys.argv) > 2 else "data/raw_accidents.json"
@@ -103,10 +110,8 @@ for i, d, s1d, s2, sr, ems, aid in results:
             db.execute("INSERT OR IGNORE INTO source_urls (accident_id,url,source_name,created_at) VALUES (?,?,?,?)", (aid, u["url"], "baidu_search", now))
     if s2:
         for c2 in s2.causes:
-            eq = "direct_quote"
-            if "推断" in c2.inference or "表明" in c2.inference: eq = "indirect_infer"
-            if "原文未直接" in c2.evidence or "原文未直接" in c2.inference: eq = "weak_infer"
-            order = {"M": 100, "F": 200, "T": 300, "H": 400, "C": 500}.get(c2.code[0], 600) + int(c2.code[1]) if len(c2.code) > 1 else 0
+            eq = compute_evidence_quality(c2.evidence, c2.inference)
+            order = compute_sort_order(c2.code)
             db.execute("INSERT INTO caics_causes (accident_id,code,name,evidence,inference,evidence_quality,sort_order) VALUES (?,?,?,?,?,?,?)", (aid, c2.code, c2.name, c2.evidence, c2.inference, eq, order))
     nf = len([v for v in s1d.values() if v not in (None, "", "未提及", 0)])
     db.execute("INSERT INTO processing_log (accident_id,pipeline_version,text_type,text_type_confidence,text_type_reason,classification_verdict,classification_rule_result,classification_llm_result,search_triggered,step1_success,step1_fields_extracted,step1_duration_ms,step2_success,step2_cause_count,step2_duration_ms,image_count_analyzed,total_duration_ms,error_message,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

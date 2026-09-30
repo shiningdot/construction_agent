@@ -32,6 +32,7 @@ from typing import Optional
 from construction_agent.collector.base import RawAccidentText
 from construction_agent.collector.classifier import classify_v2
 from construction_agent.config import settings
+from construction_agent.llm_usage import usage_of
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,9 @@ class TextTypeResult:
     accidents: list[dict] = field(default_factory=list)
     # LLM 原始响应（用于审计）
     llm_raw: Optional[dict] = None
+    # 用量记账（蓝图 02 §3.4）。规则直接判过、没调 LLM 时保持 0。
+    tokens_in: int = 0
+    tokens_out: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -191,6 +195,9 @@ class ClassificationResult:
     rule_result: dict = field(default_factory=dict)
     llm_result: Optional[dict] = None
     reason: str = ""
+    # 用量记账。规则直接判过（`RULE_HIGH_CONSTRUCTION`）时没有 LLM 调用，保持 0。
+    tokens_in: int = 0
+    tokens_out: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -328,6 +335,13 @@ class AccidentClassifier:
 
         self._checkpoint: dict[str, dict] = {}
 
+        # 本次判定累计消耗的 token（蓝图 02 §3.4）。语义是「自上一次
+        # classify*/classify 入口以来」——两个入口都会先把它清零再调 LLM，
+        # 所以读的人拿到的永远是**当前这条**的用量，不会串到上一条。
+        # ⚠️ 这是实例状态，**同一实例不可跨线程共用**（M3 执行器因此让每个
+        # 工作线程各持一个 pipeline 实例，而不是共享一个）。
+        self.last_usage: tuple[int, int] = (0, 0)
+
     # ═══════════════════════════════════════════════
     # Step 0: 文本类型判断 + MULTI 拆分
     # ═══════════════════════════════════════════════
@@ -338,8 +352,11 @@ class AccidentClassifier:
         每条文本均通过 LLM + Few-Shot Prompt 判断类型，
         不做规则预判（避免1.7%误杀率）。
         """
+        self.last_usage = (0, 0)
         llm_result = self._call_text_type_llm(title, text)
-        return self._parse_text_type_result(llm_result, title)
+        result = self._parse_text_type_result(llm_result, title)
+        result.tokens_in, result.tokens_out = self.last_usage
+        return result
 
     def _parse_text_type_result(self, llm_result: dict, title: str) -> TextTypeResult:
         """解析 LLM 返回的文本类型结果。"""
@@ -390,6 +407,7 @@ class AccidentClassifier:
                     system=TEXT_TYPE_PROMPT,
                     messages=[{"role": "user", "content": user_message}],
                 )
+                self._add_usage(response)
                 return self._parse_llm_response(response)
             except Exception as e:
                 if attempt < 2:
@@ -405,30 +423,31 @@ class AccidentClassifier:
 
     def classify(self, item: RawAccidentText) -> ClassificationResult:
         """对单条原始采集文本进行分类。"""
+        self.last_usage = (0, 0)
         text = self._sanitize_text(item.raw_text or "")
         title = item.title or ""
 
         if not self._is_primarily_chinese(title + text[:100]):
-            return ClassificationResult(
+            return self._stamp_usage(ClassificationResult(
                 item_id=item.id, item_title=title,
                 item_text=text[:200], item_source=getattr(item, 'source_name', ''),
                 verdict=ClassificationVerdict.INFO_INSUFFICIENT,
                 reason="文本非中文为主",
-            )
+            ))
 
         if len(text) < self.MIN_TEXT_LENGTH and len(title) < 10:
-            return ClassificationResult(
+            return self._stamp_usage(ClassificationResult(
                 item_id=item.id, item_title=title,
                 item_text=text[:200], item_source=getattr(item, 'source_name', ''),
                 verdict=ClassificationVerdict.INFO_INSUFFICIENT,
                 reason=f"信息不足（正文{len(text)}字）",
-            )
+            ))
 
         rule_result = classify_v2(title, text)
 
         # 规则 HIGH + 施工 → 直接通过
         if rule_result.get("confidence") == "high" and rule_result.get("is_construction"):
-            return ClassificationResult(
+            return self._stamp_usage(ClassificationResult(
                 item_id=item.id, item_title=title,
                 item_text=text[:200], item_source=getattr(item, 'source_name', ''),
                 is_construction=True,
@@ -437,10 +456,11 @@ class AccidentClassifier:
                 rule_result=rule_result,
                 llm_result=None,
                 reason=rule_result.get("reason", ""),
-            )
+            ))
 
         llm_result = self._call_llm_with_retry(title, text)
-        return self._merge_results(item, text, rule_result, llm_result)
+        return self._stamp_usage(
+            self._merge_results(item, text, rule_result, llm_result))
 
     def classify_batch(
         self, items: list[RawAccidentText],
@@ -613,6 +633,7 @@ class AccidentClassifier:
                     system=CLASSIFIER_SYSTEM_PROMPT,
                     messages=[{"role": "user", "content": user_message}],
                 )
+                self._add_usage(response)
                 return self._parse_llm_response(response)
             except Exception as e:
                 error_type = type(e).__name__
@@ -677,6 +698,29 @@ class AccidentClassifier:
     def _fallback_result(error_msg: str) -> dict:
         return {"is_construction": False, "confidence": "low",
                 "reason": error_msg, "parse_error": True}
+
+    # ═══════════════════════════════════════════════
+    # 用量记账（蓝图 02 §3.4）
+    # ═══════════════════════════════════════════════
+
+    def _add_usage(self, response) -> None:
+        """把一次响应的用量**累加**进 `last_usage`。
+
+        累加而不是覆盖：重试的每一次调用都真花了 token，只记最后一次
+        会让预估与实际对不上（蓝图 02 §8 验收第 8 条）。
+        """
+        tin, tout = usage_of(response)
+        self.last_usage = (self.last_usage[0] + tin,
+                           self.last_usage[1] + tout)
+
+    def _stamp_usage(self, result):
+        """把累计用量写进结果对象后再返回。
+
+        中间那几个 `INFO_INSUFFICIENT` / 规则直判的返回分支不调 LLM，
+        `last_usage` 停在零，写进去正好表达「这条没花钱」。
+        """
+        result.tokens_in, result.tokens_out = self.last_usage
+        return result
 
     # ═══════════════════════════════════════════════
     # 判定合并

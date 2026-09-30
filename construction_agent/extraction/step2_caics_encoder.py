@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from construction_agent.config import settings
+from construction_agent.llm_usage import usage_of
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,10 @@ class Step2Result:
     primary_cause: str = ""
     cause_chain: str = ""
     causes: list[CauseItem] = field(default_factory=list)
+    # 用量记账（蓝图 02 §3.4）。不进 `to_dict()`，理由同 `Step1Result`：
+    # 该 dict 的键数被既有脚本当作统计口径用过。
+    tokens_in: int = 0
+    tokens_out: int = 0
     _processing_time: float = 0.0
 
     @property
@@ -278,6 +283,7 @@ class Step2CaicsEncoder:
             if parsed:
                 result = self._build_result(parsed)
                 result._processing_time = time.time() - t0
+                result.tokens_in, result.tokens_out = usage_of(response)
                 return result
 
             # 重试
@@ -291,6 +297,10 @@ class Step2CaicsEncoder:
             if parsed:
                 result = self._build_result(parsed)
                 result._processing_time = time.time() - t0
+                # 与 S3 一致：两次调用的 token 都算，失败的调用也是真花钱
+                f_in, f_out = usage_of(response)
+                r_in, r_out = usage_of(retry)
+                result.tokens_in, result.tokens_out = f_in + r_in, f_out + r_out
                 return result
 
         except Exception as e:

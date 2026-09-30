@@ -11,6 +11,13 @@ from construction_agent.extraction.caics_pipeline import (
     STATUS_PURGED,
     CaicsPipeline,
 )
+# 证据等级上收为共享出口。本文件原先是 6 份复制品里**唯一分叉**的一份
+# （`indirect_infer` 多认一个「指向」），且与主库 16,323 条对不上：
+# 含「指向」只对 16,284 条，不含则全对。分叉已收敛，口径见该模块 docstring。
+from construction_agent.extraction.evidence_quality import (
+    compute_evidence_quality,
+    compute_sort_order,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -85,15 +92,9 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
 
     # caics_causes
     if s2_result:
-        sort_base = {"M":100,"F":200,"T":300,"H":400,"C":500}
         for c in s2_result.causes:
-            prefix = c.code[0]
-            order = sort_base.get(prefix, 600) + int(c.code[1]) if len(c.code) > 1 else 0
-            eq = "direct_quote"
-            if "推断" in c.inference or "表明" in c.inference or "指向" in c.inference:
-                eq = "indirect_infer"
-            if "原文未直接" in c.evidence or "原文未直接" in c.inference:
-                eq = "weak_infer"
+            order = compute_sort_order(c.code)
+            eq = compute_evidence_quality(c.evidence, c.inference)
 
             conn.execute(
                 "INSERT INTO caics_causes (accident_id,code,name,evidence,inference,evidence_quality,sort_order) VALUES (?,?,?,?,?,?,?)",

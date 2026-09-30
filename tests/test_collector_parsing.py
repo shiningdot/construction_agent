@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 from urllib.parse import urljoin
 
+import httpx
 import pytest
 from bs4 import BeautifulSoup
 
@@ -544,3 +545,63 @@ def test_PDF文本提取函数在每个调用它的模块里都解析得到():
             ):
                 problems.append(f"{path.name}:{node.lineno} 调了 {node.func.id}()，但本模块没有绑定它")
     assert not problems, "PDF 文本提取的调用点与定义对不上：\n" + "\n".join(problems)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 第七组：content-type 谎报的接口（第七轮）
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_列表接口的编码错误要翻译成能定位的话():
+    """`hebei_em` 的列表接口有**两条响应路径**，cookie 决定走哪条：
+
+    - 带 `JSESSIONID`（`collect()` 先 GET 列表页预热）→
+      `application/json;charset=UTF-8`，6,499 字节，标题正常
+    - 不带 cookie（直接 POST）→ `text/plain;charset=ISO-8859-1`，5,460 字节，
+      汉字被逐字替换成 `?`，且含非法 UTF-8 字节 `0xb7`
+
+    第二条路径下 `resp.json()` 抛的是「codec can't decode byte 0xb7 in
+    position 388」——指不到「cookie 没了」这个真正的原因。
+
+    `_decode_json()` **不静默降级**：用 latin-1 硬解确实能出 JSON，但拿到的是
+    那份汉字全是 `?` 的降级响应，接着初筛会把 110 条全判为无关——与「这个栏目
+    本来就没有建筑事故」长得一模一样。
+    """
+    from construction_agent.collector.sources.hebei_em import _decode_json
+
+    # 正常路径：UTF-8，中文原样
+    good = httpx.Response(200, content='{"data":{"count":3,"名":"值"}}'.encode())
+    assert _decode_json(good)["data"] == {"count": 3, "名": "值"}
+
+    # 匿名降级路径
+    bad = httpx.Response(
+        200,
+        content=b'{"data":{"count":110,"t":"\xb7"}}',
+        headers={"content-type": "text/plain;charset=ISO-8859-1"},
+    )
+    with pytest.raises(UnicodeDecodeError):
+        bad.json()  # 前提：resp.json() 在这条路径上确实会炸
+    with pytest.raises(RuntimeError, match="cookie"):
+        _decode_json(bad)  # 换成一句指得到原因的话
+
+
+def test_河北源不许再用resp_json():
+    """静态钉住：这个源里不能再出现 `resp.json()`。
+
+    它在这里写法最自然，但会把「cookie 预热失败」报成一句指不到原因的解码
+    错误。走 `_decode_json()`。
+    """
+    path = SOURCES_DIR / "hebei_em.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    hits = [
+        n.lineno
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "json"
+        and isinstance(n.func.value, ast.Name)
+        and n.func.value.id == "resp"
+    ]
+    assert not hits, f"hebei_em.py:{hits} 又用回了 resp.json()，该接口会抛 UnicodeDecodeError"
+
+

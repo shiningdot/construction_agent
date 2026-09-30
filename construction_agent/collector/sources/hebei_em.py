@@ -7,15 +7,33 @@
 - API: POST /portal/securitycontrol/getParentAndChildNews
   参数: id=sgdc, type=2, limit=15, pageNo=N
   返回: {data: {count, resultList: [{articletitle, articleid, createdate, ...}]}}
-- 110 条记录, 8 页, 96 篇事故调查报告 + 14 篇挂牌督办
 - 详情页 URL: /portal/index/getPortalNewsDetails?id={articleid}&categoryid={categoryid}
 - PDF 附件: /portal/upload/downloadFile?id={uuid}
 - 详情页正文极少，事故报告全文在 PDF 中
+
+**这个接口有两条响应路径，cookie 决定走哪一条：**
+
+| 请求方式 | content-type | 响应体 | 标题 |
+|---|---|---|---|
+| 带 `JSESSIONID`（`collect()` 先 GET 列表页预热） | `application/json;charset=UTF-8` | 6,499 字节 | 正常中文 |
+| 不带 cookie（直接 POST） | `text/plain;charset=ISO-8859-1` | 5,460 字节 | 汉字被逐字替换成 `?` |
+
+匿名那条路径的响应体还含非法 UTF-8 字节（`0xb7`），`resp.json()` 抛的
+`UnicodeDecodeError` 指不到「cookie 没了」这个真正的原因。
+
+所以两件事：**不要绕过 `collect()` 的 cookie 预热直接调
+`_fetch_all_pages()`**（那样测出来的是一个不存在于生产路径的故障）；
+**不要用 `resp.json()`**，走 `_decode_json()`——它把这种情况翻译成一句说清
+原因的错误，而不是静默降级成一份汉字全是 `?` 的响应。
+
+原本这里写着「110 条记录, 8 页, 96 篇事故调查报告 + 14 篇挂牌督办」——
+`count=110` 与接口自报一致，但「96 + 14」这两个数没有核算过，已删去。
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 import time
@@ -48,6 +66,38 @@ HBEM_CATEGORY_ID = "3a9d0375-6937-4730-bf52-febb997d8b48"
 # (classify_v2 已迁移至 construction_agent.collector.classifier)
 
 # (is_construction_candidate 已迁移至 classifier 模块)
+
+
+def _decode_json(resp: httpx.Response) -> dict:
+    """解析响应体，失败时给一句能定位原因的话。
+
+    **这个接口有两条响应路径，内容完全不同：**
+
+    | 请求方式 | content-type | 响应体 | 标题 |
+    |---|---|---|---|
+    | 带 `JSESSIONID`（`collect()` 先 GET 列表页预热） | `application/json;charset=UTF-8` | 6,499 字节 | 正常中文 |
+    | 不带 cookie（直接 POST） | `text/plain;charset=ISO-8859-1` | 5,460 字节 | 汉字被逐字替换成 `?` |
+
+    **cookie 决定了服务器返回哪一份。** 第二条路径下响应体还含非法 UTF-8
+    字节（`0xb7`），`resp.json()` 抛的是
+    `UnicodeDecodeError: byte 0xb7 in position 388`——这句话指不到
+    「cookie 没了」这个真正的原因。
+
+    这里**不做静默降级**。用 latin-1 硬解确实能出 JSON，但拿到的是那份汉字
+    全被替换成 `?` 的降级响应，接着关键词初筛会把 110 条全部判为无关，
+    表面上与「这个栏目本来就没有建筑事故」一模一样。宁可当场抛一句说清
+    原因的错误。
+    """
+    try:
+        return json.loads(resp.content.decode("utf-8"))
+    except UnicodeDecodeError as e:
+        raise RuntimeError(
+            f"列表接口返回的不是 UTF-8（{e}）。这通常意味着 cookie 预热失败："
+            f"服务器对匿名请求返回的降级响应 content-type 为 "
+            f"`text/plain;charset=ISO-8859-1`，其中的汉字已被替换成 `?`，"
+            f"解析出来只会得到一批无法匹配的标题。请检查 `collect()` 开头的 "
+            f"`self._session.get(HBEM_LIST_PAGE)` 是否成功。"
+        ) from e
 
 # ── 爬虫 ──
 class HebeiEMCollector(BaseCollector):
@@ -225,7 +275,7 @@ class HebeiEMCollector(BaseCollector):
         if resp.status_code != 200:
             logger.error("API 请求失败")
             return []
-        data = resp.json().get("data", {})
+        data = _decode_json(resp).get("data", {})
         count = data.get("count", 0)
         total_pages = (count + 14) // 15
         logger.info(f"API: count={count}, pages={total_pages}")
@@ -236,7 +286,7 @@ class HebeiEMCollector(BaseCollector):
                 data={"id": "sgdc", "type": "2", "limit": "15", "pageNo": str(page), "title": ""})
             if resp.status_code != 200:
                 continue
-            items = resp.json().get("data", {}).get("resultList", [])
+            items = _decode_json(resp).get("data", {}).get("resultList", [])
             for item in items:
                 title = item.get("articletitle", "")
                 article_id = item.get("articleid", "")

@@ -26,6 +26,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
@@ -53,9 +54,13 @@ class NmgEMCollector(BaseCollector):
     """
 
     def __init__(self, delay: float = 1.0, enable_classify: bool = True,
-                 data_dir: Optional[Path] = None):
+                 data_dir: Optional[Path] = None, image_max: int = 50):
         self._delay = delay
         self._enable_classify = enable_classify
+        # 一条详情页最多登记几张内容图（0 = 不抽取）。**只登记 URL、不下载**
+        # ——下载是阶段② OCR 的事，这个源实测 121 张内容图，全下等于把采集
+        # 任务变成图片搬运工。上限是防病态页面，不是常态截断。
+        self._image_max = image_max
         # `data_dir=None` 时落 `settings.DATA_DIR/<源名>`（旧行为）。在线采集
         # 传一个临时目录进来，`data/<源名>/` 就不再产生——采集产出自 M2 起
         # 只落工作库的 `raw_accidents` 表（蓝图 01 §3.4）。
@@ -120,6 +125,7 @@ class NmgEMCollector(BaseCollector):
             detail_source = "内蒙古自治区应急管理厅"
             detail_text = ""
             pdf_url = ""
+            image_urls: list[str] = []
             local_path = ""
 
             if detail:
@@ -128,6 +134,7 @@ class NmgEMCollector(BaseCollector):
                 detail_source = detail.get("source") or detail_source
                 detail_text = detail.get("text") or ""
                 pdf_url = detail.get("pdf_url") or ""
+                image_urls = detail.get("image_urls") or []
                 if pdf_url:
                     pdf_text, local_path = self._process_pdf(pdf_url, title, detail_date)
                     if pdf_text:
@@ -167,6 +174,12 @@ class NmgEMCollector(BaseCollector):
                 "source_url": rec_url, "source_name": "nmg_em",
                 "publish_date": detail_date, "status": status,
                 "pdf_urls": [pdf_url] if pdf_url else [],
+                # 内容图（2026-10-01 第二十轮补）。`nmg_em` 实测有 **121 张
+                # 内容图**（`/zwgk/zdxx/sgxxccpg/202511/W020251121….jpg`），是
+                # 全项目最多的一块，此前一张都不登记——`executor._ASSET_KEYS`
+                # 里那项 `("image_urls", "image")` 声明着，却没有源往外传。
+                # 判据与抽取逻辑共用 `construction_agent.collector.images`。
+                "image_urls": image_urls,
                 "needs_ocr": bool(pdf_url) and not detail_text,
                 "issuing_authority": detail_source,
                 "classification": classification,
@@ -250,7 +263,10 @@ class NmgEMCollector(BaseCollector):
                 pdf_url = a["href"] if a["href"].startswith("http") else urljoin(url, a["href"])
                 break
 
-        return {"title": title, "date": date, "source": source, "text": text, "pdf_url": pdf_url}
+        image_urls = extract_page_images(url, soup, max_n=self._image_max)
+
+        return {"title": title, "date": date, "source": source, "text": text,
+                "pdf_url": pdf_url, "image_urls": image_urls}
 
     def _process_pdf(self, pdf_url: str, title: str, pub_date: str) -> tuple[str, str]:
         url_hash = hashlib.md5(pdf_url.encode()).hexdigest()[:12]

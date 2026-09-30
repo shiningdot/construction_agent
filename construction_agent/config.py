@@ -22,6 +22,11 @@ class Settings:
 
     # Bing Search API（保留，备选）
     BING_SEARCH_API_KEY: str = os.getenv("BING_SEARCH_API_KEY", "")
+    # 2026-09-30 补：bing_search.py:31 一直在读 BING_SEARCH_ENDPOINT，
+    # 但本类从未定义该属性，导致 BingSearchEngine() 构造即抛
+    # AttributeError（tests/test_search.py 两项失败即由此）。
+    BING_SEARCH_ENDPOINT: str = os.getenv(
+        "BING_SEARCH_ENDPOINT", "https://api.bing.microsoft.com/v7.0/search")
 
     # Web UI
     FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")

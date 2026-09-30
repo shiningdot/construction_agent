@@ -19,6 +19,14 @@ class RawAccidentText:
     """
 
     # ── 唯一标识 ──
+    # 2026-09-30 补：`id` 此前不是本类的字段，却被两处直接读取——
+    #   llm_classifier.py:413/:422/:432 的 `item.id`
+    #   （同文件对 source_name 用的是 getattr(item,'source_name','') 兜底，
+    #     唯独 id 没有兜底）
+    # 于是任何未在调用点手工补 `item.id = ...` 的实例都会在 classify() 里抛
+    # AttributeError。run_batch_pipeline.py:179 那两行动态赋值实际是这个
+    # 缺陷的补丁，只打在调用点。今把两个字段正式收进本类。
+    id: str = ""  # 采集记录唯一标识（指纹或外部 id）
     source: str = ""  # 数据来源标注（如 safehoo / open_gov_shenyang / mohurd）
 
     # ── 原始内容 ──
@@ -27,6 +35,7 @@ class RawAccidentText:
     raw_html: str = ""  # 原始 HTML（保留用于后续二次解析，不超过 50KB）
 
     # ── 来源追踪 ──
+    source_name: str = ""  # 来源中文名（与 source 的英文 key 相对，用于展示）
     source_url: str = ""  # 原始页面 URL
     fetch_time: str = ""  # 采集时间 ISO 格式
 

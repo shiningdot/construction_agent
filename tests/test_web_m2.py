@@ -311,8 +311,14 @@ def test_重跑不重复登记附件(staging, monkeypatch):
 
 
 def test_附件键名与元素形状都认(staging, monkeypatch):
-    """pdf_urls / image_urls / attachments 三种键、字符串与字典两种元素。"""
+    """pdf_urls / office_urls / image_urls / attachments 四种键、
+    字符串与字典两种元素。
+
+    `office_urls` 是 2026-10-01 加的：`gd_em` 原先把 Word 附件塞进
+    `pdf_urls`，登记出来是 `asset_type="pdf"` 而文件是 `.docx`。
+    """
     recs = [_record("https://example.com/multi",
+                    office_urls=["https://example.com/report.docx"],
                     image_urls="https://example.com/m.png",
                     attachments=[{"url": "https://example.com/doc.docx"},
                                  "https://example.com/raw.pdf"])]
@@ -321,6 +327,7 @@ def test_附件键名与元素形状都认(staging, monkeypatch):
     rows = sdb.query("SELECT asset_type, url FROM raw_accident_assets ORDER BY id")
     assert [(r["asset_type"], r["url"]) for r in rows] == [
         ("pdf", "https://example.com/multi.pdf"),
+        ("office", "https://example.com/report.docx"),
         ("image", "https://example.com/m.png"),
         ("attachment", "https://example.com/doc.docx"),
         ("attachment", "https://example.com/raw.pdf"),

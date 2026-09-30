@@ -10,7 +10,9 @@
 - 内容格式多样化:
   1. HTML 文本（最常见,正文直接在 article_con 中）
   2. 图片（img.nfw-cms-img,需 OCR）
-  3. PDF 附件（<a href="/attachment/...">或列表页直接链接 PDF）
+  3. 附件（<a href="/attachment/..."> 或列表页直接链接），
+     实测既有 PDF 也有 Word：`.docx` 用 `extract_pdf_text` 就能提正文，
+     老 `.doc`（OLE2）提不出
 
 与 beijing_em 的关键差异:
 - 数据在 HTML 中而非 JS 数组中 → 直接用 BeautifulSoup 解析
@@ -23,6 +25,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import time
@@ -35,6 +38,7 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -86,6 +90,35 @@ NON_ACCIDENT_KW = [
 
 # (is_construction_candidate 已迁移至 classifier 模块)
 
+# 正文短于这个数、且页面挂了附件时，就去下载附件看看——省级站的常态是
+# 页面只有一行「点击链接查看报告详情：」，报告本体在 .pdf/.docx 里。
+# 这个阈值与 `needs_ocr` 的判据共用，两处必须同源，所以提成常量。
+_BODY_MIN = 200
+
+# `_build_content_summary` 正文预览的截断长度。外层 item 还会再截到
+# 50000，这里留出标题与附件列表的余量。**别再写回三位数**：实测这里的
+# 附件正文有 8,170 字，截到 3000 会丢掉三分之二，而修这条通路的全部
+# 意义就是让正文进来。
+_PREVIEW_CHARS = 40000
+
+
+def _attachment_kind(href: str) -> str:
+    """按后缀判断附件类型，返回 `"pdf"` / `"office"` / `""`（认不出）。
+
+    必须比后缀，不能比子串。原先这里写的是 `".doc" in href`——而
+    `".doc"` 是 `".docx"` 的子串，Word 附件全被当成 PDF 塞进了
+    `pdf_urls`（字段名说是 PDF），再经 `executor._ASSET_KEYS` 登记成
+    `asset_type="pdf"`。2026-10-01 查实：这条链上三处名实不符，
+    源头就是这一行。
+    """
+    path = href.lower().split("?")[0].split("#")[0]
+    if path.endswith(".pdf"):
+        return "pdf"
+    if path.endswith((".docx", ".doc")):
+        return "office"
+    return ""
+
+
 class GdEMCollector(BaseCollector):
     """广东省应急管理厅灾害事故调查评估报告采集器。
 
@@ -104,10 +137,17 @@ class GdEMCollector(BaseCollector):
         delay: float = 1.0,
         crawl_details: bool = True,
         enable_classify: bool = True,
+        data_dir: Optional[Path] = None,
     ):
         self._delay = delay
         self._crawl_details = crawl_details
         self._enable_classify = enable_classify
+        # 附件缓存目录。2026-10-01 起本源要下载附件提正文（见 `collect`），
+        # 于是需要一个落盘位置——`data_dir=None` 落 `settings.DATA_DIR/gd_em`，
+        # 在线采集传临时目录进来。此前本源不收这个参数，`registry.build()`
+        # 把它静默丢掉，registry 的 note 也照实写着「不接受」。
+        self.data_dir = Path(data_dir) if data_dir else (settings.DATA_DIR / "gd_em")
+        self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # HTTP 客户端
         self._client = httpx.Client(
@@ -228,11 +268,29 @@ class GdEMCollector(BaseCollector):
             detail_date = detail.get("date") or pub_date
             source = detail.get("source") or "广东省应急管理厅"
             pdf_urls = detail.get("pdf_urls") or []
+            office_urls = detail.get("office_urls") or []
             has_images = detail.get("has_images", False)
 
+            # 正文短而页面挂了附件 → 真正文多半在附件里，去取一次。
+            # 改之前这里到「标个 needs_ocr」就结束了：附件 URL 抽出来只写进
+            # 摘要当提示，没有任何一步去下载它。实测那两条 Word 附件的正文
+            # （`.docx` 一条 8,170 字）一直躺在 URL 后面没人取。
+            attach_text = ""
+            if len(detail_text) < _BODY_MIN and (pdf_urls or office_urls):
+                attach_text = self._extract_first_attachment(pdf_urls + office_urls)
+                if attach_text:
+                    logger.info(f"    附件正文 {len(attach_text)} 字")
+
+            # 页面正文与附件正文合并成一个 `body_text`：分类、摘要、`needs_ocr`
+            # 三处都看它，免得再出现「一处认正文、另一处不认」。
+            body_text = detail_text
+            if attach_text:
+                body_text = (f"{detail_text}\n\n{attach_text}" if detail_text
+                             else attach_text)
+
             # 二级筛选: classify_v2 文本分类
-            if self._enable_classify and detail_text:
-                result = classify_v2(detail_title, detail_text)
+            if self._enable_classify and body_text:
+                result = classify_v2(detail_title, body_text)
                 logger.info(
                     f"    分类: is_const={result['is_construction']}, "
                     f"confidence={result['confidence']}, "
@@ -261,7 +319,7 @@ class GdEMCollector(BaseCollector):
 
             # 构建内容摘要
             content_summary = self._build_content_summary(
-                detail_title, detail_text, source, pdf_urls, has_images
+                detail_title, body_text, source, pdf_urls, office_urls, has_images
             )
 
             item = {
@@ -272,8 +330,13 @@ class GdEMCollector(BaseCollector):
                 "publish_date": detail_date,
                 "status": item_status,
                 "pdf_urls": pdf_urls,
-                # 需要OCR的标准: 有图片且正文很少(<200字)，或有PDF附件且正文很少
-                "needs_ocr": (has_images and len(detail_text) < 200) or (bool(pdf_urls) and len(detail_text) < 200),
+                "office_urls": office_urls,
+                # 全项目约定：有附件/图片 且 正文没提出来 → 需要后续处理。
+                # 判据看的是 `body_text`（含附件正文），所以提到了正文的条目
+                # 不再标 OCR——2026-10-01 之前这里看的是页面正文，`.docx`
+                # 附件提得到正文也照样标 True。
+                "needs_ocr": ((has_images or bool(pdf_urls) or bool(office_urls))
+                              and len(body_text) < _BODY_MIN),
                 "issuing_authority": source,
                 "classification": classification,
                 "classification_reason": classification_reason,
@@ -446,7 +509,16 @@ class GdEMCollector(BaseCollector):
         article_div = soup.find("div", class_="article_con")
         content_text = ""
         has_images = False
-        pdf_urls = []
+        pdf_urls: list[str] = []
+        office_urls: list[str] = []
+
+        def _sort_attachment(href: str) -> None:
+            """按后缀把附件收进对应的列表。认不出就不收。"""
+            kind = _attachment_kind(href)
+            if not kind:
+                return
+            full = href if href.startswith("http") else urljoin(GDEM_BASE, href)
+            (pdf_urls if kind == "pdf" else office_urls).append(full)
 
         if article_div:
             # 检测图片
@@ -459,21 +531,15 @@ class GdEMCollector(BaseCollector):
             # 清理多余空行
             content_text = re.sub(r"\n{3,}", "\n\n", content_text)
 
-            # 提取 PDF 附件链接
+            # 提取附件链接（PDF 与 Word 分开收，见 `_attachment_kind`）
             for a in article_div.find_all("a", href=True):
-                href = a["href"]
-                if ".pdf" in href.lower() or ".doc" in href.lower():
-                    full_pdf = href if href.startswith("http") else urljoin(GDEM_BASE, href)
-                    pdf_urls.append(full_pdf)
+                _sort_attachment(a["href"])
 
-        # 如果 article_con 没找到 PDF，在整个页面范围内搜索附件
-        if not pdf_urls:
+        # 如果 article_con 没找到附件，在整个页面范围内搜索附件
+        if not pdf_urls and not office_urls:
             for a in soup.find_all("a", href=True):
-                href = a["href"]
-                text = a.get_text(strip=True)
-                if (".pdf" in href.lower() or ".doc" in href.lower()) and "附件" in text:
-                    full_pdf = href if href.startswith("http") else urljoin(GDEM_BASE, href)
-                    pdf_urls.append(full_pdf)
+                if "附件" in a.get_text(strip=True):
+                    _sort_attachment(a["href"])
 
         return {
             "title": title,
@@ -481,6 +547,7 @@ class GdEMCollector(BaseCollector):
             "date": date,
             "source": source,
             "pdf_urls": pdf_urls,
+            "office_urls": office_urls,
             "has_images": has_images,
         }
 
@@ -505,6 +572,7 @@ class GdEMCollector(BaseCollector):
             "publish_date": pub_date,
             "status": "review",
             "pdf_urls": [pdf_url],
+            "office_urls": [],
             "needs_ocr": True,
             "issuing_authority": "广东省应急管理厅",
             "classification": "pending_review",
@@ -523,6 +591,7 @@ class GdEMCollector(BaseCollector):
             "publish_date": pub_date,
             "status": "new",
             "pdf_urls": [],
+            "office_urls": [],
             "needs_ocr": False,
             "issuing_authority": "广东省应急管理厅",
             "classification": "auto_construction",
@@ -537,6 +606,7 @@ class GdEMCollector(BaseCollector):
         text: str,
         source: str,
         pdf_urls: list[str],
+        office_urls: list[str],
         has_images: bool,
     ) -> str:
         """构建内容摘要字段。"""
@@ -545,18 +615,59 @@ class GdEMCollector(BaseCollector):
             parts.append(f"信息来源: {source}")
         if has_images:
             parts.append("[图片格式报告，需 OCR 提取文字]")
-        if pdf_urls:
-            parts.append(f"附件({len(pdf_urls)}个):")
-            for u in pdf_urls[:5]:
-                parts.append(f"  {u}")
+        for label, urls in (("PDF", pdf_urls), ("Word", office_urls)):
+            if urls:
+                parts.append(f"{label} 附件({len(urls)}个):")
+                for u in urls[:5]:
+                    parts.append(f"  {u}")
         if text:
-            # 截取前 3000 字作为预览
-            preview = text[:3000]
-            if len(text) > 3000:
+            preview = text[:_PREVIEW_CHARS]
+            if len(text) > _PREVIEW_CHARS:
                 preview += f"\n... (共 {len(text)} 字)"
             parts.append(f"\n正文:\n{preview}")
 
         return "\n".join(parts)
+
+    def _extract_first_attachment(self, urls: list[str]) -> str:
+        """依次尝试下载附件并提正文，第一个成功的结果就返回。
+
+        成功的判据在 `extract_pdf_text` 里（>50 字），所以「下载到了但提不出
+        文字」（扫描件、老 `.doc`）会返回空串、继续试下一个，全都失败则返回
+        空串——由调用方用 `needs_ocr` 标出来。
+        """
+        for url in urls[:3]:
+            text = self._download_and_extract(url)
+            if text:
+                return text
+        return ""
+
+    def _download_and_extract(self, url: str) -> str:
+        """下载附件到 `data_dir` 并提取正文。
+
+        交给 `extract_pdf_text` 就够——它背后的 `fitz` 同时认 PDF 与 OOXML。
+        2026-10-01 实测：`.docx`（ZIP/OOXML）能提出正文，老 `.doc`（OLE2）
+        提不出。这个差别不在这里判断，直接交给它试。
+        """
+        if not url:
+            return ""
+
+        # 后缀要带上：`fitz` 按内容嗅探，但留个对得上的后缀便于人工排查
+        suffix = Path(url.split("?")[0]).suffix.lower() or ".bin"
+        cache_path = self.data_dir / (
+            hashlib.md5(url.encode()).hexdigest()[:12] + suffix)
+
+        if not cache_path.exists():
+            try:
+                resp = self._client.get(url)
+                if resp.status_code != 200 or len(resp.content) < 100:
+                    logger.debug(f"    附件下载失败: HTTP {resp.status_code}")
+                    return ""
+                cache_path.write_bytes(resp.content)
+            except Exception as e:  # noqa: BLE001 —— 网络异常不该打断整轮采集
+                logger.debug(f"    附件下载异常: {e}")
+                return ""
+
+        return extract_pdf_text(cache_path)
 
     def _fetch(self, url: str) -> Optional[str]:
         """获取页面 HTML，带重试。"""

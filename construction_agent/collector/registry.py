@@ -135,7 +135,7 @@ SOURCES: dict[str, SourceSpec] = dict([
     _s("gd_em", "广东省应急管理厅", "province", "广东省应急管理厅",
        "https://yjgl.gd.gov.cn/gk/zdlyxxgk/sgdcbg/index.html", 1.0,
        "gd_em", "GdEMCollector",
-       note="不接受 data_dir 参数（实测不建目录）"),
+       note="`data_dir` 是附件缓存目录（2026-10-01 起本源要下载附件提正文）"),
     _s("gz_em", "贵州省应急管理厅", "province", "贵州省应急管理厅",
        "https://yjgl.guizhou.gov.cn/gk/zfxxgk/fdzdgk/dcbg_5888759/", 1.0,
        "gz_em", "GzEMCollector"),

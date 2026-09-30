@@ -108,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_raw_task   ON raw_accidents(task_id);
 CREATE TABLE IF NOT EXISTS raw_accident_assets (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     raw_id       TEXT NOT NULL REFERENCES raw_accidents(raw_id) ON DELETE CASCADE,
-    asset_type   TEXT NOT NULL,             -- pdf | image | attachment
+    asset_type   TEXT NOT NULL,             -- pdf | office | image | attachment
     url          TEXT,
     local_path   TEXT,                      -- 相对 data/ 的路径
     bytes        INTEGER,

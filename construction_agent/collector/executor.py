@@ -74,9 +74,15 @@ def _new_id() -> str:
 
 # 采集器把附件 URL 塞在自定义字段里，键名不统一（21 个走 store 的源各写各的）。
 # 这张表是实测出来的：`pdf_urls` 是唯一定义在 `RawAccidentStore` 契约里的，
-# 其余三个是零星几个源自己的叫法。
+# 其余几个是零星几个源自己的叫法。
+#
+# `office_urls` 2026-10-01 新增：`gd_em` 原先把 Word 附件也塞进 `pdf_urls`
+# （判据是 `".doc" in href`，而 `.doc` 是 `.docx` 的子串），于是登记出来是
+# `asset_type="pdf"` 而文件其实是 `.docx`/`.doc`。**按键名映射类型**这张表
+# 本身没错，错的是上游把两种东西塞进了同一个键。
 _ASSET_KEYS: tuple[tuple[str, str], ...] = (
     ("pdf_urls", "pdf"),
+    ("office_urls", "office"),
     ("image_urls", "image"),
     ("attachment_urls", "attachment"),
     ("attachments", "attachment"),

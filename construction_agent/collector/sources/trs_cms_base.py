@@ -231,6 +231,13 @@ class TrsCmsCollector(BaseCollector):
         self._filtered_classify = 0
         self._collected = 0
         self._review = 0
+        # 网络层失败次数（重试耗尽）。**它和「列表 0 条」不是一回事。**
+        # 站点通了但栏目本来就空、DNS 挂了、TLS 谈不成、被 412 拦——
+        # 这四种在 `_total_listed` 上全是 0，日志里也只有一行 WARNING。
+        # 2026-10-01 实测：`jl_em`（DNS 解析失败）、`jx_em`（SSL 老式重协商
+        # 被禁）、`hub_em`（HTTP 412）三个源——三种毫不相干的故障——在健康
+        # 检查表上逐格相同地显示成「空」。有了这个计数才分得开。
+        self._fetch_failed = 0
 
     # ── BaseCollector 接口 ──
 
@@ -583,6 +590,10 @@ class TrsCmsCollector(BaseCollector):
                 logger.warning(f"请求失败 (尝试 {attempt+1}): {url} - {e}")
             if attempt < self.cfg.max_retries - 1:
                 time.sleep(2 ** attempt)  # 指数退避
+        # 走到这一行只有「重试耗尽」一种情况——404/410 已经在上面提前
+        # `return None` 了。**这两种 `None` 必须分开**：前者是「这一页不存在」
+        # （正常结果），后者是「没连上」（故障）。混在一起数，判据就会两头都真。
+        self._fetch_failed += 1
         return None
 
     @staticmethod

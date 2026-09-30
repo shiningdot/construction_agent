@@ -34,6 +34,23 @@
 4. **「有正文」这一列不是「正文抓到了」。** 它能证明的只是「收到的 content
    里有一段非标题的文本」。通路 A 的 `content` 是源自己拼的（标题 + 来源 +
    正文预览），长度天然大于 0。要看具体内容，跑 `--samples`。
+5. **「闭环」那一栏只在没早停时才有意义。** 它核的是
+   `列表条目数 == 收录 + 审核 + 排除`，回答的是上面「条数」栏答不了的问题：
+   列表 110 条、只收到 3 条，中间那 107 条**是初筛排除掉的，还是压根没处理**？
+   但早停会在任意一条上截断循环，此时等式两边停在同一个位置，差额恰好是
+   「还没来得及处理的条目」——恒等式**必然不成立**，而且这个不成立没有信息量。
+   所以探针对**列表本身 ≤ 60 条的源不早停**（跑完也不慢，见 `_FULL_LIST_MAX`），
+   让这一栏真能出结论；更长的源照旧早停，这一栏显示 `早停`。另有三种显示
+   ——`空表`（列表 0 条，`0 == 0 + 0 + 0` 恒真）、`—`（6 个源根本没记这几个数：
+   `esafety` / `mem` / `mohurd` / `news_aggregator` / `open_gov` / `safehoo`）
+   ——**全都表示「不适用」，不是「有问题」**。三者混着数，就会得出
+   「十几个源闭环失败」这种自己吓自己的结论。
+6. **「空」也要分两种。** 站点通了、栏目本来就空，和 DNS 挂了 / TLS 谈不成 /
+   被 412 拦，在 `_total_listed` 上都是 0，日志里都只有一行 WARNING，采集任务
+   都报「成功」。2026-10-01 实测 `jl_em`（DNS）、`jx_em`（SSL 老式重协商）、
+   `hub_em`（412）三个源在旧表上逐格相同。TRS 基类现在记 `_fetch_failed`
+   （只数重试耗尽，404/410 不算），「结果」栏据此把 `空` 拆成 `空` 与
+   `没连上`。**只覆盖 12 个 TRS 源**，其余源仍只有 `空` 一种。
 
 ## 退出码
 
@@ -75,6 +92,17 @@ CONCURRENCY = 4
 
 DEFAULT_LIMIT = 3
 
+# 列表条目数不超过这个值就**不早停**——把源跑到底，好让「闭环」那一栏出结论。
+# 60 的来由是实测的候选比例：这类源大约 15% 的列表条目能过初筛（`tj_em` 列表
+# 15 条出 3 条、`ln_em` 20 条出 2 条），跑到底十几秒；再长一档就是 84 / 94 /
+# 110 / 193 / 472，跑到底要几分钟，不值得为探测付这个代价。
+_FULL_LIST_MAX = 60
+
+# 无论如何都要停的硬上限。`_FULL_LIST_MAX` 依赖「列表条目数在进循环之前就
+# 写好了」这个前提（两族实现都满足），可这个前提一旦不成立就再没有东西能拦住
+# 探针——加一个不依赖任何前提的兜底。
+_HARD_STOP = 200
+
 
 def _median(xs: list[int]) -> int:
     if not xs:
@@ -111,6 +139,27 @@ class _Sink:
         self._fh = path.open("w", encoding="utf-8")
         self.limit = limit
         self.count = 0
+        # 挂上采集器，好在早停之前先看一眼「列表到底有多长」——见 `_short_list()`。
+        # 允许为 None：build 失败时没有采集器可挂。
+        self.watch = None
+
+    def _short_list(self) -> bool:
+        """列表本身就很短时别早停：把源跑到底，「闭环」那一栏才算得出来。
+
+        列表条目数在 `collect()` 抓完列表、进循环**之前**就写好了（两族实现
+        都如此），所以这里的每一条 `_accept` 都读得到。属性名沿用读「列表」
+        栏的那三个——只认一个名字的话，另外一族会永远退回早停。
+
+        读不到就按「不短」处理、照旧早停：**宁可这一栏算不出来，也不要赌
+        一个可能很长的源**。
+        """
+        if self.watch is None:
+            return False
+        for attr in ("_total_listed", "_total_list", "_total_records"):
+            v = getattr(self.watch, attr, None)
+            if isinstance(v, int):
+                return v <= _FULL_LIST_MAX
+        return False
 
     def _accept(self, title, url, text) -> None:
         self.count += 1
@@ -120,7 +169,9 @@ class _Sink:
             {"title": (title or "")[:80], "url": url or "",
              "chars": len(text or "")}, ensure_ascii=False) + "\n")
         self._fh.flush()
-        if self.count >= self.limit:
+        if self.count >= _HARD_STOP:
+            raise _ProbeStop
+        if self.count >= self.limit and not self._short_list():
             raise _ProbeStop
 
     def __call__(self, record: dict) -> None:
@@ -132,6 +183,51 @@ class _Sink:
 
     def close(self) -> None:
         self._fh.close()
+
+
+def _closure_of(collector) -> dict | None:
+    """把「列表 → 四个去向」的账读出来；读不齐就返回 None。
+
+    两套命名，**语义对齐之后才能相加**：
+
+    | 族 | 列表 | 收录 | 审核 | 排除 |
+    |---|---|---|---|---|
+    | TRS 基类（12 个源） | `_total_listed` | `_collected` | `_review` | `_filtered_title` + `_filtered_classify` |
+    | 独立实现（6 个源） | `_total_list` / `_total_records` | `_collected` | `_review_count` | `_filtered_out` |
+
+    TRS 把「排除」拆成初筛与分类两段，独立实现合成一个 `_filtered_out`——
+    **加起来才是同一个口径**。少加一个，12 个源的差额会恰好等于初筛排除数，
+    看起来就像是「丢了这么多条」。
+
+    返回值里的 `sum` 是三个去向之和，`listed - sum` 就是差额。
+
+    读不齐（含 `collector` 为 None）时返回 None，这一栏显示 `—`。6 个源落在
+    这里——它们压根没记这几个数，**不是「闭环失败」**。
+    """
+    if collector is None:
+        return None
+
+    def pick(*names):
+        for n in names:
+            v = getattr(collector, n, None)
+            if isinstance(v, int):
+                return v
+        return None
+
+    listed = pick("_total_listed", "_total_list", "_total_records")
+    col = pick("_collected")
+    rev = pick("_review_count", "_review")
+    fo = pick("_filtered_out")
+    if fo is None:
+        ft = pick("_filtered_title")
+        fc = pick("_filtered_classify")
+        filt = None if (ft is None and fc is None) else (ft or 0) + (fc or 0)
+    else:
+        filt = fo
+    if listed is None or col is None or rev is None or filt is None:
+        return None
+    return {"listed": listed, "collected": col, "review": rev,
+            "filtered": filt, "sum": col + rev + filt}
 
 
 def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
@@ -147,11 +243,14 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
     note = ""
     sink = None
     collector = None
+    early = False
     try:
         sink = _Sink(work / f"{key}.jsonl", limit)
         data_dir = tmp_root / key
         data_dir.mkdir(parents=True, exist_ok=True)
         collector, _spec = registry.build(key, data_dir=data_dir)
+        # 早停之前先知道列表有多长——`_short_list()` 靠它决定「值不值得跑到底」。
+        sink.watch = collector
 
         store = getattr(collector, "raw_store", None)
         if store is not None and hasattr(store, "attach"):
@@ -171,6 +270,7 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
                 for item in ret:
                     sink.feed(item)
         except _ProbeStop:
+            early = True
             note = (note + "+早停").lstrip("+")
     except Exception as e:  # noqa: BLE001 —— 探测脚本不挑异常类型
         (work / f"{key}.err").write_text(f"{type(e).__name__}: {e}",
@@ -195,6 +295,20 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
             break
     if listed is not None:
         (work / f"{key}.listed").write_text(str(listed), encoding="utf-8")
+    # **闭环**——「列表条目数 == 收录 + 审核 + 排除」。上面「列表」栏只说得出
+    # 「列表里有多少篇」，说不出「没进库的那些去哪了」；这一栏补的就是那一段。
+    # 早停时不算（见 `_Sink._short_list()` 与模块 docstring 第 5 条），
+    # 但**照样写盘**——`early_stop` 这个标志要传回父进程，好让表格显示「早停」
+    # 而不是一个看起来像差额的数字。
+    closure = _closure_of(collector)
+    if closure is not None:
+        closure["early_stop"] = early
+        # 网络层失败次数。`_total_listed == 0` 时它是唯一能把「栏目本来就空」
+        # 和「压根没连上」分开的东西——见 `_status_of`。
+        nf = getattr(collector, "_fetch_failed", None)
+        closure["net_failed"] = nf if isinstance(nf, int) else None
+        (work / f"{key}.closure").write_text(
+            json.dumps(closure), encoding="utf-8")
     (work / f"{key}.elapsed").write_text(f"{time.monotonic() - started:.1f}",
                                          encoding="utf-8")
     if note:
@@ -225,6 +339,14 @@ def _read_result(key: str, work: Path) -> dict:
     out["note"] = nt.read_text() if nt.exists() else ""
     lst = work / f"{key}.listed"
     out["listed"] = int(lst.read_text()) if lst.exists() else None
+    cl = work / f"{key}.closure"
+    if cl.exists():
+        try:
+            out["closure"] = json.loads(cl.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            out["closure"] = None   # 被 kill 时可能写了一半
+    else:
+        out["closure"] = None
     return out
 
 
@@ -285,11 +407,64 @@ def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> lis
 
 
 def _status_of(res: dict) -> str:
+    """四种取值变成五种：`空` 拆成「真的空」与「没连上」。
+
+    2026-10-01 实测：`jl_em`（DNS 解析失败）、`jx_em`（SSL 老式重协商被禁）、
+    `hub_em`（HTTP 412 反爬）三个源，三种毫不相干的故障，在旧表上逐格相同。
+    它们和「站点通了、栏目确实没内容」在 `_total_listed` 上都是 0——不拆开，
+    这一栏就答不了「这个源还活着吗」。
+    """
     if res.get("timed_out"):
         return "超时"
     if res.get("error"):
         return "出错"
-    return "有数据" if res["count"] else "空"
+    if res["count"]:
+        return "有数据"
+    return "没连上" if (res.get("closure") or {}).get("net_failed") else "空"
+
+
+def _closure_cell(res: dict) -> str:
+    """「闭环」一格的字面量。
+
+    三种取值，含义完全不同，**不能混着看**：
+
+    - `—`       读不齐计数器（6 个源根本没记这几个数），或子进程被 kill 了
+                ——不适用
+    - `早停`     列表超过 `_FULL_LIST_MAX`，探针按设计早停了——不适用
+    - `空表`     列表解析出 0 条，`0 == 0 + 0 + 0`——**恒真，同样不适用**
+    - `✓` / `差 N` **跑到底之后的真实对账结果**。只有这两个是结论。
+
+    最后那条是这一栏存在的理由：`差 N` 意味着列表里的条目进了循环、却没有
+    落到任何一个去向（三个计数器在循环里逐条累加，正常情况必然相等）。
+
+    `空表` 是补上的一个洞：这一栏刚加出来时，任何完全抓不到的源都会得到
+    `✓`——列表 0、收录 0、审核 0、排除 0。一个恒真的判据和恒假的判据一样
+    没用，所以这里不给它打勾。
+    """
+    c = res.get("closure")
+    if not c or "sum" not in c:
+        return "—"
+    if c.get("early_stop"):
+        return "早停"
+    if c["listed"] == 0:
+        return "空表"
+    d = c["listed"] - c["sum"]
+    return "✓" if d == 0 else f"差 {d}"
+
+
+def _count_cell(res: dict) -> str:
+    """「条数」一格的字面量。
+
+    这个数在两类源上**含义不同**，不打标记就没法横向比：
+
+    - 列表 ≤ `_FULL_LIST_MAX` 的源不早停 → 这是**跑到底之后的真实候选数**
+    - 更长的源早停 → 这是 `--limit`，**不是抓到了这么多**
+
+    带 `*` 的是后者。拿 `cq_em` 的 13 和 `sh_em` 的 3 直接比是错的：
+    `sh_em` 列表 94 条，只是按设计停在了 3。
+    """
+    n = str(res["count"])
+    return n + "*" if "早停" in (res.get("note") or "") else n
 
 
 def _fmt_line(res: dict) -> str:
@@ -300,11 +475,62 @@ def _fmt_line(res: dict) -> str:
     listed = res.get("listed")
     extra = f"正文中位 {med} 字" if res["count"] else (res.get("error") or "")[:60]
     tail = "" if listed is None else f"列表 {listed}"
-    return f"{res['key']:20s} {st:4s} {res['count']:2d} 条 {el:>7s}  {tail:>10s}  {extra}"
+    clo = _closure_cell(res)
+    clo = "" if clo == "—" else f"闭环 {clo}"
+    return (f"{res['key']:20s} {st:4s} {_count_cell(res):>3s} 条 {el:>7s}  "
+            f"{tail:>10s}  {clo:>8s}  {extra}")
 
 
 # 典型的一页容量。TRS 站的列表页多是 15 / 19 / 20 条一页。
 _PAGE_SIZED = 25
+
+
+def _print_closure_hint(results: list) -> None:
+    """「闭环」这一栏的读法；跑到底却对不上账的源单独列出来。
+
+    **只有 `✓` 和 `差 N` 是结论。** `早停` 与 `—` 都是「这次没算出结论」，
+    不是「有问题」——三者混着数，就会得出「十几个源闭环失败」这种自己吓
+    自己的结论。这正是环形判据的老毛病换了个地方：判据的取值域里混进了
+    「不适用」，而它和「失败」看起来一样。
+    """
+    judged = [r for r in results
+              if (r.get("closure") or {}).get("sum") is not None
+              and r["closure"].get("early_stop") is False
+              and r["closure"]["listed"] > 0]
+    bad = [r for r in judged if r["closure"]["listed"] != r["closure"]["sum"]]
+    held = [r for r in results
+            if (r.get("closure") or {}).get("early_stop") is True]
+    empty = [r for r in results
+             if (r.get("closure") or {}).get("sum") is not None
+             and r["closure"]["listed"] == 0
+             and r["closure"].get("early_stop") is False]
+    blank = [r for r in results
+             if not (r.get("closure") or {}).get("sum") is not None]
+
+    if bad:
+        print(f"\n⚠ {len(bad)} 个源跑到底后账对不上（列表 ≠ 收录+审核+排除）：")
+        for r in bad:
+            c = r["closure"]
+            print(f"  `{r['key']}`  列表 {c['listed']} ≠ 收录 {c['collected']} "
+                  f"+ 审核 {c['review']} + 排除 {c['filtered']} = {c['sum']}"
+                  f"  （差 {c['listed'] - c['sum']}）")
+        print("  三个计数器在循环里是逐条累加的，正常情况必然相等——出现差额"
+              "意味着有列表条目进了循环、却没落到任何一个去向。")
+
+    print(f"\n> 闭环：判定 {len(judged)} 个"
+          f"（`✓` {len(judged) - len(bad)}、`差 N` {len(bad)}）、"
+          f"早停未判定 {len(held)} 个、空表未判定 {len(empty)} 个、"
+          f"无此判据 {len(blank)} 个。")
+    if held:
+        print(f"> 早停的是列表超过 {_FULL_LIST_MAX} 条的源"
+              f"——**不适用，不是有问题**。")
+    if empty:
+        keys = "、".join(f"`{r['key']}`" for r in empty)
+        print(f"> 空表的是列表解析出 0 条的源（{keys}）——`0 == 0 + 0 + 0` 恒真，"
+              f"这一栏对它们没有信息量。**它们的问题不在「账对不对」，在"
+              f"「为什么一条都没有」**，看「结果」栏的 `空` / `没连上`。")
+    if blank:
+        print("> 无此判据的源没记这几个计数器，同样不是「闭环失败」。")
 
 
 def _print_paging_hint(results: list) -> None:
@@ -372,8 +598,8 @@ def main() -> int:
         order = {s.key: i for i, s in enumerate(specs)}
         results.sort(key=lambda r: order.get(r["key"], 999))
 
-        print("\n| 源 | 分组 | 结果 | 条数 | 列表 | 正文中位 | 耗时 | 通路 |")
-        print("|---|---|---|---|---|---|---|---|")
+        print("\n| 源 | 分组 | 结果 | 条数 | 列表 | 闭环 | 正文中位 | 耗时 | 通路 |")
+        print("|---|---|---|---|---|---|---|---|---|")
         by_key = {s.key: s for s in specs}
         for r in results:
             spec = by_key.get(r["key"])
@@ -381,9 +607,13 @@ def main() -> int:
             el = f"{r['elapsed']:.1f}s" if r["elapsed"] is not None else "—"
             listed = r.get("listed")
             print(f"| `{r['key']}` | {spec.group if spec else '?'} | {_status_of(r)} "
-                  f"| {r['count']} | {'—' if listed is None else listed} "
+                  f"| {_count_cell(r)} | {'—' if listed is None else listed} "
+                  f"| {_closure_cell(r)} "
                   f"| {_median(chars)} | {el} | {r.get('note','')} |")
+        print("\n> `条数` 带 `*` = 被早停截断，等于 `--limit`，**不是抓到了这么多**；"
+              "不带 = 列表本就短，跑到底的真实候选数。两者不要横向比。")
 
+        _print_closure_hint(results)
         _print_paging_hint(results)
 
         if args.samples:

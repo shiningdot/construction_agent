@@ -16,16 +16,23 @@
 所以脚本不写 `2623` 这种数字，数据变了照样跑。唯一写死的期望是「点两次同一个
 chip 回到原点」这类结构性断言。
 
-## 验的八件事
+## 验的十一件事
 
 1. 初始加载：分页器有总数，且是多页
-2. 勾一个省份 chip：总数 == 该 chip 自己标的条数
-3. 列表真的只剩该省（抽前几行的省份列）
-4. 再点一次取消：总数回到初始
-5. 翻到第 2 页：页码变了、首行换了
-6. **粘贴链接能复原**：把当前 hash 拼成 URL 新开一页，状态一致
-7. 关键词搜索：总数变小，且结果标题确实含该词
-8. 重置：回到初始
+2. **概览页筛选维度齐全**：`/api/filters` 给几维可筛，页面就渲染几维
+3. **致因页筛选维度齐全**：同一判据，同一份 `/api/filters`
+4. 勾一个省份 chip：总数 == 该 chip 自己标的条数
+5. 列表真的只剩该省（抽前几行的省份列）
+6. 再点一次取消：总数回到初始
+7. 翻到第 2 页：页码变了、首行换了
+8. **粘贴链接能复原**：把当前 hash 拼成 URL 新开一页，状态一致
+9. **过期链接自愈**：URL 里带着库里已不存在的省份时，该值被清掉
+10. 关键词搜索：总数变小，且结果标题确实含该词
+11. 重置：回到初始
+
+第 2、3 条是后来补的。原先 chips 只能按「第几个」定位，`/api/filters` 返回五维、
+概览页只画三维这种缺口测不出来——那两维的值在接口里躺着、用户筛不到，页面上
+没有任何症状。给 chips 容器加了 `data-key` 之后，两边可以直接对集合。
 
 用法：
     .venv/bin/python3 scripts/check_web_interaction.py
@@ -114,6 +121,54 @@ def main() -> int:
                 assert pages >= 3, f"分页按钮只有 {pages} 个，可能只有一页"
                 return f"共 {t0} 条"
             step("初始加载", s1)
+
+            def chips_keys(pg):
+                """页面上实际画出来的筛选维度（chips 容器的 `data-key`）。"""
+                return sorted(pg.eval_on_selector_all(
+                    "#filterChips .chips[data-key]",
+                    "els => els.map(e => e.getAttribute('data-key'))"))
+
+            def want_keys(pg):
+                """后端给了哪几维可筛。
+
+                两个页面都从 `/api/filters` 取可选值（概览页直接渲染它；
+                致因页 `causes.js` 也把它读进 `optsCache`），所以判据共用一套，
+                免得两处各写一遍、改一处漏一处。`/api/causes/distribution` 的
+                `filter` 回显看着也能用，但那里的空数组意思是「当前没筛这一维」，
+                与「这一维有没有可选值」是两回事，判不出前端漏渲染。
+
+                判据里滤掉空列表的维度：那一维确实没值，前端不画是对的。
+                `sort` 单独排除——它是个下拉（`#f_sort`），不是 chip 组。
+                """
+                opts = pg.request.get(base + "/api/filters").json()
+                return sorted(k for k, v in opts.items()
+                              if isinstance(v, list) and v and k != "sort")
+
+            def dimension_case(name: str, pg):
+                """后端给了几维筛选，页面就画几维。
+
+                这条是在补一个**盲区**：原先 chips 只能按「第几个」定位，于是
+                「`/api/filters` 返回五维、页面只渲染三维」这种缺口一直测不出来
+                ——后两维的值在接口里躺着，用户却筛不到，页面上也没有任何症状。
+                现在 chips 容器带 `data-key`，两边可以直接对集合。
+                """
+                want, got = want_keys(pg), chips_keys(pg)
+                assert got == want, (
+                    f"{name}：后端给了 {want} 这几维可筛，页面只画了 {got}"
+                    f"——少的那几维在 /api/filters 里是有值的，用户却筛不到")
+                return f"{name} {len(got)} 维：{' / '.join(got)}"
+
+            step("筛选维度齐全", lambda: dimension_case("概览页", page))
+
+            def s1c():
+                pc = ctx.new_page()
+                try:
+                    pc.goto(base + "/causes", wait_until="networkidle", timeout=30000)
+                    pc.wait_for_timeout(1200)
+                    return dimension_case("致因页", pc)
+                finally:
+                    pc.close()
+            step("致因页维度齐全", s1c)
 
             # ── 勾第一个筛选 chip ──────────────────────────────
             chip = page.locator("#filterChips label.chip").first
@@ -235,7 +290,8 @@ def main() -> int:
         for name, _, err in bad:
             print(f"  ✗ {name}：{err}")
         return 1
-    print("✓ 交互九条全过：筛选 / 取消 / 翻页 / 分享链接 / 过期链接自愈 / 搜索 / 重置。")
+    print("✓ 交互十一条全过：两页维度齐全 / 筛选 / 取消 / 翻页 / 分享链接 / "
+          "过期链接自愈 / 搜索 / 重置。")
     return 0
 
 

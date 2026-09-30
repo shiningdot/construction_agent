@@ -21,7 +21,7 @@
     accident_location_detail: '详细地点', accident_type: '事故类型',
     severity: '事故等级', deaths: '死亡人数', injuries: '受伤人数',
     summary: '摘要', direct_cause: '直接原因',
-    project_name: '工程名称', work_task: '施工工序', accident_time: '事发时刻',
+    project_name: '工程名称', work_task: '作业任务', accident_time: '事发时刻',
     worker_type: '作业人员类型', publish_date: '发布日期', district: '区县',
     search_enriched_text: '检索增强文本',
     material_involved: '涉及材料', contractor: '施工单位',

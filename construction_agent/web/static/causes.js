@@ -30,7 +30,10 @@
     severity: '事故等级',
     accident_type: '事故类型',
     project_type: '工程类型',
-    construction_phase: '施工工序',
+    // 这一维是**施工阶段**（地基与基础/主体结构/装饰装修/拆除…），不是工序。
+    // 原先标成「施工工序」，与详情页里真正的 `work_task`（WT01–WT99，作业任务）
+    // 撞了名——两个不同维度，同一个中文标签，筛选区一显示就误导。
+    construction_phase: '施工阶段',
   };
 
   const state = {
@@ -144,7 +147,8 @@
       if (!values.length) return;
 
       const picked = state[key];
-      const groups = el('div', { cls: 'chips' }, [
+      // `data-key` 供核查脚本按维度定位（见 overview.js 同名属性）
+      const groups = el('div', { cls: 'chips', attrs: { 'data-key': key } }, [
         el('span', { cls: 'chips-label', text: FIELD_LABELS[key] }),
       ]);
       if (picked.length) {

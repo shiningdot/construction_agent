@@ -17,13 +17,21 @@
   // 状态
   // ══════════════════════════════════════════════════════════
 
-  const MULTI_KEYS = ['province', 'severity', 'accident_type'];
+  // 多选筛选维度。**必须与 /api/filters 返回的键一一对应**：这里少一维，
+  // 后端多给的那组值就白算了——蓝图 04 §256 的筛选条画了五格
+  // （关键词 / 地区 / 等级 / 类型 / 工程类型），原先只渲染前三维，
+  // 工程类型与施工阶段两维在后端与致因页都有、唯独列表页漏了。
+  const MULTI_KEYS = [
+    'province', 'severity', 'accident_type', 'project_type', 'construction_phase',
+  ];
 
   const state = {
     q: '',
     province: [],
     severity: [],
     accident_type: [],
+    project_type: [],
+    construction_phase: [],
     year_from: '',
     year_to: '',
     has_causes: false,
@@ -317,17 +325,23 @@
     province: '地区',
     severity: '等级',
     accident_type: '类型',
+    project_type: '工程类型',
+    construction_phase: '施工阶段',
   };
 
   function renderFilters(opts) {
     const host = $('filterChips');
     clear(host);
 
-    ['province', 'severity', 'accident_type'].forEach((key) => {
+    // 直接走 MULTI_KEYS：原先把这行写成上文的字面副本，两处一旦不同步，
+    // chips 区与 URL/hash、重置逻辑认的维度就不一样了（改这里就等于改全部）。
+    MULTI_KEYS.forEach((key) => {
       const values = opts[key] || [];
       if (!values.length) return;
 
-      const chips = el('div', { cls: 'chips' }, [
+      // `data-key` 是给核查脚本的锚点：没有它，chips 只能按「第几个」定位，
+      // 「后端给了五个维度、前端只画了三个」这种缺口就永远测不出来。
+      const chips = el('div', { cls: 'chips', attrs: { 'data-key': key } }, [
         el('span', { cls: 'chips-label', text: FIELD_LABELS[key] }),
       ]);
 

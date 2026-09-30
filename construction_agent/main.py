@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,46 @@ AGENT_LOGO = r"""
  \___\__,_|_| |_|\___|\__,_|_| |_|\___|\__,_|_| |_|\___|_|
 [/bold cyan]
 [bold yellow]   建筑施工事故信息自动化处理系统 v{}[/bold yellow]""".format(__version__)
+
+
+# 旧理论链路的命令。主库 2,623 条数据**全部**由 S1–S4 CAICS 链路产出
+# （实测 `pipeline_version` 恒为 `caics_v1.0`，编码前缀只有 C/F/H/M/T），
+# 下面这几条走的却是 V1 四维度 + HFACS-CS 6 层：字段对不上、编码体系换了一套，
+# 产出**无法并入主库**。留着出口只会让人以为它们等价——查 help 看到两个
+# "处理单条"的命令，没有理由知道该选哪个。
+#
+# 所以默认直接拦下，要跑得显式开 `CAIEMS_ALLOW_LEGACY=1`。不删除是沿用项目
+# 「先归档再移出生产路径、不做不可逆销毁」的约定（旧资产封存见任务 #34）。
+_LEGACY_COMMANDS: dict[str, str] = {
+    "process": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "batch": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "interactive": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "hfacs-encode": "HFACS-CS v2.5 编码器",
+    "dataset": "DatasetManager（JSON 快照 data/accidents.json，非主库 caiems_v2.db）",
+}
+
+
+def block_legacy(command: str) -> None:
+    """拦下走旧理论链路的命令，除非显式放行。
+
+    放行看环境变量而不是 `--legacy` 开关：这是个"确认知道自己要什么"的信号，
+    一次性配在环境里比每次敲一串参数更不容易顺手带上。
+    """
+    what = _LEGACY_COMMANDS.get(command)
+    if what is None or os.environ.get("CAIEMS_ALLOW_LEGACY") == "1":
+        return
+
+    console.print(Panel(
+        f"`{command}` 走的是[bold]旧理论链路[/]：[yellow]{what}[/]\n\n"
+        f"而主库里的 2,623 条数据全部由 [green]S1–S4 CAICS 链路[/]产出，"
+        f"两条链路的字段与编码体系都不同构，旧链路的产出[bold]无法并入主库[/]。\n\n"
+        f"[bold]生产链路请用：[/]\n"
+        f"  [green]python -m construction_agent.main extract \"<事故文本>\"[/]\n"
+        f"    → S1 三分类闸门 → S2 施工相关性 → S3 基础字段 → S4 CAICS 编码\n\n"
+        f"确实需要跑旧链路（如复核封存前的历史结果），加环境变量放行：\n"
+        f"  [dim]CAIEMS_ALLOW_LEGACY=1 python -m construction_agent.main {command} …[/]",
+        title="[bold red]⛔ 该命令已废弃", border_style="red"))
+    sys.exit(2)
 
 
 def setup_logging(level: str = None):
@@ -291,11 +332,20 @@ def _show_causes_table(causes):
 
 
 def cmd_web(args: argparse.Namespace):
-    """启动 Web UI。"""
-    from construction_agent.web.app import app
+    """启动 Web UI。
+
+    入口是 `web.factory.create_app()`（新展示层，读主库 `caiems_v2.db`），
+    不是旧 `web.app` 的模块级单例。旧应用读的是 JSON 快照、重算 HFACS-CS，
+    实测 23 个端点返回空、2 个 500 崩溃；两张应用的路由没有交集可依赖，
+    换的是整个应用。
+    """
+    from construction_agent.web.factory import create_app
+
+    app = create_app()
 
     console.print("[bold green]🌐 启动 Web UI...[/]")
     console.print(f"[dim]地址: http://{settings.FLASK_HOST}:{settings.FLASK_PORT}[/]")
+    console.print("[dim]数据源: 主库 caiems_v2.db（CAICS 链路）[/]")
 
     app.run(
         host=settings.FLASK_HOST,
@@ -557,16 +607,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Construction Agent - 建筑施工事故信息自动化处理系统",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-使用示例:
+生产链路（与主库 caiems_v2.db 同构）:
   python -m construction_agent.main extract "某工地发生坍塌事故，造成3人死亡"
   python -m construction_agent.main extract "…" --publish-date 2024-03-16 --json out.json
-  python -m construction_agent.main process "某工地发生坍塌事故，造成3人死亡"
-  python -m construction_agent.main batch accidents.txt --json output.json --csv output.csv
-  python -m construction_agent.main interactive
   python -m construction_agent.main web
-  python -m construction_agent.main dataset stats
-  python -m construction_agent.main dataset search "坍塌"
-  python -m construction_agent.main dataset export --format csv data.csv
+
+已废弃的旧链路命令（V1 四维度 + HFACS-CS，产出无法并入主库）:
+  process · batch · interactive · hfacs-encode · dataset
+  默认被拦下；确需运行请加环境变量 CAIEMS_ALLOW_LEGACY=1
         """,
     )
     parser.add_argument("--version", action="version", version=f"v{__version__}")
@@ -575,13 +623,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # process: 处理单条
-    p_process = subparsers.add_parser("process", help="处理单条事故信息")
+    p_process = subparsers.add_parser(
+        "process", help="[已废弃] 旧链路处理单条（V1 四维度 + HFACS）")
     p_process.add_argument("text", help="事故描述文本")
     p_process.add_argument("--json", help="输出 JSON 文件路径")
     p_process.add_argument("--csv", help="输出 CSV 文件路径")
 
     # batch: 批量处理
-    p_batch = subparsers.add_parser("batch", help="批量处理事故信息（文件逐行读取）")
+    p_batch = subparsers.add_parser(
+        "batch", help="[已废弃] 旧链路批量处理（文件逐行读取）")
     p_batch.add_argument("file", help="事故信息文件路径（每行一条）")
     p_batch.add_argument("--json", help="输出 JSON 文件路径")
     p_batch.add_argument("--csv", help="输出 CSV 文件路径")
@@ -599,13 +649,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_extract.add_argument("--json", help="输出 JSON 文件路径")
 
     # interactive: 交互模式
-    subparsers.add_parser("interactive", help="交互式命令行模式")
+    subparsers.add_parser("interactive", help="[已废弃] 旧链路交互式命令行模式")
 
     # web: Web UI
     subparsers.add_parser("web", help="启动 Web UI")
 
     # dataset: 数据集管理
-    p_dataset = subparsers.add_parser("dataset", help="数据集管理")
+    p_dataset = subparsers.add_parser(
+        "dataset", help="[已废弃] JSON 快照数据集管理（非主库）")
     dataset_sub = p_dataset.add_subparsers(dest="action", help="数据集操作")
 
     p_stats = dataset_sub.add_parser("stats", help="数据集统计")
@@ -619,7 +670,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_clear.add_argument("--force", "-f", action="store_true", help="强制清空，不确认")
 
     # hfacs-encode: V2.5 HFACS 编码
-    p_hfacs = subparsers.add_parser("hfacs-encode", help="对数据集进行 HFACS-CS 编码")
+    p_hfacs = subparsers.add_parser(
+        "hfacs-encode", help="[已废弃] 对数据集进行 HFACS-CS 编码")
     p_hfacs.add_argument("--method", choices=["llm", "keyword"], default="llm",
                          help="编码方法：llm（API）或 keyword（零成本）")
     p_hfacs.add_argument("--input", default="data/accidents_merged.json", help="输入数据集")
@@ -640,6 +692,7 @@ def main(argv: list[str] | None = None):
     """入口函数。"""
     args = parse_args(argv)
     setup_logging(args.log_level)
+    block_legacy(args.command)
 
     commands = {
         "process": cmd_process,

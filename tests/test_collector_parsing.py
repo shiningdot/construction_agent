@@ -249,10 +249,12 @@ def test_详情页里的PDF附件也要还原成绝对URL(cq_collector, monkeypa
         "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/"
         "202409/t20240905_9648052.html"
     )
-    assert detail["pdf_url"] == (
+    # 2026-10-01 起这里是**列表**（`pdf_urls`）：一条详情页挂多个附件是真
+    # 实形态，只留第一个会丢掉整份报告，见 `test_trs_cms_collector.py` D 组。
+    assert detail["pdf_urls"] == [
         "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/202409/"
         "P020240905567173081196.pdf"
-    )
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════════

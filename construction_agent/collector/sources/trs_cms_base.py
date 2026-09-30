@@ -73,6 +73,7 @@ class TrsSiteConfig:
     detail_title_selector: str = "title"  # 详情标题提取: "title"(<title>标签) / "h1" / CSS选择器
     detail_text_selector: str = "body"    # 详情正文容器: "body" / "article" / CSS选择器
     detail_pdf_selector: str = "a[href$='.pdf']"  # PDF 附件链接选择器
+    detail_pdf_max: int = 5               # 一条详情页最多下载几个 PDF 附件
 
     # ── 筛选配置 ──
     construction_keywords: list[str] = field(default_factory=lambda: DEFAULT_CONSTRUCTION_KW)
@@ -291,15 +292,33 @@ class TrsCmsCollector(BaseCollector):
             detail_title = (detail or {}).get("title") or title
             detail_date = (detail or {}).get("date") or list_date
             detail_text = (detail or {}).get("text") or ""
-            pdf_url = (detail or {}).get("pdf_url") or ""
+            pdf_urls = (detail or {}).get("pdf_urls") or []
 
-            # 下载 PDF 并提取全文
-            pdf_text = ""
-            local_pdf_path = ""
-            if pdf_url:
-                pdf_text, local_pdf_path = self._download_and_extract_pdf(
-                    pdf_url, detail_title, detail_date
+            # 下载全部 PDF 并提取全文，**合并**成一份正文。
+            #
+            # 逐份下载而不是只取第一份：`sh_em` 有页面同时挂两个不同事故的
+            # 评估报告（见 `_crawl_detail` 里的注释）。凡是提出正文的都要并进
+            # 来——`combined_text` 是「PDF 正文 **或** 页面正文」，一个页面挂了
+            # 两份报告时只留第一份，等于丢掉一份事故记录。
+            #
+            # 上限 `detail_pdf_max` 是防病态页面：附件列表页（一次挂十几份
+            # 报告的汇总页）会让下载耗时线性膨胀，而那种页面本身不是事故条目。
+            # 超限记 debug 而不是静默截断——漏了要让日志说得出来。
+            pdf_parts: list[str] = []
+            for pu in pdf_urls[: self.cfg.detail_pdf_max]:
+                # 落盘只是为了提取正文，**路径不往外传**。`_run_source` 传来的
+                # `data_dir` 是临时目录，任务结束就被 `shutil.rmtree` 删掉
+                # （刻意的设计：采集产出不散在文件系统）。传出去的路径任务一
+                # 完就指向不存在的文件——空着是缺信息，填错值是在撒谎。
+                one_text, _ = self._download_and_extract_pdf(
+                    pu, detail_title, detail_date
                 )
+                if one_text:
+                    pdf_parts.append(one_text)
+            if len(pdf_urls) > self.cfg.detail_pdf_max:
+                logger.debug(f"[{self.cfg.source_name}] 附件 {len(pdf_urls)} 个，"
+                             f"只取了前 {self.cfg.detail_pdf_max} 个: {url}")
+            pdf_text = "\n\n".join(pdf_parts)
 
             # 合并正文
             combined_text = pdf_text or detail_text
@@ -372,8 +391,12 @@ class TrsCmsCollector(BaseCollector):
                     # 是**全 PDF 型**站点（各 5/5 条样本都挂 PDF），页面 HTML
                     # 正文只有 631 / 717 字，而 PDF 里有 8,635 / 7,523 字——
                     # 正文的主体在附件里，附着的是正文本身而不是什么补充材料。
-                    "pdf_urls": [pdf_url] if pdf_url else [],
-                    "needs_ocr": bool(pdf_url) and not pdf_text,
+                    "pdf_urls": pdf_urls,
+                    # 判据是「有 PDF **且** 一份都没提出正文」——不是
+                    # 「combined_text 为空」。`sh_em` 实测 HTML 正文 631 字、
+                    # PDF 里 8,635 字，HTML 那份非空不影响「附件里的主体还没
+                    # 拿到」这个事实。
+                    "needs_ocr": bool(pdf_urls) and not pdf_text,
                 },
             )
             # 附加信息通过 metadata 传递
@@ -573,13 +596,29 @@ class TrsCmsCollector(BaseCollector):
         # `https://yjt.shanxi.gov.cn/P020240905567173081196.pdf`，**整条路径都丢了**，
         # 下载必然 404。而 PDF 恰恰是省级源的主要载体：`sx_em` 的详情页正文
         # 一个字都不在 HTML 里，全在这个附件中。
-        pdf_url = ""
+        #
+        # **取全部而不是第一个**（2026-10-01 第十五轮查出）。原先这里是
+        # `pdf_url = ...; break`，只留第一个——而一条详情页挂多个附件是真实
+        # 存在的形态，且往往是**最要紧的那种**：
+        #
+        #   sh_em  /xxgk/…/202507/36eba1e4….html
+        #         ├ 上海崇明兴海联公司「2·26」起重伤害一般事故…评估报告.pdf
+        #         └ 上海崇明江南造船（集团）「12·17」一般车辆伤害事故…评估报告.pdf
+        #
+        # **一份页面装着两个不同事故的报告**，正是三分类里 `multi` 的典型场景。
+        # 旧写法下第二份从不被下载、也不被登记——与第十四轮修的缺陷 B 是两回事
+        # （B 是「下载了却不登记」，这里是「根本没进入视野」）。
+        #
+        # 去重是必需的：`sc_em` 实测存在**同一个 PDF 挂两个链接**的页面
+        # （正文里链接一次、附件区再列一次），不去重会重复下载同一份。
+        pdf_urls: list[str] = []
         if self.cfg.detail_pdf_selector:
             for a_tag in soup.select(self.cfg.detail_pdf_selector):
                 href = a_tag.get("href", "")
                 if href.endswith(".pdf"):
-                    pdf_url = _absolute(url, href)
-                    break
+                    full = _absolute(url, href)
+                    if full not in pdf_urls:
+                        pdf_urls.append(full)
 
         # 正文
         text = ""
@@ -588,7 +627,8 @@ class TrsCmsCollector(BaseCollector):
             if body:
                 text = body.get_text()
 
-        return {"title": title, "date": date, "text": text, "pdf_url": pdf_url}
+        return {"title": title, "date": date, "text": text,
+                "pdf_urls": pdf_urls}
 
     def _download_and_extract_pdf(
         self, pdf_url: str, title: str, date: str

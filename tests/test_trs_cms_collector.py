@@ -56,6 +56,9 @@ _LINKS = [
 
 _PDF_HREF = "./P020260713387609310237.pdf"
 _PDF_URL = _LIST_DIR + "P020260713387609310237.pdf"
+# 第二条附件：`sh_em` 实测有页面同时挂两份**不同事故**的评估报告
+_PDF_HREF2 = "./P020260713387609310238.pdf"
+_PDF_URL2 = _LIST_DIR + "P020260713387609310238.pdf"
 
 
 def _detail_url(date: str, seq: str) -> str:
@@ -69,14 +72,19 @@ def _list_html() -> str:
     return f"<html><body><ul>{items}</ul></body></html>"
 
 
-def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 30) -> str:
-    pdf_tag = f'<a href="{_PDF_HREF}">附件：调查报告</a>' if with_pdf else ""
+def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 30,
+                 pdf_hrefs: list[str] | None = None) -> str:
+    hrefs = (pdf_hrefs if pdf_hrefs is not None
+             else ([_PDF_HREF] if with_pdf else []))
+    tags = "".join(f'<a href="{h}">附件：调查报告</a>' for h in hrefs)
     return (f"<html><head><title>{title}</title></head>"
-            f"<body><div class='con'>{body}</div>{pdf_tag}</body></html>")
+            f"<body><div class='con'>{body}</div>{tags}</body></html>")
 
 
 def _collector(tmp_path: Path, *, with_pdf: bool = True,
-               body: str = "页面正文。" * 30) -> TrsCmsCollector:
+               body: str = "页面正文。" * 30,
+               pdf_hrefs: list[str] | None = None,
+               pdf_max: int = 5) -> TrsCmsCollector:
     """五条条目的不联网采集器。
 
     五条是刻意的：`collect()` 在 `len(results) % 5 == 0` 时才批量写库，
@@ -92,11 +100,13 @@ def _collector(tmp_path: Path, *, with_pdf: bool = True,
         construction_keywords=["事故"],
         enable_classify_v2=False,          # 走 pending_review 分支，不跑规则分类
         min_text_length=30,
+        detail_pdf_max=pdf_max,
         delay=0,
     )
     c = TrsCmsCollector(cfg, data_dir=tmp_path / "src")
     c.raw_store = RawAccidentStore(filepath=tmp_path / "raw.json")
-    details = {_detail_url(d, s): _detail_html(t, with_pdf=with_pdf, body=body)
+    details = {_detail_url(d, s): _detail_html(t, with_pdf=with_pdf,
+                                               body=body, pdf_hrefs=pdf_hrefs)
                for t, d, s in _LINKS}
     c._fetch = lambda url: _list_html() if url == _LIST_URL else details.get(url, "")
     return c
@@ -395,3 +405,128 @@ def test_日期解析失败时通路B仍能转换(tmp_path):
     assert row["publish_date"] is None
     assert row["_assets"] == []
     assert row["fingerprint"]      # 没有日期也要算得出指纹
+
+
+# --------------------------------------------------------------------------
+# D 组：一条详情页挂多个附件（缺陷 F，2026-10-01 第十五轮查出）
+#
+# 旧写法 `pdf_url = ...; break` 只留第一个附件，而多附件是真实存在的形态，
+# 且往往是最要紧的那种：`sh_em` 的 /xxgk/…/202507/36eba1e4….html 一份页面上
+# 同时挂着**两个不同事故**的评估报告（崇明兴海联「2·26」+ 江南造船「12·17」）
+# ——正是三分类里 `multi` 的典型场景。第二份从不被下载、也不被登记。
+# --------------------------------------------------------------------------
+
+
+def test_两个附件都下载且正文合并(tmp_path):
+    """两份报告的正文都要进来，不能只留第一份。"""
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF, _PDF_HREF2])
+    calls: list[str] = []
+
+    def fake(url, title, date):
+        calls.append(url)
+        return f"来自 {url} 的正文", "/x/a.pdf"
+
+    c._download_and_extract_pdf = fake
+    try:
+        c.collect()
+        # 5 条 × 每条 2 个附件
+        assert len(calls) == 10, f"下载了 {len(calls)} 次，应为 10"
+        assert set(calls) == {_PDF_URL, _PDF_URL2}
+        for item in c.raw_store.get_all():
+            assert item["pdf_urls"] == [_PDF_URL, _PDF_URL2]
+            # **合并**，不是「取第一个非空的」
+            assert f"来自 {_PDF_URL} 的正文" in item["content"]
+            assert f"来自 {_PDF_URL2} 的正文" in item["content"]
+            assert item["needs_ocr"] is False
+    finally:
+        _close(c)
+
+
+def test_同一个PDF挂两个链接只下载一次(tmp_path):
+    """`sc_em` 实测存在这种页面：正文里链一次、附件区再列一次，href 完全相同。
+
+    不去重就会把同一份 PDF 下两遍——一条页面还好，全站采集就是成倍的白跑。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF, _PDF_HREF])
+    calls: list[str] = []
+
+    def fake(url, title, date):
+        calls.append(url)
+        return "正文", "/x/a.pdf"
+
+    c._download_and_extract_pdf = fake
+    try:
+        c.collect()
+        assert len(calls) == 5, f"5 条各下载 {len(calls) // 5} 次，应各 1 次"
+        assert c.raw_store.get_all()[0]["pdf_urls"] == [_PDF_URL]
+    finally:
+        _close(c)
+
+
+def test_超过上限只下载前N个但URL全部登记(tmp_path):
+    """上限防的是病态页面（一次挂十几份报告的汇总页）让下载耗时线性膨胀。
+
+    **登记与下载的数目故意不同**：`pdf_urls` 登记**全部**（阶段② 可能要用
+    到没下载的那几份），只对**下载**设上限。少登记等于替下游做决定。
+    """
+    hrefs = [f"./P02026071338760{i:06d}.pdf" for i in range(8)]
+    urls = [_LIST_DIR + h[2:] for h in hrefs]
+    c = _collector(tmp_path, pdf_hrefs=hrefs, pdf_max=3)
+    calls: list[str] = []
+
+    def fake(url, title, date):
+        calls.append(url)
+        return "正文", "/x/a.pdf"
+
+    c._download_and_extract_pdf = fake
+    try:
+        c.collect()
+        assert len(calls) == 15, f"5 条 × 3 个上限 = 15，实际 {len(calls)}"
+        item = c.raw_store.get_all()[0]
+        assert item["pdf_urls"] == urls, "URL 应当全部登记"
+    finally:
+        _close(c)
+
+
+def test_一份提不出来另一份能提出来(tmp_path):
+    """`needs_ocr` 判的是「所有附件都提不出正文」，不是「第一个提不出来」。"""
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF, _PDF_HREF2])
+    c._download_and_extract_pdf = lambda u, t, d: (
+        ("", "") if u == _PDF_URL else ("能读的那份正文", "/x/a.pdf"))
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["needs_ocr"] is False
+        assert "能读的那份正文" in item["content"]
+        # 两份 URL 都要留着，人工审核时得能点开看不出来的那份
+        assert item["pdf_urls"] == [_PDF_URL, _PDF_URL2]
+    finally:
+        _close(c)
+
+
+def test_所有附件都提不出来时标needs_ocr(tmp_path):
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF, _PDF_HREF2])
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["needs_ocr"] is True
+        assert item["pdf_urls"] == [_PDF_URL, _PDF_URL2]
+    finally:
+        _close(c)
+
+
+def test_多个附件的条目通路B登记多个asset(tmp_path):
+    """登记进 `raw_accident_assets` 的也必须是两个——那是阶段②的取件清单。"""
+    from construction_agent.collector.executor import _row_from_raw_item
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF, _PDF_HREF2])
+    c._download_and_extract_pdf = lambda u, t, d: ("正文", "/x/a.pdf")
+    try:
+        ret = c.collect()
+        row = _row_from_raw_item(ret[0], "tsrc", "task1")
+        assert row["_assets"] == [
+            {"asset_type": "pdf", "url": _PDF_URL},
+            {"asset_type": "pdf", "url": _PDF_URL2},
+        ]
+    finally:
+        _close(c)

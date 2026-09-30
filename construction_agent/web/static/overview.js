@@ -460,8 +460,15 @@
     }
 
     data.items.forEach((it) => {
+      // 标题是指向详情页的链接。用 <a href> 而不是点击事件：中键新开、
+      // 右键复制链接、浏览器前进后退都跟着能用，而详情页的「返回列表」
+      // 正靠 history.back() 回到带筛选状态的这一页
       const titleCell = el('td', { cls: 'title-cell' }, [
-        el('div', { cls: 'title-main', text: it.title || '（无标题）' }),
+        el('a', {
+          cls: 'title-main',
+          text: it.title || '（无标题）',
+          attrs: { href: '/accident/' + encodeURIComponent(it.id || '') },
+        }),
         el('div', { cls: 'title-meta', text: it.id || '' }),
       ]);
 

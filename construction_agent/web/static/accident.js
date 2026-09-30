@@ -31,12 +31,15 @@
     supervision_company: '监理单位', weather: '天气',
   };
 
+  // 不列 `source_count`：主库 2,623 条**全部等于 1**，是恒量不是信息，
+  // 摆出来只会让人以为「每条事故只有一个来源」——那是这张表的填充方式，
+  // 不是数据的性质（来源数要看 source_urls 表）。蓝图 05 待决项 H 的结论。
   const META_LABELS = {
     id: '记录 ID', source_name: '来源', source_url: '来源链接',
     crawl_date: '采集时间', report_type: '报告类型', text_type: '文本类型',
     classification_verdict: '分类判定路径',
     classification_confidence: '判定置信度',
-    source_count: '来源计数', search_performed: '是否检索增强',
+    search_performed: '是否检索增强',
     pipeline_version: '管道版本',
     step1_duration_ms: 'S1 耗时', step2_duration_ms: 'S2 耗时',
     created_at: '入库时间',
@@ -338,15 +341,46 @@
 
   /* ── ⑦ 原文 ────────────────────────────────────────────── */
 
+  // 文献轨的记录 raw_text 是整页 PDF 文本，主库最长 43,124 字。一次性
+  // 铺进 DOM 会让这一段的排版与滚动都变钝，而其中绝大多数时候没人看。
+  // 超过阈值先只渲染开头，想看全文再点——全文已经在响应里，不额外请求。
+  const RAW_PREVIEW = 5000;
+
   function renderRaw(d) {
     if (!d.raw_text || !String(d.raw_text).trim()) return null;
+    const full = String(d.raw_text);
+    const long = full.length > RAW_PREVIEW;
+
+    const pre = el('pre', {
+      cls: 'raw-text',
+      text: long ? full.slice(0, RAW_PREVIEW) : full,
+    });
+
+    const body = el('div', { cls: 'raw-body' }, [pre]);
+    if (long) {
+      const more = el('button', {
+        cls: 'btn raw-more',
+        text: `展开全文（还有 ${num(full.length - RAW_PREVIEW)} 字）`,
+        attrs: { type: 'button' },
+      });
+      more.addEventListener('click', () => {
+        pre.textContent = full;
+        more.remove();
+      });
+      body.appendChild(more);
+    }
+
     return el('section', { cls: 'panel' }, [
       el('details', {}, [
         el('summary', {}, [
           el('span', { cls: 'tier-label', text: '原文全文' }),
-          el('span', { cls: 'tier-n', text: d.raw_text.length + ' 字' }),
+          el('span', {
+            cls: 'tier-n',
+            text: num(full.length) + ' 字'
+                 + (long ? ` · 默认只显示前 ${num(RAW_PREVIEW)} 字` : ''),
+          }),
         ]),
-        el('pre', { cls: 'raw-text', text: d.raw_text }),
+        body,
       ]),
     ]);
   }
@@ -372,8 +406,11 @@
         el('span', { text: err.message || String(err) }),
       ]));
     }
-    box.appendChild(el('p', { cls: 'panel-note' }, [
-      el('a', { text: '← 返回列表', attrs: { href: '/' } }),
+    // 返回控件与正常路径共用同一套类名（`.detail-back` > `.back-link`）。
+    // 出错页和正常页的出口不该是两套结构——样式、验收脚本、将来的改动
+    // 都只认这一套，分两套就一定会有一套先坏掉。
+    box.appendChild(el('div', { cls: 'detail-back' }, [
+      el('a', { cls: 'back-link', text: '← 返回列表', attrs: { href: '/' } }),
     ]));
     root.appendChild(box);
   }

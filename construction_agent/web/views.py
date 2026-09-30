@@ -26,3 +26,9 @@ def overview_page():
 def accident_page(accident_id: str):
     """单事故详情。蓝图 05 §4.1。id 交给前端拉 API，页面本身只出壳。"""
     return render_template("accident.html", accident_id=accident_id)
+
+
+@views_bp.get("/causes")
+def causes_page():
+    """致因分析。蓝图 05 §4.2。四张图各自拉一个端点，筛选条件放 URL hash。"""
+    return render_template("causes.html")

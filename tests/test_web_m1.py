@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from construction_agent.web import accidents_query, db, detail, overview, province
+from construction_agent.web import (
+    accidents_query, causes, db, detail, overview, province,
+)
 from construction_agent.web.factory import create_app
 
 # ══════════════════════════════════════════════════════════════
@@ -771,6 +773,262 @@ class TestApi:
 
 
 # ══════════════════════════════════════════════════════════════
+# 致因分析页（蓝图 05 §4.2）
+# ══════════════════════════════════════════════════════════════
+
+
+class TestCauses:
+    """小库 10 条事故 / 6 条编码（覆盖 5 条事故、5 个类别）。
+
+    编码分布刻意造成：M1 与 H1 落在同一事故（唯一一对共现）、
+    三级证据各有、一个类别两次出现（M 层 2 条）。共现对数 1 远低于
+    `MIN_PAIR_COUNT`，正好验证门槛生效时 `pairs` 为空但矩阵仍有值。
+    """
+
+    def test_framework_按层给出类目(self, client):
+        d = client.get("/api/causes/framework").get_json()["data"]
+        assert [l["key"] for l in d["layers"]] == ["M", "F", "T", "H", "C"]
+        assert [l["count"] for l in d["layers"]] == [2, 1, 1, 2, 0]
+        assert d["total"] == 6
+        assert d["covered_accidents"] == 5
+
+    def test_framework_层计数等于类目计数之和(self, client):
+        d = client.get("/api/causes/framework").get_json()["data"]
+        for layer in d["layers"]:
+            assert layer["count"] == sum(c["count"] for c in layer["categories"])
+
+    def test_framework_类目含名称与计数(self, client):
+        """页面拿它当 19 类明细的骨架，缺 name 就只能显示编码。"""
+        d = client.get("/api/causes/framework").get_json()["data"]
+        codes = {c["code"] for l in d["layers"] for c in l["categories"]}
+        assert codes == {"M1", "M2", "F4", "T1", "H1", "H3"}
+        for layer in d["layers"]:
+            for c in layer["categories"]:
+                assert c["name"], c
+                assert c["count"] >= c["accidents"]
+
+    def test_scope_两个口径都报(self, client):
+        d = client.get("/api/causes/distribution").get_json()
+        assert d["scope"] == {
+            "accidents": 10, "causes": 6, "covered": 5, "pairs": 6,
+            "without_causes": 5, "filtered": False,
+        }
+
+    def test_层序固定不随计数变化(self, client):
+        """M/F/T/H/C 是体系的层序，不是排序结果。
+
+        小库里 C 层计数为 0，若按计数排序它会被排到最前或最后并被
+        「优化」掉——层序一旦随数据变化，读者就没法把它和论文里的
+        金字塔对上。
+        """
+        by_layer = client.get("/api/causes/distribution").get_json()["data"]["by_layer"]
+        assert [l["key"] for l in by_layer] == ["M", "F", "T", "H", "C"]
+        assert by_layer[-1]["count"] == 0, "计数为 0 的层也要出现"
+
+    def test_证据三级各有且无未归类(self, client):
+        d = client.get("/api/causes/distribution").get_json()["data"]
+        assert [e["count"] for e in d["evidence_quality"]] == [4, 1, 1]
+        assert d["evidence_unknown"] == 0
+
+    def test_类目计数与直接_SQL_对账(self, client, tiny_db):
+        d = client.get("/api/causes/distribution").get_json()["data"]
+        rows = db.query(
+            "SELECT code, COUNT(*) AS n, COUNT(DISTINCT accident_id) AS a "
+            "FROM caics_causes GROUP BY code"
+        )
+        got = {c["code"]: (c["count"], c["accidents"]) for c in d["by_category"]}
+        assert got == {r["code"]: (r["n"], r["a"]) for r in rows}
+
+    def test_类目占比合计为_1(self, client):
+        d = client.get("/api/causes/distribution").get_json()["data"]
+        assert d["total_causes"] == 6
+        assert abs(sum(c["share"] for c in d["by_category"]) - 1.0) < 1e-9
+
+    def test_筛选后收窄且各图同口径(self, client):
+        d = client.get("/api/causes/distribution?accident_type=坍塌").get_json()
+        assert d["scope"] == {
+            "accidents": 5, "causes": 4, "covered": 3, "pairs": 4,
+            "without_causes": 2, "filtered": True,
+        }
+        assert sum(c["count"] for c in d["data"]["by_category"]) == d["scope"]["causes"]
+
+    def test_共现低于门槛时列表为空但矩阵仍给全量(self, client):
+        """`min_count` 只截列表，不截矩阵。
+
+        矩阵被截断会让人以为角落的类别从不共现——那是没数据，不是
+        没有关系。
+        """
+        d = client.get("/api/causes/cooccurrence").get_json()["data"]
+        assert d["pair_total"] == 1
+        assert d["pairs"] == [], "唯一一对只出现 1 次，低于门槛"
+        assert d["filter"]["min_count"] == 10
+        assert len(d["matrix"]) == 6
+        assert len(d["matrix"][0]) == 6
+
+    def test_共现矩阵对称且对角为零(self, client):
+        d = client.get("/api/causes/cooccurrence").get_json()["data"]
+        n = len(d["matrix"])
+        assert all(d["matrix"][i][j] == d["matrix"][j][i]
+                   for i in range(n) for j in range(n))
+        assert all(d["matrix"][i][i] == 0 for i in range(n)), "对角是自己与自己"
+
+    def test_共现默认按_count_排序(self, client):
+        """实测 lift 榜首是只有 24 条事故支撑的 C1+H4，首屏拿不到主线。"""
+        assert client.get("/api/causes/cooccurrence").get_json()["data"]["sort"] == "count"
+        assert client.get(
+            "/api/causes/cooccurrence?order=lift"
+        ).get_json()["data"]["sort"] == "lift"
+
+    def test_共现非法排序参数退回默认(self, client):
+        d = client.get("/api/causes/cooccurrence?order=乱写").get_json()["data"]
+        assert d["sort"] == "count"
+
+    def test_共现_top_参数被夹在合法区间(self, client):
+        for raw, want in (("0", 1), ("9999", 100), ("abc", 20)):
+            d = client.get(f"/api/causes/cooccurrence?top={raw}").get_json()["data"]
+            assert len(d["pairs"]) <= want
+
+    def test_timeline_年份连续且补零(self, client):
+        """1990 与 1991 之间没有记录也要出现，否则折线会直接连过去。"""
+        d = client.get("/api/causes/timeline").get_json()["data"]
+        assert d["years"][0] == "1990" and d["years"][-1] == "2024"
+        assert len(d["years"]) == 35
+        assert all(int(d["years"][i + 1]) == int(d["years"][i]) + 1
+                   for i in range(len(d["years"]) - 1))
+        assert d["accidents"][1] == 0, "1991 年无记录，补零"
+
+    def test_timeline_报出无日期的条数(self, client):
+        """无日期的事故落不到任何年份。
+
+        不报出来，读者会拿它去和口径条上的事故总数相减然后找不到差额——
+        小库里就是 a8 那一条。
+        """
+        d = client.get("/api/causes/timeline").get_json()["data"]
+        assert d["without_date"] == 1
+        assert sum(d["accidents"]) + d["without_date"] == 10
+
+    def test_timeline_按层给覆盖事故数(self, client):
+        d = client.get("/api/causes/timeline").get_json()["data"]
+        assert [l["key"] for l in d["by_layer"]] == ["M", "F", "T", "H", "C"]
+        for layer in d["by_layer"]:
+            assert len(layer["counts"]) == len(d["years"])
+        # 每层每年的事故数不可能超过当年的全部事故数
+        assert all(layer["counts"][i] <= d["accidents"][i]
+                   for layer in d["by_layer"] for i in range(len(d["years"])))
+
+    def test_筛选_multi_值可重复传参(self, client):
+        d = client.get(
+            "/api/causes/distribution?accident_type=坍塌&accident_type=触电"
+        ).get_json()
+        # 坍塌 5 条 + 触电 1 条（a4，有一编码）
+        assert d["scope"]["accidents"] == 6
+        assert d["scope"]["causes"] == 5
+
+    def test_零结果不崩且各图给空数组(self, client):
+        """筛选到空集时四张图必须给出可渲染的空结构，而不是 None 或多一个键。"""
+        q = "?accident_type=根本不存在的类型"
+        dist = client.get("/api/causes/distribution" + q).get_json()
+        assert dist["scope"]["accidents"] == 0
+        assert [l["count"] for l in dist["data"]["by_layer"]] == [0] * 5
+        assert dist["data"]["by_category"] == []
+        assert dist["data"]["total_causes"] == 0, "分母为 0 时占比不能算出一堆 NaN"
+        assert all(e["count"] == 0 for e in dist["data"]["evidence_quality"])
+
+        tl = client.get("/api/causes/timeline" + q).get_json()["data"]
+        assert tl == {"years": [], "accidents": [], "by_layer": [], "without_date": 0}
+
+        co = client.get("/api/causes/cooccurrence" + q).get_json()["data"]
+        assert co["pairs"] == [] and co["codes"] == [] and co["matrix"] == []
+
+    def test_致因页与静态资源可访问(self, client):
+        for path in ("/causes", "/static/causes.js", "/static/dom.js"):
+            assert client.get(path).status_code == 200, path
+        html = client.get("/causes").data.decode("utf-8")
+        assert 'id="causes"' in html
+        assert "causes.js" in html
+
+    def test_两页导航互链(self, client):
+        html = client.get("/causes").data.decode("utf-8")
+        assert 'href="/"' in html
+        home = client.get("/").data.decode("utf-8")
+        assert 'href="/causes"' in home
+
+    def test_致因页不引外部资源(self, client):
+        """内网与外网断开时页面必须完整可用（蓝图 05 验收 13）。
+
+        只认真正会发起请求的写法。`causes.js` 里的
+        `http://www.w3.org/2000/svg` 是 SVG 命名空间标识符，不联网，
+        按整串 "http://" 搜会误报。
+        """
+        for path in ("/causes", "/"):
+            html = client.get(path).data.decode("utf-8")
+            assert 'src="http' not in html, path
+            assert 'href="http' not in html, path
+        css = client.get("/static/app.css").data.decode("utf-8")
+        assert "url(http" not in css and "@import" not in css
+
+    def test_页面文案不含禁用措辞(self, client):
+        """共现是关联不是因果（蓝图 05 待决项 B / CLAUDE.md 禁用措辞）。"""
+        js = client.get("/static/causes.js").data.decode("utf-8")
+        for word in ("导致", "因果", "引起", "证明", "专家级", "替代人工"):
+            assert word not in js, word
+
+
+# ══════════════════════════════════════════════════════════════
+# 静态资源里踩过的坑
+# ══════════════════════════════════════════════════════════════
+
+
+class TestStaticAssets:
+    """这些是浏览器布局行为，pytest 里跑不到渲染，只能按约定钉住。
+
+    两条都在本轮的端到端验证里真实发生过，不是预防性写法。
+    """
+
+    def test_列表容器在宽屏下不做滚动容器(self, client):
+        """sticky 表头的包含块，就是离它最近的滚动容器。
+
+        `.table-wrap` 一旦写上 overflow-x，它就成了滚动容器：表头既不跟随
+        视口滚动（sticky 白设），又被 `top:57px` 从容器顶再往下推 57px，
+        压住首行数据。实测表头落在 938–977、首行落在 920–983，标题的中心点
+        被表头吃掉 —— 列表里的标题因此点不进详情页。表格最小需要 738px，
+        宽屏本来就装得下；窄屏在 `@media (max-width: 790px)` 里才切回滚动
+        容器，并同时把表头改回 static（两者不能在同一个元素上并存）。
+        """
+        css = client.get("/static/app.css").data.decode("utf-8")
+        assert ".table-wrap {" in css, "样式表里找不到 .table-wrap 规则"
+
+        parts = css.split(".table-wrap {")
+        default_body = parts[1].split("}", 1)[0]
+        assert "overflow" not in default_body, (
+            "默认规则里出现 overflow 会把 .table-wrap 变成滚动容器，"
+            "表头将被下推 57px 并压住首行"
+        )
+
+        assert len(parts) >= 3, "窄屏断点里少了 .table-wrap 的横向滚动规则"
+        narrow_body = parts[2].split("}", 1)[0]
+        assert "overflow-x: auto" in narrow_body
+
+        # 用 rindex 而不是 split：这段断点名在上面的注释里也出现过一次，
+        # 从第一次出现处切会切到注释中间。
+        i = css.rindex("@media (max-width: 790px)")
+        assert "position: static" in css[i:], (
+            "窄屏切到滚动容器后必须把表头改回 static，否则又是同一个错位"
+        )
+
+    def test_列表标题是指向详情页的链接(self, client):
+        """蓝图 05 的三条用户路径之一：列表 → 详情 → 返回。
+
+        用 <a href> 而不是点击事件：中键新开、右键复制链接、浏览器前进
+        后退都跟着能用，而详情页的返回按钮正靠 history.back() 回到带筛选
+        状态的列表。
+        """
+        js = client.get("/static/overview.js").data.decode("utf-8")
+        assert "title-main" in js
+        assert "'/accident/'" in js, "标题没有拼成详情页链接"
+
+
+# ══════════════════════════════════════════════════════════════
 # 主库对账（库不在则跳过）
 # ══════════════════════════════════════════════════════════════
 
@@ -938,3 +1196,71 @@ class TestMainDbParity:
         )
         assert (total, filled) == (2623, 2202)
         assert total - filled == 421
+
+    # ── 致因分析页（蓝图 05 §4.2）──────────────────────────────
+
+    def test_causes_体系与直接_SQL_逐项对账(self, main_db):
+        d = causes.framework()
+        assert len(d["layers"]) == 5
+        assert d["total"] == 16323
+        assert d["covered_accidents"] == 2618
+        raw = {(r["code"], r["name"], r["count"]) for r in db.query(
+            "SELECT code, MAX(name) AS name, COUNT(*) AS count "
+            "FROM caics_causes GROUP BY code"
+        )}
+        got = {(c["code"], c["name"], c["count"])
+               for layer in d["layers"] for c in layer["categories"]}
+        assert got == raw
+
+    def test_causes_层计数与概览一致(self, main_db):
+        """同一批数字不在两处各算一遍——这正是旧代码 6 份副本的老毛病。"""
+        fw = {l["key"]: l["count"] for l in causes.framework()["layers"]}
+        ov = {l["key"]: l["count"] for l in overview.build()["caics_layer"]}
+        assert fw == ov == {"M": 7077, "H": 4723, "F": 2799, "T": 1533, "C": 191}
+
+    def test_causes_类目按层内计数降序(self, main_db):
+        """层内顺序是页面上 19 类明细的固定骨架。
+
+        若顺序由 `caics_catalog` 的原始顺序（按 code 排）决定，页面上会
+        出现「M3 的安全培训不足 1,200 排在 M4 的制度规程漏洞 1,390 之前」——
+        读者会以为条形图排序坏了。
+        """
+        for layer in causes.framework()["layers"]:
+            counts = [c["count"] for c in layer["categories"]]
+            assert counts == sorted(counts, reverse=True), layer["key"]
+
+    def test_causes_分布两个口径分列(self, main_db):
+        d = causes.distribution(accidents_query.ListParams())
+        assert d["total_causes"] == 16323
+        assert sum(c["count"] for c in d["by_category"]) == 16323, "行数口径"
+        assert sum(c["accidents"] for c in d["by_category"]) == 15985, "去重口径"
+        assert all(c["accidents"] <= c["count"] for c in d["by_category"])
+
+    def test_causes_证据三级与论文一致(self, main_db):
+        d = causes.distribution(accidents_query.ListParams())
+        assert [e["count"] for e in d["evidence_quality"]] == [14784, 1117, 422]
+        assert d["evidence_unknown"] == 0
+
+    def test_causes_共现取去重口径(self, main_db):
+        """行数口径 1,968、事故级 1,821。差 147 来自同一事故同一对码标多次。"""
+        co = causes.cooccurrence(accidents_query.ListParams(), top=1)
+        assert (co["pairs"][0]["a"], co["pairs"][0]["b"], co["pairs"][0]["count"]) \
+            == ("H1", "M1", 1821)
+        assert co["sort"] == "count", "默认按共现事故数，不是 lift"
+
+    def test_causes_共现矩阵给全量(self, main_db):
+        co = causes.cooccurrence(accidents_query.ListParams(), top=1)
+        n = len(co["codes"])
+        assert n == 19 and len(co["matrix"]) == n
+        assert co["pair_total"] > len(co["pairs"]), "矩阵不受 top 与门槛限制"
+        assert max(max(row) for row in co["matrix"]) == 1821
+
+    def test_causes_年代趋势四十九年且报出无日期(self, main_db):
+        t = causes.timeline(accidents_query.ListParams())
+        assert len(t["years"]) == 49
+        assert t["years"][0] == "1978" and t["years"][-1] == "2026"
+        assert sum(t["accidents"]) == 2593
+        assert t["without_date"] == 30
+        assert sum(t["accidents"]) + t["without_date"] == 2623, "要和事故总数对得上"
+        assert all(t["accidents"][t["years"].index(y)] == 0
+                   for y in t["years"] if 1991 <= int(y) <= 2004)

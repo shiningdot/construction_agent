@@ -10,9 +10,18 @@
 |---|---|---|
 | GET | `/api/overview` | 概览统计（totals / 五张分布 / CAICS 类目 / 省份分组） |
 | GET | `/api/accidents` | 事故列表（筛选 / 排序 / 分页） |
+| GET | `/api/accidents/<id>` | 单事故详情（字段 / 致因 / 图片 / 元信息，一次返回） |
 | GET | `/api/filters` | 筛选器各字段的可选值与计数 |
+| GET | `/api/causes/framework` | CAICS 体系定义（19 类 + 层归属 + 计数） |
+| GET | `/api/causes/distribution` | 五层金字塔 + 19 类明细 + 证据等级分布 |
+| GET | `/api/causes/cooccurrence` | 编码共现矩阵与 Top 对（去重口径） |
+| GET | `/api/causes/timeline` | 每年 × 每层的覆盖事故数 |
 | GET | `/api/province/audit` | 省份归一的逐条明细（数据质量核查用） |
 | GET | `/api/health` | 库连通性与表行数自检 |
+
+致因四端点与 `/api/accidents` **共用同一套筛选参数**（同一个 `ListParams`、
+同一个 `build_where()`）——两页对「筛选了事故类型=坍塌」的理解必须一致，
+否则用户从列表点进致因页会看到对不上的数字。
 
 `/api/health` 是蓝图 07 中 M1 的启动自检项：库路径、九表行数、索引是否
 齐备，一眼可判「跑起来的环境对不对」。
@@ -22,7 +31,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from . import accidents_query, db, detail, overview, province
+from . import accidents_query, causes, db, detail, overview, province
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -70,6 +79,59 @@ def api_accident_detail(accident_id: str):
 def api_filters():
     """筛选器的可选值。取值来自数据本身，新增枚举值无需改代码。"""
     return jsonify(accidents_query.filter_options())
+
+
+# ══════════════════════════════════════════════════════════════
+# 致因分析（蓝图 05 §4.2）
+# ══════════════════════════════════════════════════════════════
+
+
+@api_bp.get("/causes/framework")
+def api_causes_framework():
+    """CAICS 体系定义。页面初始化取一次。"""
+    return jsonify({"ok": True, "data": causes.framework()})
+
+
+@api_bp.get("/causes/distribution")
+def api_causes_distribution():
+    """五层金字塔 + 19 类明细 + 证据等级分布。与列表页共用同一套筛选参数。"""
+    params = accidents_query.ListParams.from_request(request.args)
+    return jsonify({
+        "ok": True,
+        "scope": causes.scope(params),
+        "filter": params.normalized(),
+        "data": causes.distribution(params),
+    })
+
+
+@api_bp.get("/causes/cooccurrence")
+def api_causes_cooccurrence():
+    """编码共现。`order` 取 `count`（默认）或 `lift`。
+
+    去重口径——`count` 是**共现的事故数**，不是编码出现次数。默认按 count
+    排序的理由（实测 lift 榜首是只有 24 条事故支撑的 C1+H4）写在
+    `causes.cooccurrence()` 的 docstring 里。
+    """
+    params = accidents_query.ListParams.from_request(request.args)
+    order = request.args.get("order", "count")
+    if order not in ("count", "lift"):
+        order = "count"
+    try:
+        top = int(request.args.get("top", 20))
+    except (TypeError, ValueError):
+        top = 20
+
+    return jsonify({
+        "ok": True,
+        "data": causes.cooccurrence(params, top=top, order=order),
+    })
+
+
+@api_bp.get("/causes/timeline")
+def api_causes_timeline():
+    """每年 × 每层的覆盖事故数，含每年总事故数作分母。"""
+    params = accidents_query.ListParams.from_request(request.args)
+    return jsonify({"ok": True, "data": causes.timeline(params)})
 
 
 # ══════════════════════════════════════════════════════════════

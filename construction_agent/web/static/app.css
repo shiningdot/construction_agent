@@ -328,10 +328,18 @@ code { font-family: var(--mono); font-size: .88em;
 .result-count { font-size: 13px; color: var(--muted); }
 .result-count b { color: var(--text); font-variant-numeric: tabular-nums; }
 
-.table-wrap { overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
+/* 这里**不能**写 overflow-x —— 那会让 .table-wrap 变成滚动容器，而 sticky
+   是相对最近滚动容器的 padding box 定位的：表头于是既不跟随视口（sticky
+   白设），又被 top:57px 从容器顶再往下推 57px，压在首行数据上。实测表头
+   落在 938–977、首行落在 920–983，标题中心点被表头吃掉 —— 列表里的标题
+   点不进详情页。表格最小需要 738px，宽屏本来就装得下；窄屏另见
+   `@media (max-width: 790px)`，那里才切回滚动容器并关掉 sticky。 */
+.table-wrap { margin: 0 -20px; padding: 0 20px; }
 
 .grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
+/* top 值对应 topbar 的高度（见 .topbar-inner 的 padding），改顶栏高度时
+   要一起改，否则表头会浮在顶栏下沿的错位处。 */
 .grid thead th {
   position: sticky; top: 57px; z-index: 5;
   background: var(--surface);
@@ -351,7 +359,14 @@ code { font-family: var(--mono); font-size: .88em;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .title-cell { max-width: 40ch; }
-.title-main { color: var(--text); font-weight: 500; }
+/* 标题是进详情页的链接，压在表格里不该带下划线——悬停时再用颜色和
+   下划线表明可点，避免整张表被 50 条下划线切碎 */
+.title-main {
+  color: var(--text); font-weight: 500;
+  text-decoration: none; display: block;
+}
+.title-main:hover { color: var(--brand-dark); text-decoration: underline; }
+.title-main:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .title-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px;
               font-family: var(--mono); }
 
@@ -650,6 +665,10 @@ code { font-family: var(--mono); font-size: .88em;
 }
 
 /* ── 原文 ── */
+.raw-more {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
 .raw-text {
   margin: 0; padding: 12px 14px; max-height: 420px; overflow: auto;
   background: var(--surface-2); border: 1px solid var(--border-soft);
@@ -664,7 +683,190 @@ code { font-family: var(--mono); font-size: .88em;
 }
 
 /* ══════════════════════════════════════════════════════════
-   ⑫ 页脚与响应式
+   ⑫ 致因分析页
+   ══════════════════════════════════════════════════════════ */
+
+/* 加载中：整块降透明度并禁指针。比逐段塞骨架省事，且不会因为
+   某段忘了加骨架而闪一下空白 */
+.causes.is-loading { opacity: .55; pointer-events: none; }
+
+/* ── ① 口径条 ── */
+.scope-bar {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 16px;
+}
+.scope-cell {
+  flex: 1 1 150px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.scope-num {
+  font-size: 22px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.scope-label { font-size: 12px; color: var(--muted); }
+.scope-cell.is-warn { border-color: var(--sev-3); background: #FDF7F1; }
+.scope-cell.is-warn .scope-num { color: var(--sev-3); }
+
+/* ── ② 筛选条 ── */
+.chips-picked {
+  font-size: 11px; padding: 1px 6px; border-radius: 9px;
+  background: var(--brand-soft); color: var(--brand-dark);
+  align-self: center; cursor: help;
+}
+
+/* ── ③④ 横条行（五层 / 19 类共用） ── */
+.hrow {
+  display: grid;
+  grid-template-columns: 42px minmax(110px, 220px) 1fr 96px 152px;
+  align-items: center; gap: 10px;
+  padding: 5px 0; border-bottom: 1px solid var(--border-soft);
+}
+.hrow:last-child { border-bottom: 0; }
+.hrow-code {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--text-2); text-align: right; padding-right: 2px;
+}
+.hrow-name {
+  font-size: 13px; color: var(--text); cursor: help;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hrow-track {
+  height: 14px; background: var(--surface-2);
+  border-radius: 3px; overflow: hidden;
+}
+.hrow-fill {
+  display: block; height: 100%; min-width: 2px;
+  background: var(--muted); border-radius: 3px;
+  transition: width .18s ease;
+}
+.hrow-val {
+  font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text);
+  display: flex; align-items: baseline; gap: 6px; justify-content: flex-end;
+}
+.hrow-val .share { font-size: 11px; color: var(--muted); }
+.hrow-sub {
+  font-size: 11.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.hrow.is-zero { opacity: .45; }
+.hrow.is-zero .hrow-fill { min-width: 0; }
+
+/* 层配色：条的颜色 = 层的身份色，与详情页致因树一致 */
+.hrow.layer-M .hrow-fill { background: var(--layer-M); }
+.hrow.layer-F .hrow-fill { background: var(--layer-F); }
+.hrow.layer-T .hrow-fill { background: var(--layer-T); }
+.hrow.layer-H .hrow-fill { background: var(--layer-H); }
+.hrow.layer-C .hrow-fill { background: var(--layer-C); }
+
+/* ── ⑤ 共现 ── */
+.cooc-wrap { display: grid; grid-template-columns: 1fr auto; gap: 20px; }
+.cooc-list { min-width: 0; }
+.cooc-row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) 90px 52px 46px 62px;
+  align-items: center; gap: 10px;
+  padding: 4px 0; border-bottom: 1px solid var(--border-soft);
+}
+.cooc-pair { display: flex; align-items: center; gap: 3px; }
+.cooc-code {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+  padding: 1px 5px; border-radius: 3px;
+  background: var(--surface-2); color: var(--text-2);
+}
+.cooc-plus { font-size: 11px; color: var(--muted); }
+.cooc-names {
+  font-size: 12px; color: var(--text-2); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; cursor: help;
+}
+.cooc-track { height: 10px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.cooc-fill { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+.cooc-n {
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+  text-align: right; color: var(--text);
+}
+.cooc-share, .cooc-lift {
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  text-align: right; color: var(--muted); cursor: help;
+}
+.cooc-matrix { overflow-x: auto; }
+.cooc-svg { display: block; }
+.cooc-head { fill: var(--border); }
+.cooc-head.layer-M { fill: var(--layer-M); }
+.cooc-head.layer-F { fill: var(--layer-F); }
+.cooc-head.layer-T { fill: var(--layer-T); }
+.cooc-head.layer-H { fill: var(--layer-H); }
+.cooc-head.layer-C { fill: var(--layer-C); }
+.cooc-axis {
+  font-family: var(--mono); font-size: 9px; fill: var(--surface);
+  pointer-events: none;
+}
+/* 这里**不能**写 fill —— CSS 声明会盖掉元素的 fill 呈现属性，
+   写了一条就等于把热力图的色阶全部抹平成同一个颜色。格子颜色由
+   causes.js 按值算好直接写在属性上；对角的浅底也在那里给。 */
+.cooc-cell { stroke: var(--surface); stroke-width: 1; }
+.cooc-legend, .empty-note {
+  font-size: 11.5px; color: var(--muted); margin: 10px 0 0;
+}
+
+/* ── ⑥ 证据等级 ── */
+.ev-stack {
+  display: flex; height: 26px; border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--surface-2);
+}
+.ev-seg { display: block; height: 100%; }
+.ev-seg.ev-direct { background: var(--ev-direct); }
+.ev-seg.ev-indirect { background: var(--ev-indirect); }
+.ev-seg.ev-weak { background: var(--ev-weak); }
+.ev-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 12px;
+}
+.ev-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--text-2);
+}
+.ev-item b { font-variant-numeric: tabular-nums; color: var(--text); }
+.ev-item.is-warn { color: var(--sev-3); }
+.ev-dot, .trend-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--muted); flex: none;
+}
+.ev-dot.ev-direct { background: var(--ev-direct); }
+.ev-dot.ev-indirect { background: var(--ev-indirect); }
+.ev-dot.ev-weak { background: var(--ev-weak); }
+
+/* ── ⑦ 年代趋势 ── */
+.trend-svg { width: 100%; height: auto; display: block; }
+.trend-grid { stroke: var(--border-soft); stroke-width: 1; }
+.trend-base { fill: var(--border-soft); }
+.trend-axis {
+  font-family: var(--mono); font-size: 10px; fill: var(--muted);
+}
+.trend-dot.is-base { border-radius: 2px; background: var(--border); }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; }
+
+/* ── 零结果 ── */
+.empty-veil {
+  margin-top: 16px; padding: 28px; text-align: center;
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: var(--radius); color: var(--text-2);
+}
+.empty-veil p { margin: 0 0 14px; }
+
+@media (max-width: 1080px) {
+  .cooc-wrap { grid-template-columns: 1fr; }
+}
+@media (max-width: 780px) {
+  .hrow { grid-template-columns: 36px 1fr 76px; }
+  .hrow-track, .hrow-sub { display: none; }
+  .cooc-row { grid-template-columns: 100px 1fr 72px 44px; }
+  .cooc-share, .cooc-lift { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   ⑬ 页脚与响应式
    ══════════════════════════════════════════════════════════ */
 
 .foot {
@@ -673,12 +875,19 @@ code { font-family: var(--mono); font-size: .88em;
   font-size: 12px; color: var(--muted);
 }
 
+/* 表格最小需要 738px，加上 .table-wrap 左右各 20px，视口窄于约 780px 就装不
+   下了。这里才切成横向滚动容器，同时把表头改回 static：sticky 的包含块
+   正是那个滚动容器，两者不能在同一个元素上并存（理由见 .table-wrap）。 */
+@media (max-width: 790px) {
+  .table-wrap { overflow-x: auto; }
+  .grid thead th { position: static; }
+}
+
 @media (max-width: 720px) {
   .topbar-inner { padding: 10px 14px; gap: 14px; }
   .brand-text small { display: none; }
   .db-chip { display: none; }
   .page { padding: 16px 14px 48px; }
-  .grid thead th { top: 53px; }
   .bar-row { grid-template-columns: minmax(64px, 100px) 1fr auto; gap: 8px; }
   .stat-value { font-size: 21px; }
 }

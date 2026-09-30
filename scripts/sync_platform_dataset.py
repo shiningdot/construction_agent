@@ -39,6 +39,9 @@ for r in rows:
         'building_structure': r['building_structure'],
         'construction_phase': r['construction_phase'],
         'work_task': r['work_task'],
+        # ⚠️ 历史遗留列：1,538 条里 703 条是已废弃编码（WT11–WT15，当前
+        # `enum_definitions` 中不存在）。当前口径只看 `work_task`。
+        # 这里照搬是为了兼容 legacy 平台的 schema，**新代码不要读这一列**。
         'work_task_enum': r['work_task_enum'],
         'accident_type': r['accident_type'],
         'severity': r['severity'],

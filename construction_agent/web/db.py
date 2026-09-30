@@ -171,6 +171,21 @@ def list_indexes(table: str | None = None, db_path: str | Path | None = None) ->
     return [dict(r) for r in rows]
 
 
+def db_fingerprint(db_path: str | Path | None = None) -> tuple[str, int, int]:
+    """库文件指纹 ``(路径, mtime_ns, 大小)``。
+
+    聚合层（province / overview）用它做缓存失效键：库没变就复用上次结果，
+    库一更新（补跑采集、并入暂存数据）立即失效。文件不存在时返回零值指纹，
+    让调用方照常走一次查询并在那里抛出 `DatabaseNotFoundError`。
+    """
+    path = Path(db_path).expanduser().resolve() if db_path else resolve_db_path()
+    try:
+        st = path.stat()
+    except OSError:
+        return (str(path), 0, 0)
+    return (str(path), st.st_mtime_ns, st.st_size)
+
+
 def db_summary(db_path: str | Path | None = None) -> dict[str, Any]:
     """库级概览：路径、大小、表与行数。用于启动自检与「关于数据」页。"""
     path = Path(db_path).expanduser().resolve() if db_path else resolve_db_path()

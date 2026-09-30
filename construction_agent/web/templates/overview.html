@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}概览与检索 · CAIEMS{% endblock %}
+
+{% block content %}
+<noscript>
+  <div class="notice">本页的数据由浏览器端脚本从 <code>/api/*</code> 拉取，
+  请启用 JavaScript。</div>
+</noscript>
+
+{# ── ① 统计卡 ────────────────────────────────────────────── #}
+<section class="stats" id="stats" aria-label="总体统计"></section>
+
+{# ── ② 数据分布 ──────────────────────────────────────────── #}
+<section class="panel" id="distPanel">
+  <div class="panel-head">
+    <h2>数据分布</h2>
+    <div class="segmented" id="chartTabs" role="tablist"></div>
+  </div>
+  <div class="chart-area" id="chartArea">
+    <div class="skeleton-chart"></div>
+  </div>
+  <p class="panel-note" id="chartNote"></p>
+</section>
+
+{# ── ③ 检索 ──────────────────────────────────────────────── #}
+<section class="panel" id="searchPanel">
+  <div class="panel-head">
+    <h2>事故检索</h2>
+    <div class="result-count" id="resultCount"></div>
+  </div>
+
+  <form class="filters" id="filters" autocomplete="off">
+    <div class="filters-row">
+      <label class="field field-grow">
+        <span>关键词</span>
+        <input type="search" id="f_q" placeholder="标题 / 摘要 / 直接原因，如「坍塌」「未按规定放坡」">
+      </label>
+      <label class="field">
+        <span>年份起</span>
+        <input type="number" id="f_year_from" min="1978" max="2030" placeholder="1978">
+      </label>
+      <label class="field">
+        <span>年份止</span>
+        <input type="number" id="f_year_to" min="1978" max="2030" placeholder="2026">
+      </label>
+      <label class="field">
+        <span>排序</span>
+        <select id="f_sort"></select>
+      </label>
+    </div>
+
+    <div class="filters-row" id="filterChips"></div>
+
+    <div class="filters-actions">
+      <button type="submit" class="btn btn-primary">检索</button>
+      <button type="button" class="btn" id="resetBtn">重置</button>
+      <label class="check">
+        <input type="checkbox" id="f_has_causes"> 仅看已有致因编码
+      </label>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="grid" id="grid">
+      <thead>
+        <tr>
+          <th class="col-title">事故</th>
+          <th class="col-date">日期</th>
+          <th class="col-place">地点</th>
+          <th class="col-type">类型</th>
+          <th class="col-task">工序</th>
+          <th class="col-sev">等级</th>
+          <th class="col-num">死亡</th>
+          <th class="col-num">受伤</th>
+          <th class="col-num">致因</th>
+        </tr>
+      </thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+  </div>
+
+  <div class="pager" id="pager"></div>
+</section>
+
+{# ── ④ 数据质量 ──────────────────────────────────────────── #}
+<section class="panel" id="qualityPanel">
+  <details>
+    <summary>
+      <h2>数据质量</h2>
+      <span class="muted" id="qualityHint"></span>
+    </summary>
+    <div id="qualityBody"></div>
+  </details>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='overview.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CAIEMS{% endblock %}</title>
+{# 不引 CDN：内网环境与外网断开时页面必须完整可用 #}
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="{{ url_for('views.overview_page') }}">
+      <span class="brand-mark">CA</span>
+      <span class="brand-text">
+        <strong>建筑施工事故信息系统</strong>
+        <small>CAIEMS · 数据资源与致因编码</small>
+      </span>
+    </a>
+    <nav class="topnav">
+      <a href="{{ url_for('views.overview_page') }}" class="is-active">概览与检索</a>
+    </nav>
+    <span class="db-chip" id="dbChip" title="当前数据库">
+      <span class="dot"></span><span id="dbChipText">连接中…</span>
+    </span>
+  </div>
+</header>
+
+<main class="page">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="foot">
+  <span>CAICS 五层 19 类致因编码 · 证据三级分层</span>
+  <span class="muted" id="footMeta"></span>
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

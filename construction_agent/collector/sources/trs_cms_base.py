@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
@@ -134,6 +135,33 @@ def _unwrap_data_islands(html: str) -> str:
                   _one, html, flags=re.S | re.I)
 
 
+def _absolute(page_url: str, href: str) -> str:
+    """把列表页里的 href 还原成绝对 URL。
+
+    **必须拿列表页自己的地址去 `urljoin`，不能拿 `base_url` 拼。**
+    TRS 的列表页常把详情链接写成相对当前目录的形式——`./202609/t20260918_…html`。
+    原先写的是 `base_url.rstrip("/") + "/" + href.lstrip("/")`，而 `lstrip("/")`
+    **不去掉开头的 `./`**，拼出来是 `https://yjj.cq.gov.cn/./202609/…`，
+    服务器对 `/./` 一律 404。
+
+    于是一个源会呈现成**最容易被放过的那种样子**：列表页正常、条目正常解析出
+    15 条、每条都有标题，只是详情页全 404、正文一个字都没有。健康检查若只看
+    「抓到几条」，这四个源全部判绿。实测三种拼法（2026-10-01，`cq_em` 第一条）：
+
+    | 拼法 | 结果 |
+    |---|---|
+    | 旧拼法（含 `/./`） | **404** |
+    | `urljoin(列表页, href)` | **200，49,969 字符** |
+    | `base_url` + href 去掉 `./` | **404** |
+
+    第三行说明它也**不是相对于站点根**：`./202609/…` 相对的是列表页所在目录
+    `/zwgk_230/…/dcbg/`，所以只能拿列表页 URL 去 join。顺带地，`urljoin` 还
+    正确对待三种旧拼法处理不了的写法：`//host/x`（协议相对）、`../x`（上一级）、
+    已是绝对 URL 的 href。
+    """
+    return urljoin(page_url, href)
+
+
 def _date_from_url(href: str) -> str:
     """从详情页 URL 的路径里抠出日期，返回 `YYYY-MM-DD`；抠不到返回空串。
 
@@ -220,7 +248,9 @@ class TrsCmsCollector(BaseCollector):
         for page_url in pages:
             html = self._fetch(page_url)
             if html:
-                all_links.extend(self._parse_list(html))
+                # 传 `page_url` 而不是让 `_parse_list` 自己去猜：相对链接
+                # （`./202609/…`）要对着**这一页**的地址解析，分页时页页不同。
+                all_links.extend(self._parse_list(html, page_url))
 
         self._total_listed = len(all_links)
         logger.info(f"[{self.cfg.source_name}] 列表共 {self._total_listed} 篇文章")
@@ -377,12 +407,20 @@ class TrsCmsCollector(BaseCollector):
             return f"{self.cfg.list_url.rstrip('/')}/{pattern.format(n=page_num)}"
         return pattern
 
-    def _parse_list(self, html: str) -> list[dict]:
+    def _parse_list(self, html: str, page_url: str = "") -> list[dict]:
         """解析列表页 HTML，提取文章链接。
+
+        Args:
+            html: 列表页 HTML。
+            page_url: **这一页**的 URL。用来把相对链接还原成绝对 URL——
+                列表页里的 href 可能是 `./202609/…` 这种相对当前目录的写法，
+                只能对着列表页地址解析。省略时退回 `cfg.list_url`，
+                对第一页是对的，对分页不对——**分页的循环必须传**。
 
         Returns:
             [{"title": str, "url": str, "date": str}, ...]
         """
+        base = page_url or self.cfg.list_url
         html = _unwrap_data_islands(html)
         soup = BeautifulSoup(html, "html.parser")
         records: list[dict] = []
@@ -396,9 +434,7 @@ class TrsCmsCollector(BaseCollector):
                     title = re.sub(r"\s+", "", title)
                     if len(title) < 5:
                         continue
-                    full_url = href if href.startswith("http") else (
-                        self.cfg.base_url.rstrip("/") + "/" + href.lstrip("/")
-                    )
+                    full_url = _absolute(base, href)
                     date = _date_from_url(href)
                     if title:
                         records.append({"title": title, "url": full_url, "date": date})
@@ -412,9 +448,7 @@ class TrsCmsCollector(BaseCollector):
                 title = re.sub(r"\s+", "", title)
                 if len(title) < 5:
                     continue
-                full_url = href if href.startswith("http") else (
-                    self.cfg.base_url.rstrip("/") + "/" + href.lstrip("/")
-                )
+                full_url = _absolute(base, href)
                 date = _date_from_url(href)
                 if title:
                     records.append({"title": title, "url": full_url, "date": date})
@@ -443,14 +477,17 @@ class TrsCmsCollector(BaseCollector):
             date = m.group(1)
 
         # PDF 链接
+        # 同样要用 `_absolute` 对着**详情页自己的地址**解析。TRS 的附件链接也写作
+        # `./P020240905567173081196.pdf`——旧拼法会把它接到站点根上，拼出
+        # `https://yjt.shanxi.gov.cn/P020240905567173081196.pdf`，**整条路径都丢了**，
+        # 下载必然 404。而 PDF 恰恰是省级源的主要载体：`sx_em` 的详情页正文
+        # 一个字都不在 HTML 里，全在这个附件中。
         pdf_url = ""
         if self.cfg.detail_pdf_selector:
             for a_tag in soup.select(self.cfg.detail_pdf_selector):
                 href = a_tag.get("href", "")
                 if href.endswith(".pdf"):
-                    pdf_url = href if href.startswith("http") else (
-                        self.cfg.base_url.rstrip("/") + "/" + href.lstrip("/")
-                    )
+                    pdf_url = _absolute(url, href)
                     break
 
         # 正文

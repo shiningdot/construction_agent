@@ -34,9 +34,11 @@ import pytest
 from bs4 import BeautifulSoup
 
 from construction_agent.collector.base import RawAccidentText
+from construction_agent.collector.sources.cq_em import CqEMCollector
 from construction_agent.collector.sources.js_em import JsEMCollector
 from construction_agent.collector.sources.sc_em import ScEMCollector
 from construction_agent.collector.sources.trs_cms_base import (
+    _absolute,
     _date_from_url,
     _unwrap_data_islands,
 )
@@ -157,7 +159,102 @@ def test_sc_em_正则不收别的形状(href):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 第三、四组：只能静态查的契约
+# 第三组：列表页里的相对链接（四个源「正文 0 字」的根因）
+#
+# `cq_em` / `shaanxi_em` / `sx_em` / `tj_em` 的详情页**全是 404**。列表页正常、
+# 条目正常解析出十几条、标题都齐全，只有正文一个字都没有——健康检查里它们
+# 显示的是「有数据」，是四个源里最容易被放过的那一类。
+#
+# 根因：TRS 把详情链接写成相对当前目录的 `./202609/t20260918_…html`，而旧拼法
+# 是 `base_url.rstrip("/") + "/" + href.lstrip("/")`——`lstrip("/")` **不去掉
+# 开头的 `./`**，拼出 `https://yjj.cq.gov.cn/./202609/…`，服务器对 `/./` 一律 404。
+# 三种拼法的实测（2026-10-01，`cq_em` 第一条）见 `_absolute()` 的 docstring。
+# ═══════════════════════════════════════════════════════════════════
+
+CQ_LIST_URL = "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/"
+
+REL_LIST_HTML = (
+    "<ul>"
+    '<li><a href="./202609/t20260918_16096386.html">重庆南川“3·12”一般森林火灾事故调查报告</a></li>'
+    '<li><a href="./202609/t20260918_16096374.html">重庆涪陵“2·10”一般坍塌事故调查报告</a></li>'
+    "</ul>"
+)
+
+
+@pytest.fixture(scope="module")
+def cq_collector(tmp_path_factory):
+    """真构造一个采集器，但不发任何请求——`_parse_list` 只吃 HTML 字符串。"""
+    return CqEMCollector(data_dir=tmp_path_factory.mktemp("cq_em"))
+
+
+def test_相对链接要还原成绝对URL(cq_collector):
+    records = cq_collector._parse_list(REL_LIST_HTML, CQ_LIST_URL)
+    assert [r["url"] for r in records] == [
+        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/"
+        "202609/t20260918_16096386.html",
+        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/"
+        "202609/t20260918_16096374.html",
+    ]
+
+
+def test_拼出来的URL里不许出现_斜杠点_或_斜杠点点(cq_collector):
+    """`/./` 是旧拼法的指纹，服务器对它的应答一律 404。
+
+    这条比上一条更值得留：它不绑定具体站点地址，**任何一个源**拼出 `/./`、
+    `/../` 都说明没走 `urljoin`。
+    """
+    for r in cq_collector._parse_list(REL_LIST_HTML, CQ_LIST_URL):
+        assert "/./" not in r["url"], r["url"]
+        assert "/../" not in r["url"], r["url"]
+
+
+@pytest.mark.parametrize(
+    "href, expected",
+    [
+        ("./202609/t1.html", "https://yjj.cq.gov.cn/a/b/c/202609/t1.html"),
+        ("../202609/t1.html", "https://yjj.cq.gov.cn/a/b/202609/t1.html"),
+        ("/zwgk_230/x.html", "https://yjj.cq.gov.cn/zwgk_230/x.html"),
+        ("//other.example.com/x.html", "https://other.example.com/x.html"),
+        ("https://other.example.com/x.html", "https://other.example.com/x.html"),
+    ],
+    ids=["相对当前目录", "相对上一级", "站内绝对路径", "协议相对", "已是绝对URL"],
+)
+def test_五种href写法都还原得对(href, expected):
+    """后三种是旧拼法处理不了的：`//host/x` 会被 `lstrip("/")` 啃掉两个斜杠。"""
+    assert _absolute("https://yjj.cq.gov.cn/a/b/c/index.html", href) == expected
+
+
+def test_详情页里的PDF附件也要还原成绝对URL(cq_collector, monkeypatch):
+    """同一段错误逻辑的**第二个现场**：附件链接也写作 `./P0202…pdf`。
+
+    旧拼法把它接到站点根上，拼出 `https://yjt.shanxi.gov.cn/P0202…pdf`，
+    **整条路径都丢了**，下载必然 404。而省级源的正文往往只存在于附件里：
+    `sx_em` 的详情页 HTML 一个字正文都没有，全在 PDF 中——PDF 取不到，
+    `body.get_text()` 就只剩页脚导航，分类器再从页脚里读到
+    「国家矿山安全监察局」，**高置信度判成非建筑施工事故**。
+    一个 URL 拼接错误，最后长成了「这个源没有建筑事故」。
+
+    这里 monkeypatch 掉 `_fetch`，不发请求。
+    """
+    detail_html = (
+        "<html><head><title>某坍塌事故调查报告</title></head><body>"
+        '<div class="box">运城永济市…较大坍塌事故防范和整改措施落实情况评估报告</div>'
+        '<a href="./P020240905567173081196.pdf">…评估报告.pdf</a>'
+        "</body></html>"
+    )
+    monkeypatch.setattr(cq_collector, "_fetch", lambda url: detail_html)
+    detail = cq_collector._crawl_detail(
+        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/"
+        "202409/t20240905_9648052.html"
+    )
+    assert detail["pdf_url"] == (
+        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/202409/"
+        "P020240905567173081196.pdf"
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 第四、五组：只能静态查的契约
 #
 # 两组的共同点：错误发生在方法体内部，`import` 得动、契约也 "符合"，
 # 只有真正执行到那一行才炸。第一组那类「跑一次就知道」的缺陷上一轮已经

@@ -109,14 +109,10 @@ META_FIELDS: tuple[str, ...] = (
     "pipeline_version", "step1_duration_ms", "step2_duration_ms", "created_at",
 )
 
-# 枚举列 → `enum_definitions.enum_type`。中文名查表得到，前端不硬编码编码表。
-ENUM_COLUMNS: dict[str, str] = {
-    "work_task": "work_task",
-    "equipment_involved": "equipment_involved",
-    "material_involved": "material_involved",
-    "worker_type": "worker_type",
-    "building_structure": "building_structure",
-}
+# 编码列 → `enum_definitions.enum_type`。中文名查表得到，前端不硬编码编码表。
+# 映射本体定义在 `accidents_query`（数据层）：审核页与详情页都要用它把库里的码
+# 翻成中文名，同一份数据在两处翻译得不一样就没法看了。
+ENUM_COLUMNS = accidents_query.ENUM_COLUMNS
 
 
 def has_value(v: Any) -> bool:

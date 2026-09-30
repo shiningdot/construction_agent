@@ -286,6 +286,39 @@ def test_详情返回全部可编辑字段(client, env):
     assert d["causes"][0]["evidence_quality_label"] == "直引"
 
 
+def test_详情下发编码列的中文名对照表(client, env):
+    """审核员要判的是「S3 判的 `WT04` 对不对」，只给码等于让人先背下 11 个 WT 码。
+
+    接口一次下发五个编码列（`accidents_query.ENUM_COLUMNS`）的对照表，键必须齐：
+    少给一列，那一列就退回裸码，而**页面上没有任何迹象**——不报错、不空白，只是
+    审核员看不懂。详情页早就翻了（`detail.py`），此前审核页没翻。
+    """
+    from construction_agent.web import accidents_query
+
+    seed("a", work_task="WT04", material_involved="MAT02、MAT07")
+    d = client.get("/api/review/items/a").get_json()["data"]
+    assert set(d["enum_labels"]) == set(accidents_query.ENUM_COLUMNS)
+
+    con = sqlite3.connect(final_path(env))
+    con.executemany(
+        "INSERT INTO enum_definitions (enum_type,code,name,definition,is_active)"
+        " VALUES (?,?,?,?,?)",
+        [("work_task", "WT04", "模板与脚手架工程", "模板、支撑、脚手架作业", 1),
+         ("material_involved", "MAT02", "钢筋", "钢筋及制品", 1),
+         # 停用的枚举不下发——它是迁移遗留，不该出现在审核员的候选里
+         ("material_involved", "MAT07", "旧版材料类", "停用", 0)])
+    con.commit()
+    con.close()
+    accidents_query.reset_cache()   # 枚举名按库指纹缓存，灌完数据要清
+
+    d = client.get("/api/review/items/a").get_json()["data"]
+    assert d["enum_labels"]["work_task"]["WT04"] == "模板与脚手架工程"
+    assert d["enum_labels"]["material_involved"]["MAT02"] == "钢筋"
+    assert "MAT07" not in d["enum_labels"]["material_involved"]
+    # 没灌数据的枚举给空表而不是缺键——前端按「有没有这张表」判断这一列要不要提示
+    assert d["enum_labels"]["worker_type"] == {}
+
+
 def test_详情404(client, env):
     assert client.get("/api/review/items/nope").status_code == 404
 

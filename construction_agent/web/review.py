@@ -40,7 +40,7 @@ from flask import Blueprint, jsonify, request
 from ..extraction.evidence_quality import LEVEL_LABELS
 from ..review import promote as pm
 from ..review import warnings as wn
-from . import db, staging_db
+from . import accidents_query, db, staging_db
 
 review_bp = Blueprint("review", __name__, url_prefix="/api/review")
 
@@ -365,6 +365,15 @@ def item(stage_id: str):
         },
         "promoted": row["raw_id"] in pm.promoted_accident_ids(),
         "editable": list(EDITABLE_FIELDS),
+        # 编码列的对照表，**一次下发全表**（照蓝图 03 §4.2 给告警码定的同一条原则：
+        # 前端渲染标签用后端给的对照表，不必自己维护编码表）。五个枚举合计 57 条，
+        # 比一次请求本身大不了多少。
+        #
+        # 为什么审核页特别需要它：这五列存的是码（`WT01`、`BLD03`…），审核员要判的
+        # 恰恰是「S3 判的 `WT04` 对不对」——只给码等于让人对着背下来的表核。详情页
+        # 早就翻了（`detail.py:_label_of`），审核页此前没翻。
+        "enum_labels": {col: accidents_query.enum_names(et)
+                        for col, et in accidents_query.ENUM_COLUMNS.items()},
     }})
 
 

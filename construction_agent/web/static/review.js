@@ -19,6 +19,7 @@
   var pendingPlan = null;     // 预演结果 {stage_ids, confirm_token, ...}
   var taxonomy = [];          // CAICS 19 类，抽屉里"新增编码"用
   var origCauses = [];        // 抽屉打开时服务端给的编码，用来判断"改没改"
+  var enumLabels = {};        // 编码列 → 中文名，抽屉打开时由接口一次下发
 
   // 层序就是因果泄漏顺序 M→F→T→H→C，与 step2_caics_encoder 的 sort_order
   // 对齐。默认字典序会排成 C/F/H/M/T，跟理论叙述正好倒过来。
@@ -424,6 +425,7 @@
   function renderDrawer(d) {
     var body = clear($('drawerBody'));
     $('drawerTitle').textContent = (d.fields.title || '（无标题）');
+    enumLabels = d.enum_labels || {};
 
     // 告警与状态
     body.appendChild(el('div', { cls: 'warn-box' }, [
@@ -519,6 +521,50 @@
     ]);
   }
 
+  /* 编码列的中文名。
+
+     `work_task` / `building_structure` / `equipment_involved` / `material_involved`
+     / `worker_type` 五列库里存的是码（`WT04`、`BLD03`…），S3 也按码输出。审核员
+     要判的恰恰是「S3 判的 `WT04` 对不对」——只给码，等于让人先背下 11 个 WT 码
+     再来核对。详情页早就翻了（`detail.py`），这一页此前没翻。
+
+     对照表由接口一次下发（`enum_labels`），前端不维护编码表。这就是蓝图 03 §4.2
+     给告警码定的那条原则：**前端渲染标签用后端给的对照表**，少了它，遇到一个没
+     见过的码就只能显示裸码。 */
+  /* 这一列有没有对照表。**空对象也算没有**——`{}` 在 JS 里是 truthy，只看
+     `enumLabels[field]` 会让「枚举表里一条都没有」的库把每个码都标成
+     「枚举表里没有这个码」，全是噪声。 */
+  function hasEnumTable(field) {
+    var t = enumLabels[field];
+    return !!t && Object.keys(t).length > 0;
+  }
+
+  function enumNames(field, value) {
+    var table = enumLabels[field];
+    var raw = value == null ? '' : String(value).trim();
+    if (!hasEnumTable(field) || !raw) return null;
+    // 多值用顿号分隔（S3 提示词要求「多人多设备用顿号」），逗号与分号一并容忍
+    return raw.split(/[、,;；\s]+/).filter(Boolean).map(function (code) {
+      return { code: code, name: table[code] || null };
+    });
+  }
+
+  function fillHint(node, field, value) {
+    clear(node);
+    var parts = enumNames(field, value);
+    if (!parts) return;
+    parts.forEach(function (p, i) {
+      if (i) node.appendChild(el('span', { cls: 'kv-hint-sep', text: '、' }));
+      if (p.name) {
+        node.appendChild(el('span', { text: p.name }));
+      } else {
+        // 查不到名字的码**原样亮出来**，不吞掉也不换兜底词：异常编码该自己冒头
+        node.appendChild(el('span', { cls: 'kv-hint-bad',
+          text: p.code + '（枚举表里没有这个码）' }));
+      }
+    });
+  }
+
   function fieldInput(field, value) {
     var input = el('input', {
       attrs: {
@@ -532,6 +578,16 @@
       el('div', { cls: 'kv-key', text: FIELD_LABEL[field] || field }),
       input,
     ]);
+    // 提示只在编码列上出现（判据是接口下发了这一列**非空**的对照表）
+    if (hasEnumTable(field)) {
+      var hint = el('div', { cls: 'kv-hint' });
+      fillHint(hint, field, value);
+      // 改了码，中文名要跟着变——否则提示停在旧值上，比没有提示更误导
+      input.addEventListener('input', function () {
+        fillHint(hint, field, input.value);
+      });
+      wrap.appendChild(hint);
+    }
     return wrap;
   }
 

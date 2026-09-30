@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""枚举取值对齐核查：schema 注释声明的取值 ↔ 前端标签表的键。
+"""枚举取值对齐核查。
+
+三节判据，两类枚举：
+
+| 节 | 查的对象 | 真值在哪 | 失效长什么样 |
+|---|---|---|---|
+| 一、二 | 工作库状态列（`collect_tasks.status`…） | `staging_schema.py` 的列注释 | 页面上冒英文码 |
+| 三 | 编码列（`work_task`、`building_structure`…） | 主库 `enum_definitions` 表 | 页面上是一串看不出对错的码 |
+
+一、二节是**静态**比对（读源码的两个集合）；第三节是**动态**的（真起 app 打接口）。
 
 ## 为什么查这个
 
@@ -34,11 +43,27 @@
 - `raw_accident_assets` 的 `asset_type` / `ocr_status` 前端**直接拼原值上屏**
   （`'OCR: ' + a.ocr_status`），没有标签表
 
+## 第三节的判据
+
+**接口在下发的每条记录上，凡编码列有值，就要给对应的中文名。** 三个页面分别判：
+
+- 详情页 `/api/accidents/<id>`：`data.fields[col]` 有值 → `data.fields[col+"_label"]` 必须在
+- 列表页 `/api/accidents`：凡 `*_code` 有值 → 配对的 `*_label` 必须在（不写死列名，
+  列表页以后多带编码列会自动跟上）
+- 审核页 `/api/review/items/<id>`：`enum_labels` 的键要覆盖「`ENUM_COLUMNS` ∩
+  `EDITABLE_FIELDS`」——审核员要判的正是这些码对不对
+
+判据是**单向**的：接口没给中文名就是漏了。这跟一、二节不同——那边差集不指明谁对。
+
+2026-10-01 这节查出：审核页把五个编码列渲染成可编辑输入框，值就是码，而详情页
+早就翻了（`detail.py`）。同一份数据在两个页面一个翻一个不翻。
+
 ## 边界
 
-- 只查 `staging_schema.py` 里**以列注释形式声明**的枚举。`work_task`
-  （WT01–WT99）这类走 `enum_definitions` 表的编码不在此列——它们的真值是库里的
-  表，不是注释
+- 一、二节只查 `staging_schema.py` 里**以列注释形式声明**的枚举；走
+  `enum_definitions` 表的编码列归第三节（它们的真值是库里的表，不是注释）
+- 第三节**依赖库里真有条目**：主库没有编码列有值、或工作库没建，对应的组会跳过并
+  在输出里说明。**跳过长得跟通过一样绿**，看输出里的 `·` 行区分
 - 前端标签表按**变量名**定位（脚本里的 `PAIRS` 写死映射）。改了变量名要同步改这里
 - 第 2 条判据的「后端文件」也是写死的（`WRITERS`）。它只覆盖状态类列——这几处
   赋值形式规整、精度高；分类列（`project_type` 等）的取值来自 LLM 而非代码字面量，
@@ -49,7 +74,9 @@
     .venv/bin/python3 scripts/check_enum_alignment.py
     .venv/bin/python3 scripts/check_enum_alignment.py --verbose
 
-退出码 `0` = 每组两侧一致、且写入值都在注释里；`1` = 有不一致（可直接接 CI）。
+退出码 `0` = 前三节都没有缺口；`1` = 有缺口（可直接接 CI）。
+第三节要连库，跑之前确认 `CAIEMS_DB`（主库）与 `CAIEMS_STAGING_DB`（工作库）指向
+想看的那两个库；不设就用默认路径。
 """
 from __future__ import annotations
 
@@ -179,6 +206,130 @@ def written_literals(column: str, rules: tuple[tuple[str, str, str], ...]) -> se
     return got
 
 
+# ══════════════════════════════════════════════════════════════
+# 第三节：库里存码的列，接口在下发的记录上有没有给中文名
+# ══════════════════════════════════════════════════════════════
+#
+# 前两节比的是**工作库的状态列**：取值域写在 schema 注释里，前端各有标签表，
+# 漏了会「冒英文码」。这一节比的是另一类枚举——`work_task` / `building_structure`
+# / `equipment_involved` / `material_involved` / `worker_type` 五列，库里存的是码
+# （`WT04`、`BLD01`…），中文名在**主库的 `enum_definitions` 表**里，注释里没有
+# 取值域可写（枚举是数据，不是 DDL）。
+#
+# 它们的失效形态也不同：`WT04` 看着就像个正经编码，页面上不刺眼，没人觉得哪里
+# 不对——只是审核员核不了「S3 判的 WT04 对不对」。所以这一节只能问接口，不能查
+# 源码；问的是「有值的编码列，接口给没给对应的 `_label`」。
+#
+# 2026-10-01 这一节查出：审核页把五个编码列渲染成可编辑输入框，值就是码，而详情页
+# 早就翻了（`detail.py`）。同一份数据在两个页面一个翻一个不翻。
+
+def code_column_coverage() -> tuple[list[str], list[str], str]:
+    """打真实接口，问「编码列有没有中文名」。
+
+    返回 `(缺口, 提示, 说明)`。缺口导致退出码 1；提示只是告知（比如工作库没建，
+    审核页这一组跳过）。
+    """
+    from construction_agent.web import accidents_query as aq
+    from construction_agent.web import db as wdb
+    from construction_agent.web.factory import create_app
+
+    problems: list[str] = []
+    notes: list[str] = []
+
+    db_path = wdb.resolve_db_path()
+    if not db_path.exists():
+        return [], [f"主库不存在（{db_path}），整节跳过"], "跳过"
+    app = create_app({"TESTING": True})
+    c = app.test_client()
+
+    # ── 详情页：五个编码列都该有 `_label` ──
+    #
+    # 挑一条**填得最满**的样本，而不是随手第一条：五个编码列的填充率差得远
+    # （主库 2,623 条实测 work_task 2,202、building_structure 只有 359），随手
+    # 挑一条往往只验得到两个列——判据看着绿，实际七成没验。逐级降级取样本，
+    # 验不到的列在 notes 里点名，而不是让它们悄悄混过去。
+    cols = list(aq.ENUM_COLUMNS)
+    con = wdb.connect_readonly()
+    try:
+        row, covered = None, []
+        for n in range(len(cols), 0, -1):
+            want = cols[:n]
+            where = " AND ".join(f"COALESCE(TRIM({k}),'')<>''" for k in want)
+            # 顺便数一数有几条这么满的——这个数字本身就是填充率的实况
+            hit = con.execute(
+                f"SELECT id FROM accidents WHERE {where} LIMIT 1").fetchone()
+            if hit is not None:
+                row, covered = {"id": hit[0]}, want
+                break
+    finally:
+        con.close()
+
+    if row is None:
+        notes.append("主库里没有任何一条带编码列的事故，详情页这一组跳过")
+    else:
+        d = c.get(f"/api/accidents/{row['id']}").get_json()
+        fields = (d.get("data") or {}).get("fields") or {}
+        for col in covered:
+            v = fields.get(col)
+            if not fields.get(col + "_label"):
+                problems.append(
+                    f"详情页：`{col}` 有值（{v}）却没有 `{col}_label`")
+        missed = [col for col in cols if col not in covered]
+        if missed:
+            notes.append(f"详情页没验到的编码列（全库无一条同时有值）："
+                         f"{'、'.join(missed)}")
+        else:
+            notes.append(f"详情页样本 {row['id']}：五个编码列全覆盖")
+
+    # ── 列表页：凡 `*_code` 有值，就该有配对的 `*_label` ──
+    #
+    # 注意这个接口**没有 `data` 层**：`api.py:60` 直接把
+    # `accidents_query.run()` 的 `{"items", "meta"}` jsonify 出去。审核队列
+    # 那边正相反，`data` 是记录数组本身。三个接口三种包装，写判据时一个都不能
+    # 照抄——这类「差一层」的错误不会报错，只会静默地什么都查不到。
+    #
+    # 不写死 `work_task`：哪天列表页多带一个编码列，这条自动跟上去。
+    b = c.get("/api/accidents?page=1&page_size=20").get_json()
+    items = (b.get("items")) or []
+    if not items:
+        notes.append("列表页没取到数据，这一组跳过")
+    seen_code = 0
+    for it in items:
+        for k, v in it.items():
+            if not k.endswith("_code") or v in (None, ""):
+                continue
+            seen_code += 1
+            lab = k[: -len("_code")] + "_label"
+            if not it.get(lab):
+                problems.append(f"列表页：`{k}` 有值（{v}）却没有 `{lab}`")
+                break
+    if items and not seen_code:
+        notes.append("列表页这一页没有任何 `*_code` 键——判据被架空，需人核")
+
+    # ── 审核页：可编辑的编码列都要有对照表 ──
+    from construction_agent.web import review as rv
+    need = [col for col in aq.ENUM_COLUMNS if col in rv.EDITABLE_FIELDS]
+    q = c.get("/api/review/queue?page=1&page_size=1").get_json()
+    qitems = (q.get("data")) or []          # 这个接口的 data 就是数组，不是 {items}
+    if not qitems:
+        notes.append(f"工作库没有暂存记录，审核页这一组跳过"
+                     f"（该页要翻译 {len(need)} 个可编辑编码列）")
+    else:
+        d = c.get(f"/api/review/items/{qitems[0]['stage_id']}").get_json()
+        labels = (d.get("data") or {}).get("enum_labels") or {}
+        notes.append(f"审核页样本 {qitems[0]['stage_id']}："
+                     f"{len(need)} 个可编辑编码列逐个核对下行对照表")
+        for col in need:
+            if col not in labels:
+                problems.append(f"审核页：可编辑的编码列 `{col}` 没下发对照表")
+            elif not labels[col]:
+                notes.append(f"审核页：`{col}` 的对照表是空的——主库"
+                             f"`enum_definitions` 里这个枚举没有 `is_active` 行")
+
+    return problems, notes, f"详情页 / 列表页 / 审核页 × {len(aq.ENUM_COLUMNS)} 个编码列"
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--verbose", action="store_true", help="打印每一组的完整集合")
@@ -236,13 +387,39 @@ def main() -> int:
             print(f"        schema: {' '.join(want)}")
             print(f"        前端  : {' '.join(got)}")
 
+    # ── 第三节：库里存码的列，接口给没给中文名 ──
+    #
+    # 用 try 包住：这一节要真起 app、真连库，缺库或工作库没建都可能抛异常。
+    # 抛了就当「这节没跑」并说清楚——**不能让它把前两节的结论一起带崩**，
+    # 更不能静默吞掉（吞掉就成了「跑过且通过」，比没跑更坏）。
+    print()
+    try:
+        cov_problems, cov_notes, cov_brief = code_column_coverage()
+    except Exception as exc:  # noqa: BLE001 —— 见上
+        cov_problems, cov_notes = [], []
+        cov_brief = f"跑不起来（{type(exc).__name__}: {exc}）"
+    print(f"编码列在各页面的翻译   {cov_brief}")
+    for n in cov_notes:
+        print(f"  · {n}")
+    if not cov_problems:
+        print("  ✓ 接口下发的记录里，有值的编码列都带了中文名")
+    problems += cov_problems
+
     if problems:
         print(f"\n✗ {len(problems)} 处不一致：")
         for p in problems:
             print(f"    - {p}")
-        print("\n  差集本身不指明谁对：可能是注释多写了一个不产出的值，也可能是前端"
-              "少认了一个真实值。")
-        print("  看 `WRITERS` 那一列（后端写入）定方向——它列了就说明代码真会产出。")
+
+        # 两类问题的修法不同，尾注也要分头给：前两节的差集是双向的（不知道谁对），
+        # 第三节是单向的（接口漏了就是漏了）。混着写等于给一半的问题开了错药方。
+        page_prefixes = ("详情页：", "列表页：", "审核页：")
+        if any(p.startswith(page_prefixes) for p in problems):
+            print("\n  第三节是单向判据：接口没给出中文名就是漏了，没有「谁对」的"
+                  "歧义——补 `_label` / `enum_labels` 即可。")
+        if any(not p.startswith(page_prefixes) for p in problems):
+            print("\n  第一/二节的差集本身不指明谁对：可能是注释多写了一个不产出的"
+                  "值，也可能是前端少认了一个真实值。")
+            print("  看 `WRITERS` 那一列（后端写入）定方向——它列了就说明代码真会产出。")
         return 1
 
     print("\n✓ 每组枚举两侧一致，且代码里写入的取值都在注释声明之内。")

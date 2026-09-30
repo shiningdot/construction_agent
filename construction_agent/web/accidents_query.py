@@ -127,6 +127,22 @@ LIST_COLUMNS = """
 _ENUM_CACHE: dict[tuple, dict[str, str]] = {}
 
 
+#: 「编码列 → `enum_definitions.enum_type`」。这五列在库里存的是**码**（`WT01`、
+#: `BLD03`…），中文名在 `enum_definitions` 表里。凡是渲染这五列的页面都得过这一层，
+#: 否则页面上就是裸码。键与值现在完全相同，仍写成两列而不是 one-liner：哪天列名与
+#: 枚举名分了家，就是改这里一处，而不是去找散在各页的硬编码。
+#:
+#: 定义在数据层而不是某个页面模块，是因为**审核页与详情页都要用**——同一份数据在
+#: 两个页面翻译得不一样，用户看到的就是两个东西。
+ENUM_COLUMNS: dict[str, str] = {
+    "work_task": "work_task",
+    "equipment_involved": "equipment_involved",
+    "material_involved": "material_involved",
+    "worker_type": "worker_type",
+    "building_structure": "building_structure",
+}
+
+
 def enum_names(enum_type: str, db_path: str | Path | None = None) -> dict[str, str]:
     """`enum_definitions` 的 code → 中文名（只取 `is_active`）。按库指纹缓存。"""
     fp = (enum_type, *db.db_fingerprint(db_path))

@@ -69,10 +69,45 @@
     });
   }
 
+  /* 顶栏右下角的库状态徽标。它显示的是**最终库**（`/api/health`），跟在
+     哪个页面无关，所以放在公共文件里由 dom.js 加载时自动填一次——
+     collector 页不读最终库，但用户仍该看到「库在不在、索引齐不齐」。
+
+     `overview.js` 里还留着一份等价的内联实现（早于本文件），两份写同一
+     个元素、内容一致，不会打架；合并留到 M1 收尾时做。 */
+  function loadDbChip() {
+    const chip = document.getElementById('dbChip');
+    const text = document.getElementById('dbChipText');
+    if (!chip || !text) return;
+    fetchJson('/api/health').then(function (h) {
+      text.textContent = h.db_path.split('/').pop() + ' · '
+                         + num(h.tables.accidents) + ' 条';
+      const missing = h.missing_indexes || [];
+      chip.title = h.db_path + (missing.length
+        ? '\n缺索引：' + missing.join(', ') + '\n' + (h.hint || '')
+        : '\n索引齐备');
+      chip.className = 'db-chip ' + (missing.length ? 'is-warn' : 'is-ok');
+      if (missing.length) {
+        const foot = document.getElementById('footMeta');
+        if (foot) {
+          foot.textContent = '⚠ 缺 ' + missing.length
+            + ' 个索引，列表筛选会明显变慢（scripts/add_indexes.py）';
+        }
+      }
+    }).catch(function (e) {
+      chip.className = 'db-chip is-error';
+      text.textContent = '数据库不可用';
+      chip.title = e.message;
+    });
+  }
+
   global.$ = $;
   global.clear = clear;
   global.el = el;
   global.num = num;
   global.fetchJson = fetchJson;
   global.blank = blank;
+  global.loadDbChip = loadDbChip;
+
+  loadDbChip();
 })(window);

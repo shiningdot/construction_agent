@@ -11,17 +11,38 @@ JS 执行，对一个内网查询工具可以接受。
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, render_template, send_file
+from flask import Blueprint, abort, current_app, render_template, send_file
 
+from ..collector import executor as collect_executor
 from . import images
 
 views_bp = Blueprint("views", __name__)
+
+# 进程重启后 `collect_tasks` 里会留下几行写着 `running` 的僵死任务（线程池
+# 随进程没了）。清理只需要做一次，放在页面入口而不是 `create_app()`：工厂
+# 会被测试反复调用几十次，每次都去写一次库既慢又脏。
+_reconciled = False
 
 
 @views_bp.get("/")
 def overview_page():
     """概览与检索。蓝图 04 的落地页。"""
     return render_template("overview.html")
+
+
+@views_bp.get("/collect")
+def collect_page():
+    """在线采集。蓝图 01 的落地页，对应流水线的阶段①。"""
+    global _reconciled
+    if not _reconciled:
+        _reconciled = True
+        try:
+            n = collect_executor.reconcile_stale_tasks()
+            if n:
+                current_app.logger.info("清理了 %d 个中断的采集任务", n)
+        except Exception as e:  # noqa: BLE001 —— 库没建时不该拦住页面
+            current_app.logger.debug("跳过僵死任务清理: %s", e)
+    return render_template("collect.html")
 
 
 @views_bp.get("/accident/<accident_id>")

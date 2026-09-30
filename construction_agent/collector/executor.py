@@ -72,6 +72,47 @@ def _new_id() -> str:
 # --------------------------------------------------------------------------
 
 
+# 采集器把附件 URL 塞在自定义字段里，键名不统一（21 个走 store 的源各写各的）。
+# 这张表是实测出来的：`pdf_urls` 是唯一定义在 `RawAccidentStore` 契约里的，
+# 其余三个是零星几个源自己的叫法。
+_ASSET_KEYS: tuple[tuple[str, str], ...] = (
+    ("pdf_urls", "pdf"),
+    ("image_urls", "image"),
+    ("attachment_urls", "attachment"),
+    ("attachments", "attachment"),
+)
+
+
+def _assets_from(extra: dict) -> list[dict]:
+    """从采集器的自定义字段里认出附件 URL，登记到 `raw_accident_assets`。
+
+    为什么要登记：这些 PDF 常常是**正文的唯一来源**（省级站的通报正文直接
+    以附件形式挂出来，页面本身只有一行标题）。阶段② 要靠这张表知道该去下
+    哪些文件，不然信息就断在采集这一步了。
+
+    键名不认识的不猜——宁可少登记一条，也不要把一个普通链接当附件去下载。
+    元素允许是字符串或 `{"url": ...}` 形状的字典（两种都实测出现过）。
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for key, kind in _ASSET_KEYS:
+        val = (extra or {}).get(key)
+        if isinstance(val, str):
+            val = [val]
+        if not isinstance(val, (list, tuple)):
+            continue
+        for item in val:
+            if isinstance(item, dict):
+                url = item.get("url") or item.get("href")
+            else:
+                url = item
+            url = str(url or "").strip()
+            if url and url not in seen:
+                seen.add(url)
+                out.append({"asset_type": kind, "url": url})
+    return out
+
+
 def _row_from_sink_record(rec: dict, source_key: str, task_id: str
                           ) -> Optional[dict]:
     """通路 A：`RawAccidentStore.add()` 交出来的 record → 一行。
@@ -106,6 +147,8 @@ def _row_from_sink_record(rec: dict, source_key: str, task_id: str
         "fingerprint": None,        # 规则提取器还没跑（阶段②的事）
         "title_hash": None,
         "extra": json.dumps(extra, ensure_ascii=False, default=str) if extra else None,
+        # `_` 前缀的键不是 `raw_accidents` 的列，写库前会被摘出去单独处理
+        "_assets": _assets_from(extra),
     }
 
 
@@ -153,6 +196,7 @@ def _row_from_raw_item(item: RawAccidentText, source_key: str, task_id: str
         "ext_severity": item.extracted_severity or None,
         "confidence_overall": item.confidence_overall or None,
         "extra": json.dumps(extra, ensure_ascii=False, default=str) if extra else None,
+        "_assets": _assets_from(extra),
     }
 
 
@@ -187,6 +231,70 @@ def _fill(row: dict) -> dict:
 
 
 # --------------------------------------------------------------------------
+# 采集后过滤
+# --------------------------------------------------------------------------
+
+
+def normalize_params(params: Optional[dict]) -> dict:
+    """把请求参数归一成执行器认的形状。
+
+    `keywords` 允许传列表或逗号分隔的字符串（表单里是后者），统一成列表；
+    `limit` 统一成 int 或 None。**不改语义**——它到底是「采集后筛选」还是
+    「只抓这些」，见 `matches_filters()` 的说明。
+    """
+    p = dict(params or {})
+    kw = p.get("keywords")
+    if isinstance(kw, str):
+        p["keywords"] = [k.strip() for k in kw.replace("，", ",").split(",")
+                         if k.strip()]
+    elif isinstance(kw, (list, tuple)):
+        p["keywords"] = [str(k).strip() for k in kw if str(k).strip()]
+    else:
+        p["keywords"] = []
+
+    for k in ("since", "until"):
+        v = p.get(k)
+        p[k] = str(v)[:10] if v else None
+
+    if p.get("limit") is not None:
+        try:
+            p["limit"] = max(1, int(p["limit"]))
+        except (TypeError, ValueError):
+            p["limit"] = None
+    return p
+
+
+def matches_filters(row: dict, filters: dict) -> bool:
+    """入库前过滤的一道闸。
+
+    **这是「采集后筛选」，不是「只抓这些」。** 24 个适配器没有一个接受
+    `since` / `until` / `keywords`（唯一沾边的是 `safehoo.max_items` 和
+    `mem.start_year/end_year`，那属于源自己的构造参数），所以条件只能在
+    记录回来之后才判——网络请求数不会因此减少，页面上必须这么写，否则
+    用户会以为限了日期就能少抓几页。
+
+    `publish_date` 提不出来的记录在有日期条件时**一律保留**：过滤的目的是
+    缩小范围，不是把提不出日期的记录判死。省级站有相当比例的正文把日期
+    埋在 PDF 里，一律丢掉等于白跑一趟。
+    """
+    since, until = filters.get("since"), filters.get("until")
+    if since or until:
+        d = (row.get("publish_date") or "")[:10]
+        if d:
+            if since and d < since:
+                return False
+            if until and d > until:
+                return False
+
+    kws = filters.get("keywords") or []
+    if kws:
+        hay = (row.get("title") or "") + (row.get("content") or "")
+        if not any(k in hay for k in kws):
+            return False
+    return True
+
+
+# --------------------------------------------------------------------------
 # 单源收集器
 # --------------------------------------------------------------------------
 
@@ -197,7 +305,8 @@ class SourceOutcome:
 
     key: str
     ok: bool = False
-    collected: int = 0     # 源交出来的条数（含与库内重复的）
+    collected: int = 0     # 源交出来的条数（含与库内重复的、含被条件滤掉的）
+    filtered: int = 0      # 被 since/until/keywords 拦下的条数
     inserted: int = 0      # 真正落库的条数
     dup: int = 0           # 被 UNIQUE(url_hash) 拦下的条数
     error: str = ""
@@ -205,8 +314,8 @@ class SourceOutcome:
 
     def as_dict(self) -> dict:
         return {"ok": self.ok, "collected": self.collected,
-                "inserted": self.inserted, "dup": self.dup,
-                "error": self.error, "ms": self.ms}
+                "filtered": self.filtered, "inserted": self.inserted,
+                "dup": self.dup, "error": self.error, "ms": self.ms}
 
 
 class _Sink:
@@ -219,17 +328,24 @@ class _Sink:
     """
 
     def __init__(self, key: str, task_id: str, limit: Optional[int],
-                 stop: Callable[[], bool]):
+                 stop: Callable[[], bool], filters: Optional[dict] = None):
         self.key = key
         self.task_id = task_id
         self.limit = limit
         self._stop = stop
+        self.filters = filters or {}
         self.rows: list[dict] = []
         self._lock = threading.Lock()
         self.capped = False
+        self.filtered_out = 0
 
     def _accept(self, row: Optional[dict]) -> None:
         if row is None:
+            return
+        # 过滤放在计数之前：被条件拦下的记录不该占 limit 的名额，
+        # 否则「上限 20 条」在一堆不相关文本里会一条都留不下。
+        if not matches_filters(row, self.filters):
+            self.filtered_out += 1
             return
         with self._lock:
             if self.limit is not None and len(self.rows) >= self.limit:
@@ -257,6 +373,7 @@ class _Sink:
 
 def _run_source(spec: SourceSpec, task_id: str, *,
                 limit: Optional[int], tmp_root: Path,
+                filters: Optional[dict] = None,
                 per_source_timeout: int = SOURCE_TIMEOUT_S) -> SourceOutcome:
     """跑一个源：构造 → 挂 sink → collect → 收返回值 → 写库。
 
@@ -265,7 +382,8 @@ def _run_source(spec: SourceSpec, task_id: str, *,
     """
     started = time.monotonic()
     out = SourceOutcome(key=spec.key)
-    sink = _Sink(spec.key, task_id, limit, lambda: _is_cancelled(task_id))
+    sink = _Sink(spec.key, task_id, limit, lambda: _is_cancelled(task_id),
+                 filters)
 
     # 每个源一个独立临时目录：`data_dir` 传进去之后 PDF、详情 HTML 都落这里，
     # 任务结束即删。`data/<源名>/` 因此永远不出现（蓝图 01 §8 验收第 10 条）。
@@ -310,13 +428,41 @@ def _run_source(spec: SourceSpec, task_id: str, *,
             logger.debug("[%s] collect() 返回 %s，非列表，按 store 通路处理",
                          spec.key, type(ret).__name__)
 
-        out.collected = len(sink.rows)
+        out.collected = len(sink.rows) + sink.filtered_out
+        out.filtered = sink.filtered_out
 
         if sink.rows:
+            rows, assets_by_id = [], {}
+            for raw in sink.rows:
+                row = _fill(raw)
+                found = row.pop("_assets", None)
+                if found:
+                    assets_by_id[row["raw_id"]] = found
+                rows.append(row)
+
             with staging_db.write_tx() as con:
+                # 先问清楚哪些 raw_id 是新的。`INSERT OR IGNORE` 之后
+                # `total_changes` 只给总数，分不出「插进去的」和「被唯一键
+                # 拦下的」，而附件只能给真正新进来的记录登记——否则每重跑
+                # 一次采集，同一批 PDF 就再登记一遍。
+                ids = [r["raw_id"] for r in rows]
+                marks = ",".join("?" * len(ids))
+                existing = {r[0] for r in con.execute(
+                    f"SELECT raw_id FROM raw_accidents WHERE raw_id IN ({marks})",
+                    ids)}
+
                 before = con.total_changes
-                con.executemany(_INSERT_SQL, [_fill(r) for r in sink.rows])
+                con.executemany(_INSERT_SQL, rows)
                 out.inserted = con.total_changes - before
+
+                fresh = [(rid, a) for rid, lst in assets_by_id.items()
+                         if rid not in existing for a in lst]
+                if fresh:
+                    con.executemany(
+                        "INSERT INTO raw_accident_assets "
+                        "(raw_id, asset_type, url, ocr_status) "
+                        "VALUES (?, ?, ?, 'pending')",
+                        [(rid, a["asset_type"], a["url"]) for rid, a in fresh])
             out.dup = out.collected - out.inserted
 
         out.ok = True
@@ -324,7 +470,8 @@ def _run_source(spec: SourceSpec, task_id: str, *,
     except Exception as e:  # noqa: BLE001 —— 单源失败不许影响别的源
         out.ok = False
         out.error = f"{type(e).__name__}: {e}"[:500]
-        out.collected = len(sink.rows)
+        out.collected = len(sink.rows) + sink.filtered_out
+        out.filtered = sink.filtered_out
         logger.warning("[%s] 采集失败: %s", spec.key, out.error)
     finally:
         out.ms = int((time.monotonic() - started) * 1000)
@@ -390,7 +537,7 @@ def create_task(source_keys: list[str], params: Optional[dict] = None,
         registry.get(k)          # 未登记就抛 KeyError，早失败好过跑一半才发现
 
     task_id = _new_id()
-    p = dict(params or {})
+    p = normalize_params(params)
     p.setdefault("concurrency", concurrency)
     with staging_db.write_tx() as con:
         # 外键要求 collect_sources 先有行；同时保证源清单和代码同步
@@ -419,7 +566,7 @@ def run_task(task_id: str) -> dict:
         raise KeyError(f"任务不存在: {task_id}")
 
     keys: list[str] = json.loads(task["source_keys"])
-    params: dict = json.loads(task["params"] or "{}")
+    params: dict = normalize_params(json.loads(task["params"] or "{}"))
     limit = params.get("limit") or None
     concurrency = int(params.get("concurrency") or DEFAULT_CONCURRENCY)
 
@@ -436,7 +583,7 @@ def run_task(task_id: str) -> dict:
             for key in keys:
                 spec = registry.get(key)
                 fut = pool.submit(_run_source, spec, task_id, limit=limit,
-                                  tmp_root=tmp_root)
+                                  tmp_root=tmp_root, filters=params)
                 futures[fut] = spec
             for fut in futures:
                 spec = futures[fut]
@@ -472,6 +619,7 @@ def run_task(task_id: str) -> dict:
     totals = {
         "per_source": per_source,
         "collected": sum(v["collected"] for v in per_source.values()),
+        "filtered": sum(v["filtered"] for v in per_source.values()),
         "inserted": sum(v["inserted"] for v in per_source.values()),
         "dup": sum(v["dup"] for v in per_source.values()),
         "failed_sources": failed,

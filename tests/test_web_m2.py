@@ -278,6 +278,74 @@ def test_跨任务同URL被拦(staging, monkeypatch):
     assert stats["inserted"] == 0 and stats["dup"] == 1
 
 
+# ══════════════════════════════════════════════════════════════
+# 附件登记
+# ══════════════════════════════════════════════════════════════
+
+
+def test_附件URL登记成待处理资产(staging, monkeypatch):
+    """采集期只登记 URL，不下载——下载与 OCR 是阶段②的事。
+
+    省级站的通报常常把正文挂在 PDF 附件上，页面本身只有一行标题。不登记
+    就等于把正文丢了。
+    """
+    recs = [_record(f"https://example.com/a{i}") for i in range(2)]
+    _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+
+    rows = sdb.query("SELECT raw_id, asset_type, url, ocr_status "
+                     "FROM raw_accident_assets ORDER BY raw_id")
+    assert len(rows) == 2
+    assert all(r["asset_type"] == "pdf" for r in rows)
+    assert all(r["ocr_status"] == "pending" for r in rows), "等着阶段②去下载 OCR"
+    assert all(r["url"].endswith(".pdf") for r in rows)
+
+
+def test_重跑不重复登记附件(staging, monkeypatch):
+    """第二次采集同一条被 UNIQUE 拦下，附件也不该再登记一遍。"""
+    recs = [_record("https://example.com/same")]
+    _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+    _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+
+    n = sdb.scalar("SELECT COUNT(*) FROM raw_accident_assets", default=0)
+    assert n == 1, f"附件被重复登记了 {n} 次"
+
+
+def test_附件键名与元素形状都认(staging, monkeypatch):
+    """pdf_urls / image_urls / attachments 三种键、字符串与字典两种元素。"""
+    recs = [_record("https://example.com/multi",
+                    image_urls="https://example.com/m.png",
+                    attachments=[{"url": "https://example.com/doc.docx"},
+                                 "https://example.com/raw.pdf"])]
+    _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+
+    rows = sdb.query("SELECT asset_type, url FROM raw_accident_assets ORDER BY id")
+    assert [(r["asset_type"], r["url"]) for r in rows] == [
+        ("pdf", "https://example.com/multi.pdf"),
+        ("image", "https://example.com/m.png"),
+        ("attachment", "https://example.com/doc.docx"),
+        ("attachment", "https://example.com/raw.pdf"),
+    ]
+
+
+def test_认不出的键不当附件(staging, monkeypatch):
+    """宁可不登记，也不要把普通链接当附件去下载。"""
+    recs = [_record("https://example.com/x", pdf_urls=[],
+                    related_links=["https://example.com/other"])]
+    _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+
+    assert sdb.scalar("SELECT COUNT(*) FROM raw_accident_assets", default=0) == 0
+
+
+def test_没有URL的记录直接丢(staging, monkeypatch):
+    """`raw_id` / `url_hash` 都由 URL 算出，没有 URL 就没有主键。"""
+    recs = [_record("https://example.com/ok"),
+            {"id": "nourl", "title": "无 URL 的记录", "content": "正文"}]
+    _, stats = _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch)
+
+    assert _raw_count() == 1
+    assert stats["collected"] == 1, "丢掉的不算收集数，否则 dup 会算错"
+
+
 def test_limit只截收集不截采集(staging, monkeypatch):
     recs = [_record(f"https://example.com/l{i}") for i in range(10)]
     _, stats = _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch, limit=3)
@@ -286,6 +354,63 @@ def test_limit只截收集不截采集(staging, monkeypatch):
     # 源本身没有 limit 概念（只有 safehoo 有 max_items），所以它照跑 10 条，
     # 是收集层把后 7 条丢了。这个数字就是那条限制的证据。
     assert stats["per_source"][KEY]["collected"] == 3
+
+
+# ══════════════════════════════════════════════════════════════
+# 采集后过滤（since / until / keywords）
+# ══════════════════════════════════════════════════════════════
+
+
+def test_keywords过滤掉不相关文本(staging, monkeypatch):
+    recs = [
+        _record("https://example.com/k1", title="某工地坍塌事故"),
+        _record("https://example.com/k2", title="某工地坠落事故"),
+        _record("https://example.com/k3", title="脚手架坍塌致2死"),
+    ]
+    _, stats = _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch,
+                    keywords="坍塌")
+
+    assert _raw_count() == 2
+    assert stats["filtered"] == 1
+    assert stats["per_source"][KEY]["collected"] == 3, "collected 含被滤掉的"
+
+
+def test_日期过滤但保留提不出日期的记录(staging, monkeypatch):
+    recs = [
+        _record("https://example.com/d1", publish_date="2026-05-01"),
+        _record("https://example.com/d2", publish_date="2025-01-01"),
+        _record("https://example.com/d3", publish_date=""),      # 提不出日期
+    ]
+    _, stats = _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch,
+                    since="2026-01-01")
+
+    assert _raw_count() == 2, "2025 那条该被拦，无日期的必须留下"
+    assert stats["filtered"] == 1
+
+
+def test_过滤发生在limit之前(staging, monkeypatch):
+    """被条件拦下的条目不占 limit 名额，否则上限会被无关文本吃光。"""
+    recs = ([_record(f"https://example.com/n{i}", title="防汛演练")
+             for i in range(6)]
+            + [_record(f"https://example.com/h{i}", title="高处坠落事故")
+               for i in range(4)])
+    _, _ = _run(lambda **kw: StoreCollector(recs, **kw), monkeypatch,
+                keywords="坠落", limit=3)
+
+    rows = sdb.query("SELECT title FROM raw_accidents")
+    assert len(rows) == 3
+    assert all("坠落" in r["title"] for r in rows)
+
+
+def test_params归一化(staging):
+    p = executor.normalize_params({"keywords": "坍塌， 坠落 ,", "limit": "20",
+                                   "since": "2026-01-01T00:00:00"})
+    assert p["keywords"] == ["坍塌", "坠落"]
+    assert p["limit"] == 20
+    assert p["since"] == "2026-01-01"
+
+    p = executor.normalize_params({"keywords": None, "limit": "abc"})
+    assert p["keywords"] == [] and p["limit"] is None
 
 
 # ══════════════════════════════════════════════════════════════

@@ -980,3 +980,267 @@ body.lb-locked { overflow: hidden; }
   .bar-row { grid-template-columns: minmax(64px, 100px) 1fr auto; gap: 8px; }
   .stat-value { font-size: 21px; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   ⑭ 跨页补齐
+   ══════════════════════════════════════════════════════════ */
+
+/* 下面这几个类在 overview.js / accident.js / causes.js 里早就用上了，
+   当时只补了各自专用的一段，公共的漏在这里。补齐而不是另起名字——
+   JS 那边已经写好了，改名要动四个文件。 */
+
+.mono { font-family: var(--mono); }
+.wrap { white-space: normal; word-break: break-all; }
+
+/* 外链：URL 用等宽，且允许在任意位置断行——政府站点的 URL 经常一百多
+   字符，按词断行会把整行撑破 */
+.ext { word-break: break-all; }
+
+/* 次要按钮（行内操作用）。.btn 的默认 padding 是按表单按钮定的，放进
+   表格行里会把行高撑到 40px 以上。 */
+.btn-sm { padding: 3px 9px; font-size: 12.5px; line-height: 1.5; }
+
+/* 「当前条件下没有……」这类空态提示。与 .empty 的区别：.empty 占整块，
+   这个是块内的一行说明，所以不居中、不分段。 */
+.empty-note { margin: 8px 2px; font-size: 13px; color: var(--muted); }
+
+/* 原文引用块：事故报告的正文段落 */
+.raw-text {
+  margin: 0; padding: 11px 13px;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+  font-size: 13.5px; line-height: 1.75; color: var(--text-2);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* 原始 HTML / 采集器 extra：抓回来的**数据**，不是页面结构。
+   等宽 + pre-wrap 原样展示，任何时候都不解析它。 */
+.raw-html {
+  margin: 8px 0 0; padding: 10px 12px;
+  max-height: 320px; overflow: auto;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.55;
+  color: var(--text-2); white-space: pre-wrap; word-break: break-all;
+}
+
+/* 侧栏抽屉。详情页用弹窗、采集页用抽屉，两者共用 .raw-text/.raw-html
+   这类内容块，但外壳各自定义。 */
+.drawer {
+  position: fixed; inset: 0 0 0 auto; z-index: 40;
+  width: min(720px, 92vw);
+  display: flex;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -6px 0 28px rgba(42, 39, 36, .12);
+}
+/* [hidden] 的 UA 规则只有 0,0,1 的特异性，会被上面的 display:flex 盖掉，
+   于是「hidden 却还显示着」。这里显式再关一次。 */
+.drawer[hidden] { display: none; }
+
+.drawer-inner { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+
+.drawer-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+}
+.drawer-head h3 { margin: 0 auto 0 0; font-size: 14px; font-weight: 600; }
+
+.drawer-body { flex: 1; overflow-y: auto; padding: 14px 16px 28px; }
+
+.drawer-title {
+  margin: 0 0 12px; font-size: 17px; font-weight: 600; line-height: 1.45;
+}
+.drawer-src { margin: 10px 0 0; font-size: 12px; word-break: break-all; }
+
+.drawer-block {
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.drawer-block h4 {
+  margin: 0 0 7px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.drawer-block > p { margin: 0; font-size: 13.5px; line-height: 1.7;
+                    color: var(--text-2); }
+.drawer-block > summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.drawer-block > summary:hover { color: var(--text-2); }
+
+/* 键值对网格：列宽自适应，值太长时换行而不是撑破抽屉 */
+.kv-grid {
+  display: grid; gap: 9px 18px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.kv { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.kv-key { font-size: 11.5px; color: var(--muted); }
+.kv-val { font-size: 13px; color: var(--text-2); word-break: break-word; }
+
+/* 附件登记行 */
+.asset-list { list-style: none; margin: 0; padding: 0;
+              display: flex; flex-direction: column; gap: 5px; }
+.asset-list li { display: flex; align-items: baseline; gap: 8px;
+                 font-size: 12px; word-break: break-all; }
+.asset-type {
+  flex: 0 0 auto; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+}
+
+/* ══════════════════════════════════════════════════════════
+   ⑮ 在线采集（阶段①）
+   ══════════════════════════════════════════════════════════ */
+
+.notice-warn {
+  background: #FBF3E6; border-color: #EBD9B8; color: #7A5A21;
+}
+.notice-warn code { background: rgba(255, 255, 255, .6); }
+
+/* 表单按钮旁的一行状态文案（「正在提交…」「提交失败：…」） */
+.hint-inline { font-size: 12.5px; color: var(--muted); }
+
+/* 采集页判的是「相关/不相关、正常/失败」，与事故等级那套 sev-1..4 不是
+   一回事，所以另起一组语义变体，不动原有定义。 */
+.badge.is-ok      { background: var(--brand-soft); color: var(--brand-dark);
+                    border-color: #CFE4DF; }
+.badge.is-sev     { background: #F8E8E6; color: var(--sev-2);
+                    border-color: #EBD2CF; }
+.badge.is-warn    { background: #FBF0E4; color: var(--sev-3);
+                    border-color: #EEDCC4; }
+.badge.is-muted   { background: var(--surface-2); color: var(--muted);
+                    border-color: var(--border); }
+.badge.is-running { background: #E7EEF6; color: var(--link);
+                    border-color: #D3E0EE; }
+
+/* ── 源清单 ── */
+
+.grid-src tbody td { vertical-align: middle; }
+.grid-src td.col-pick { width: 32px; text-align: center; }
+.grid-src .col-src { width: 30%; }
+.grid-src .col-auth { width: 15%; }
+.grid-src .col-time { width: 118px; white-space: nowrap; }
+.grid-src .col-num { width: 76px; }
+.grid-src .col-health { width: 84px; }
+.grid-src .col-act { width: 62px; text-align: right; }
+
+/* 未启用的源：看得见（用户要知道它存在），但整行压暗 */
+.grid-src tr.is-off { opacity: .45; }
+
+.src-name { display: block; font-weight: 600; color: var(--text); }
+.src-key { font-size: 11px; color: var(--muted); }
+
+/* 分组标题行。不用 sticky——表头已经占了 sticky top:0，两个粘在一起会
+   互相盖。分组本身就短，滚过去也能靠 .src-key 认出源名。 */
+.group-row td {
+  padding: 9px 20px 5px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .05em;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+/* ── 任务卡 ── */
+
+#taskList { display: flex; flex-direction: column; gap: 10px; }
+
+.task-card {
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: var(--radius);
+}
+.task-card.is-pending    { border-left-color: var(--border); }
+.task-card.is-running    { border-left-color: var(--link); }
+.task-card.is-cancelling { border-left-color: var(--sev-3); }
+.task-card.is-done       { border-left-color: var(--brand); }
+.task-card.is-failed     { border-left-color: var(--sev-2); }
+.task-card.is-cancelled  { border-left-color: var(--muted); }
+
+.task-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.task-id { font-size: 12px; color: var(--text-2); }
+.task-scope { font-size: 13px; }
+.task-time {
+  margin-left: auto; font-size: 12px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.task-actions { display: flex; gap: 6px; }
+
+/* 进度条的分母是「选了几个源」，不是「多少条事故」——适配器不报总数，
+   按条数画进度条只能是假的。 */
+.task-progress {
+  height: 4px; margin: 9px 0 7px;
+  background: var(--surface-2); border-radius: 999px; overflow: hidden;
+}
+.task-progress-fill {
+  height: 100%; background: var(--brand);
+  transition: width .3s ease;
+}
+
+.task-totals {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 12px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.task-sources {
+  list-style: none; margin: 9px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.task-sources li {
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+}
+.ts-name {
+  flex: 0 0 11em; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.ts-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ts-ms { color: var(--muted); }
+.ts-err {
+  max-width: 44ch; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+  color: var(--sev-2);
+}
+.task-error { margin: 8px 0 0; font-size: 12.5px; color: var(--sev-2); }
+
+/* ── 原始数据表 ── */
+
+.grid td.col-title { max-width: 42ch; }
+.grid td.col-reason {
+  max-width: 26ch; font-size: 12.5px; color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.grid td.col-src-small { font-size: 12.5px; color: var(--text-2); }
+.grid td.col-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.preview { font-size: 11.5px; }
+.asset-dot { margin-right: 7px; font-size: 11px; color: var(--muted); }
+.empty-cell { padding: 22px 0; text-align: center; font-size: 13.5px;
+              color: var(--muted); }
+
+/* ── 批量裁决条 ── */
+
+/* 固定在底部而不是表格上方：勾选发生在滚到表格中段的时候，操作条得跟
+   着视线走。胶囊形状让它明显浮在内容之上，不会被误当成页面的一部分。 */
+.bulkbar {
+  position: fixed; left: 50%; bottom: 18px; z-index: 30;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.bulkbar[hidden] { display: none; }
+.bulk-count { margin-right: 4px; font-size: 13px; color: var(--text-2); }
+
+/* ── 窄屏 ── */
+
+/* 源清单有 8 列，1100px 以下先丢「发布机构」和「上次运行」——这两列是
+   辅助信息，源名与健康度才是要看的。 */
+@media (max-width: 1100px) {
+  .grid-src .col-auth, .grid-src .col-time { display: none; }
+}
+
+@media (max-width: 780px) {
+  .bulkbar { left: 10px; right: 10px; transform: none;
+             justify-content: center; flex-wrap: wrap; }
+  .drawer { width: 100vw; }
+  .ts-name { flex-basis: 8em; }
+}

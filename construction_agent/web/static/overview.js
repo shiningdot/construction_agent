@@ -569,7 +569,7 @@
     unanchored: '认不出来',
   };
 
-  function renderQuality(ov, audit) {
+  function renderQuality(ov, audit, img) {
     const dq = ov.data_quality;
     const pg = ov.province_group;
 
@@ -589,6 +589,20 @@
       { h: '年份缺失', v: num(dq.year_unlabeled),
         p: '无日期或格式异常，不计入年份序列。' },
     ];
+
+    // 图片覆盖率是同一类信息：这条数据线收了多少、缺口在哪。放进质量面板
+    // 而不是单开一块，是因为它和上面四张回答的是同一个问题——「这批数据
+    // 有多全」。工作库没建时整张卡不出现，而不是显示一个 0：没有图片索引
+    // 与「一张图都没有」是两件事，混在一起会谎报采集完整度。
+    if (img && img.available) {
+      cards.push({
+        h: '现场图片', v: num(img.files),
+        p: `覆盖 ${num(img.accidents_with_images)} 条事故`
+           + `（${(img.coverage * 100).toFixed(1)}%）；其中 `
+           + `${num(img.accidents_with_images_legacy_only)} 条只有早期目录`
+           + `（images/、imageV2/）里的图，没有最终版。`,
+      });
+    }
 
     const grid = el('div', { cls: 'quality-grid' });
     cards.forEach((c) => {
@@ -625,8 +639,12 @@
   }
 
   function loadQuality(ov) {
-    return jsonGet('/api/province/audit')
-      .then((a) => renderQuality(ov, a))
+    // 两个端点并行取。图片统计失败（工作库没建）不该拖垮整个质量面板，
+    // 所以那一路单独 catch 成 null，由 renderQuality 决定要不要出卡。
+    return Promise.all([
+      jsonGet('/api/province/audit'),
+      jsonGet('/api/images/stats').catch(() => null),
+    ]).then(([a, img]) => renderQuality(ov, a, img))
       .catch(() => {});
   }
 

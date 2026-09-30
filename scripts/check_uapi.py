@@ -36,6 +36,7 @@ except Exception as e:
 
 print("\nDB 状态:")
 db = sqlite3.connect("/home/suntianhao/construction_agent/data/caiems_v2.db")
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 total = db.execute("SELECT COUNT(*) FROM accidents").fetchone()[0]
 searched = db.execute("SELECT COUNT(*) FROM accidents WHERE search_performed=1").fetchone()[0]
 news = db.execute("""

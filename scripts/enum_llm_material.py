@@ -101,6 +101,7 @@ def main():
     db_path = Path(args.db)
     if not db_path.is_absolute(): db_path = Path.cwd() / db_path
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     rows = conn.execute("""
         SELECT material_involved, COUNT(*) FROM accidents
         WHERE material_involved IS NOT NULL AND material_involved != ''

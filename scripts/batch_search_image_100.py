@@ -25,6 +25,7 @@ if os.path.exists(CHECKPOINT):
 
 # 选取100条未增强的新闻事故
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 candidates = db.execute("""
     SELECT id, title, raw_text, source_url FROM accidents
     WHERE source_name IN ('safehoo','esafety')

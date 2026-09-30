@@ -22,6 +22,7 @@ if os.path.exists(CHECKPOINT):
 
 # 选取未采集图片的新闻事故(优先已搜索增强过的, 因为搜索增强记录了 enriched_text)
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 candidates = db.execute("""
     SELECT id, title, raw_text FROM accidents
     WHERE source_name IN ('safehoo','esafety')

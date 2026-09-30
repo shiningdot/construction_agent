@@ -9,6 +9,7 @@ key_uapi = os.getenv("UAPI_KEY", "")
 key_llm = os.getenv("ANTHROPIC_API_KEY", "")
 
 db = sqlite3.connect("/home/suntianhao/construction_agent/data/caiems_v2.db")
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 r = db.execute("SELECT id, title, raw_text FROM accidents WHERE source_name IN ('safehoo','esafety') AND raw_text IS NOT NULL AND length(raw_text) > 300 ORDER BY RANDOM() LIMIT 1").fetchone()
 db.close()
 acc_id, title, raw_text = r

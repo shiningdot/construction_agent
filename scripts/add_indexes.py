@@ -80,6 +80,7 @@ def main() -> int:
         return 2
 
     con = sqlite3.connect(db_path)
+    con.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     try:
         # 前置检查：确认表都在，避免建到一半失败
         for table in TABLES:

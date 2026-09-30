@@ -45,6 +45,7 @@ log.info("Step1就绪")
 # ---- 加载任务 ----
 processed=set(json.load(open(CHECKPOINT))) if os.path.exists(CHECKPOINT) else set()
 db=sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 candidates=db.execute("""SELECT id,title,raw_text FROM accidents
     WHERE source_name IN ('safehoo','esafety')
     AND raw_text IS NOT NULL AND length(raw_text)>200

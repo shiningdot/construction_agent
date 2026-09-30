@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sqlite3, httpx, os, time
 db=sqlite3.connect("/home/suntianhao/construction_agent/data/caiems_v2.db")
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 r=db.execute("SELECT id, title, city, accident_type FROM accidents WHERE id='ae16d12d2c7f'").fetchone()
 db.close()
 key=os.getenv("UAPI_KEY")

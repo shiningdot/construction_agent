@@ -218,6 +218,7 @@ def main():
         print(f"[ERROR] 数据库不存在: {db_path}"); sys.exit(1)
 
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     rows = conn.execute("""
         SELECT equipment_involved, COUNT(*) FROM accidents
         WHERE equipment_involved IS NOT NULL AND equipment_involved != ''

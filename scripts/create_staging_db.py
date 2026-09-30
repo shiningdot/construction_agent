@@ -40,6 +40,7 @@ def print_info(path: Path) -> None:
     print(f"  大小：{size_mb:.1f} MB")
 
     con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    con.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     try:
         ver = con.execute(
             "SELECT value FROM staging_metadata WHERE key='schema_version'"

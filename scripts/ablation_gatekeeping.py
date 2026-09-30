@@ -129,6 +129,7 @@ ALL_CODES = [f'{L}{i}' for L, n in [('M',5),('F',4),('T',4),('H',4),('C',2)] for
 def load_sample():
     """从 DB 分层抽取 100 条（accident_type × severity 比例分配）"""
     db = sqlite3.connect(DB)
+    db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     rows = db.execute("""
         SELECT id, title, raw_text, accident_type, severity
         FROM accidents

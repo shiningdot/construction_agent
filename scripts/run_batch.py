@@ -21,6 +21,7 @@ N = int(sys.argv[3]) if len(sys.argv) > 3 else 50
 WORKERS = int(sys.argv[4]) if len(sys.argv) > 4 else 3
 
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 existing_ids = set(r[0] for r in db.execute("SELECT id FROM accidents").fetchall())
 existing_urls = set(r[0] for r in db.execute("SELECT source_url FROM accidents").fetchall())
 print(f"[init] DB已有 {len(existing_ids)} 条", flush=True)

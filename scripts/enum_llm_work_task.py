@@ -425,6 +425,7 @@ def main():
 
     # 读取数据
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     rows = conn.execute("""
         SELECT work_task, COUNT(*) as cnt
         FROM accidents

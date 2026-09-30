@@ -95,6 +95,7 @@ def main():
     db_path = Path(args.db)
     if not db_path.is_absolute(): db_path = Path.cwd() / db_path
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     rows = conn.execute("""
         SELECT worker_type, COUNT(*) FROM accidents WHERE worker_type IS NOT NULL AND worker_type != ''
           AND worker_type != '未提及' AND worker_type != 'null'

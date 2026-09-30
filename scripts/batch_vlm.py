@@ -10,6 +10,7 @@ CHECKPOINT = "/home/suntianhao/construction_agent/data/vlm_checkpoint.json"
 
 processed = set(json.load(open(CHECKPOINT))) if os.path.exists(CHECKPOINT) else set()
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 
 rows = db.execute("""
     SELECT a.id, a.title, a.accident_type, a.severity, a.deaths, a.injuries, a.city, a.work_task,

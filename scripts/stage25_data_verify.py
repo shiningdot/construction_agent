@@ -16,6 +16,7 @@ def check(name, ok, detail=''):
 
 print('=== A. 数据库统计 ===')
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 n = db.execute('SELECT COUNT(*) FROM accidents').fetchone()[0]
 check('事故记录 2,623', n == 2623, f'(DB={n})')
 n = db.execute('SELECT COUNT(*) FROM caics_causes').fetchone()[0]

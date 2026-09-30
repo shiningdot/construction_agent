@@ -68,6 +68,7 @@ for name, s in assertions:
 print()
 print('=== D. 数据库与实验一/三数字（rerun stage25 核心项） ===')
 db = sqlite3.connect('/home/suntianhao/construction_agent/data/caiems_v2.db')
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 n = db.execute('SELECT COUNT(*) FROM accidents').fetchone()[0]
 check('2,623 条记录', n == 2623 and '2,623' in paper)
 n = db.execute('SELECT COUNT(*) FROM caics_causes').fetchone()[0]

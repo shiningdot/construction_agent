@@ -10,6 +10,7 @@ sys.path.insert(0, '/home/suntianhao/construction_agent/.claude/worktrees/classi
 from ablation_gatekeeping import PROMPTS, JSON_SPEC, USER_PREFIX, TWOSTEP_BODY, COVERAGE, extract_json
 
 db = sqlite3.connect('/home/suntianhao/construction_agent/data/caiems_v2.db')
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 row = db.execute("SELECT id, title, raw_text FROM accidents WHERE raw_text IS NOT NULL AND length(raw_text)>200 LIMIT 1").fetchone()
 db.close()
 acc_id, title, text = row

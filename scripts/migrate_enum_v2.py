@@ -395,6 +395,7 @@ def main():
         sys.exit(1)
 
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 
     if args.rollback:
         print("回滚到 v1.0 规则版...")

@@ -5,6 +5,7 @@ sys.path.insert(0, "/home/suntianhao/construction_agent/.claude/worktrees/classi
 from construction_agent.extraction.vlm_analyzer import VLMAnalyzer
 
 db = sqlite3.connect("/home/suntianhao/construction_agent/data/caiems_v2.db")
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 ids = ("55cee856a09e","28cc000bce2f","b7d2d036d638","58b66050e8b2","f78d268438ee")
 rows = db.execute(
     "SELECT a.id,a.title,a.accident_type,a.severity,a.deaths,a.injuries,a.city,a.work_task,i.local_path "

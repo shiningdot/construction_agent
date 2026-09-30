@@ -166,6 +166,7 @@ def load_backfill(final_db: Path | None) -> tuple[dict, dict]:
         return {}, {}
 
     con = sqlite3.connect(f"file:{final_db.as_posix()}?mode=ro", uri=True)
+    con.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     con.row_factory = sqlite3.Row
     try:
         files: dict[tuple[str, str], dict] = {}

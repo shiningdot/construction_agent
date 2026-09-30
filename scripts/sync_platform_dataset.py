@@ -15,6 +15,7 @@ if DST.exists():
     print('已备份原 193 条文件 → accidents_merged.json.bak193')
 
 db = sqlite3.connect(DB)
+db.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
 db.row_factory = sqlite3.Row
 
 # 每条事故的 CAICS 编码

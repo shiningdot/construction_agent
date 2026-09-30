@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from construction_agent.web import accidents_query, db, overview, province
+from construction_agent.web import accidents_query, db, detail, overview, province
 from construction_agent.web.factory import create_app
 
 # ══════════════════════════════════════════════════════════════
@@ -34,12 +34,19 @@ CREATE TABLE accidents (
     work_task TEXT
 );
 CREATE TABLE caics_causes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     accident_id TEXT, code TEXT, name TEXT, evidence TEXT,
-    inference TEXT, evidence_quality TEXT
+    inference TEXT, evidence_quality TEXT, sort_order INTEGER
 );
 CREATE TABLE enum_definitions (
     enum_type TEXT, code TEXT, name TEXT,
     is_active INTEGER DEFAULT 1
+);
+CREATE TABLE image_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accident_id TEXT, local_path TEXT, source_url TEXT,
+    phase1_scene_type TEXT, phase1_objects TEXT, phase1_damage TEXT,
+    phase2_consistency TEXT, phase2_confidence REAL
 );
 """
 
@@ -90,14 +97,17 @@ ACCIDENTS: list[dict] = [
          source_name="safehoo"),
 ]
 
-# 6 条编码，覆盖 5 条事故；证据三级各有
-CAUSES: list[tuple[str, str, str, str]] = [
-    ("a1", "M1", "现场监管缺失", "direct_quote"),
-    ("a1", "H1", "违反操作规程", "indirect_infer"),
-    ("a2", "F4", "个体防护未使用", "direct_quote"),
-    ("a4", "T1", "设备机具故障", "weak_infer"),
-    ("a5", "M2", "隐患排查失效", "direct_quote"),
-    ("a10", "H3", "风险辨识失败", "direct_quote"),
+# 6 条编码，覆盖 5 条事故；证据三级各有。
+# `evidence` / `inference` 留空是有意的——实测主库两列各有 8 / 11 条空串，
+# 详情页必须显示「未提供证据文本」而不能拿类名冒充证据。
+# sort_order 取层级顺序，验证层内排序而非按 code 字母序。
+CAUSES: list[tuple[str, str, str, str, int]] = [
+    ("a1", "M1", "现场监管缺失", "direct_quote", 8),
+    ("a1", "H1", "违反操作规程", "indirect_infer", 20),
+    ("a2", "F4", "个体防护未使用", "direct_quote", 11),
+    ("a4", "T1", "设备机具故障", "weak_infer", 15),
+    ("a5", "M2", "隐患排查失效", "direct_quote", 9),
+    ("a10", "H3", "风险辨识失败", "direct_quote", 22),
 ]
 
 # 工序枚举：3 条在用 + 1 条停用。停用那条用来验证 `is_active=0` 不会被查到名字。
@@ -126,7 +136,8 @@ def tiny_db(tmp_path, monkeypatch) -> Path:
     con.executescript(SCHEMA)
     _insert(con, "accidents", ACCIDENT_COLS, ACCIDENTS)
     con.executemany(
-        "INSERT INTO caics_causes (accident_id,code,name,evidence_quality) VALUES (?,?,?,?)",
+        "INSERT INTO caics_causes (accident_id,code,name,evidence_quality,sort_order)"
+        " VALUES (?,?,?,?,?)",
         CAUSES,
     )
     con.executemany(
@@ -526,10 +537,173 @@ class TestWorkTask:
         assert accidents_query.enum_names("work_task") is first
 
 
+# ══════════════════════════════════════════════════════════════
+# 详情页（蓝图 05）
+# ══════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def dup_client(tiny_db):
+    """在 tiny_db 上追加「同一编码多条标注」与图片记录。
+
+    单独开一个 fixture 是为了不动共用的 `ACCIDENTS` / `CAUSES`——概览与
+    列表的断言依赖那两组的计数。`caics_causes` 对 `(accident_id, code)`
+    无唯一约束是主库的实测事实（278 组重复、616 行），这里复现它。
+    """
+    con = sqlite3.connect(tiny_db)
+    con.executemany(
+        "INSERT INTO caics_causes (accident_id,code,name,evidence,inference,"
+        "evidence_quality,sort_order) VALUES (?,?,?,?,?,?,?)",
+        [
+            # a1 的 M1 第二条：等级更弱、证据文本是空串（实测 8 条这种情况）
+            ("a1", "M1", "现场监管缺失", "", "", "weak_infer", 8),
+            # a1 的 H1 第二条：等级更强且带证据，验证合并取最强
+            ("a1", "H1", "违反操作规程", "工人未系安全带", "现场照片可见",
+             "direct_quote", 20),
+            # 中间层，验证层分组顺序与层内 sort_order 排序
+            ("a1", "F2", "防护设施缺失", "临边无护栏", "", "direct_quote", 12),
+        ],
+    )
+    con.execute(
+        "INSERT INTO image_analyses (accident_id,local_path,source_url,"
+        "phase1_scene_type,phase1_damage,phase2_consistency) "
+        "VALUES ('a1','data/imageV3/a1/1.jpg','http://example.invalid/1.jpg',"
+        "'坍塌现场','结构破坏','一致')"
+    )
+    con.execute(
+        "INSERT INTO image_analyses (accident_id,local_path,phase1_scene_type) "
+        "VALUES ('a1','data/imageV3/a1/2.jpg','救援现场')"
+    )
+    con.commit()
+    con.close()
+    accidents_query.reset_cache()
+    return create_app({"TESTING": True}).test_client()
+
+
+class TestDetail:
+    """详情聚合。接口契约：`detail.build()` 的返回值即前端唯一数据源。"""
+
+    def test_不存在的_id_返回_404(self, client):
+        """404 而不是 200 + 空对象——「没有这条」与「这条什么都没有」是两件事。"""
+        r = client.get("/api/accidents/zzz")
+        assert r.status_code == 404
+        assert r.get_json()["error"] == "accident_not_found"
+
+    def test_详情页路由出壳(self, client):
+        r = client.get("/accident/a1")
+        assert r.status_code == 200
+        assert b'data-accident-id="a1"' in r.data
+
+    def test_层分组且层内按_sort_order_排(self, dup_client):
+        d = dup_client.get("/api/accidents/a1").get_json()["data"]
+        assert [c["code"] for c in d["causes"]["items"]] == ["M1", "F2", "H1"]
+        assert [c["layer"] for c in d["causes"]["items"]] == ["M", "F", "H"]
+        assert d["causes"]["items"][1]["layer_label"] == "设施设备"
+
+    def test_同一编码多条标注并列不丢弃(self, dup_client):
+        d = dup_client.get("/api/accidents/a1").get_json()["data"]
+        m1 = d["causes"]["items"][0]
+        assert m1["code"] == "M1"
+        assert m1["citation_count"] == 2
+        assert len(m1["citations"]) == 2
+
+    def test_合并后证据等级取最强(self, dup_client):
+        """并存一条弱推断不该把「原文有直引」降级。"""
+        by_code = {c["code"]: c
+                   for c in dup_client.get("/api/accidents/a1").get_json()["data"]
+                   ["causes"]["items"]}
+        assert by_code["M1"]["evidence_quality"] == "direct_quote"
+        assert by_code["H1"]["evidence_quality"] == "direct_quote"
+        assert by_code["H1"]["quality_label"] == "原文直接表述"
+
+    def test_空证据给_None_不拿类名冒充(self, dup_client):
+        by_code = {c["code"]: c
+                   for c in dup_client.get("/api/accidents/a1").get_json()["data"]
+                   ["causes"]["items"]}
+        # M1 两条的证据列都是空串（主库实测 8 / 11 条这种情况）→ 一律给 None
+        assert [c["evidence"] for c in by_code["M1"]["citations"]] == [None, None]
+        # H1 一条空、一条有文本：并列展示，各归各，不互相顶替
+        evs = [c["evidence"] for c in by_code["H1"]["citations"]]
+        assert None in evs
+        assert "工人未系安全带" in evs
+
+    def test_计数口径两个层次(self, dup_client):
+        """`citations` 是标注行数，`distinct` 是事故×类别覆盖数。"""
+        c = dup_client.get("/api/accidents/a1").get_json()["data"]["causes"]
+        assert c["citations"] == 5   # M1×2 + H1×2 + F2×1
+        assert c["distinct"] == 3
+
+    def test_无编码事故不报错(self, client):
+        c = client.get("/api/accidents/a8").get_json()["data"]["causes"]
+        assert c["items"] == []
+        assert c["distinct"] == 0
+        assert c["citations"] == 0
+
+    def test_分档带可用数且_D_档含被困人数(self, client):
+        tiers = client.get("/api/accidents/a1").get_json()["data"]["tiers"]
+        assert [t["key"] for t in tiers] == ["A", "B", "C", "D"]
+        a = tiers[0]
+        assert a["total"] == 11
+        # a1 有值 8 项：title/date/province/type/severity/deaths/injuries/direct_cause
+        # 缺 3 项：city / accident_location_detail / summary
+        assert a["available"] == 8
+        d = tiers[3]
+        assert "trapped_count" in d["fields"]
+        assert "weather" in d["fields"]
+
+    def test_空值与零可区分(self, client):
+        """a2 的 `deaths=0` 算有值。
+
+        语义是「报道未提及伤亡」而非「这一栏没填」——若把 0 判成缺失，
+        主库 2,280 条记录过死亡人数的数据会被系统性地误判（蓝图 00 §3.5）。
+        a2 实际有值 7 项（含 deaths=0），缺 city / accident_location_detail /
+        summary / direct_cause 4 项。
+        """
+        tiers = client.get("/api/accidents/a2").get_json()["data"]["tiers"]
+        assert tiers[0]["available"] == 7
+
+    def test_省份走与列表页同一套归一(self, client):
+        d = client.get("/api/accidents/a4").get_json()["data"]["fields"]
+        # 原始脏值保留，归一结果另存——脏值不掩盖、可追溯
+        assert d["province"] == "鄂州市五里墩建设工地"
+        assert d["province_label"] == "湖北省"
+
+    def test_工序列给中文名(self, client):
+        f = client.get("/api/accidents/a1").get_json()["data"]["fields"]
+        assert f["work_task"] == "WT01"
+        assert f["work_task_label"] == "地基与基础工程"
+
+    def test_编码不在枚举表时回退编码本身(self, client):
+        f = client.get("/api/accidents/a4").get_json()["data"]["fields"]
+        assert f["work_task_label"] == "WT77"
+
+    def test_图片按事故过滤(self, dup_client, client):
+        assert len(dup_client.get("/api/accidents/a1").get_json()
+                   ["data"]["images"]) == 2
+        assert client.get("/api/accidents/a2").get_json()["data"]["images"] == []
+
+    def test_元信息含分类判定路径(self, client):
+        m = client.get("/api/accidents/a1").get_json()["data"]["meta"]
+        assert set(m) == {"id", "source_name", "source_url", "crawl_date",
+                          "report_type", "text_type", "classification_verdict",
+                          "classification_confidence", "source_count",
+                          "search_performed", "pipeline_version",
+                          "step1_duration_ms", "step2_duration_ms", "created_at"}
+        assert m["id"] == "a1"
+        assert m["source_name"] == "safehoo"
+
+    def test_来源链接不外泄到内容字段(self, client):
+        """`source_url` 只在元信息区出现，内容分档里没有它。"""
+        d = client.get("/api/accidents/a1").get_json()["data"]
+        all_fields = [f for t in d["tiers"] for f in t["fields"]]
+        assert "source_url" not in all_fields
+
+
 class TestApi:
 
     def test_页面与静态资源可访问(self, client):
-        for path in ("/", "/static/app.css", "/static/overview.js"):
+        for path in ("/", "/accident/a1", "/static/app.css", "/static/dom.js",
+                     "/static/overview.js", "/static/accident.js"):
             assert client.get(path).status_code == 200, path
 
     def test_health_报出库路径与表(self, client):
@@ -685,6 +859,75 @@ class TestMainDbParity:
         )
         assert rows, "主库工序列不该是空的"
         assert sorted(r["v"] for r in rows if r["v"] not in names) == []
+
+    def test_详情抽样与直接_SQL_对账(self, main_db):
+        """逐条 build 与直接查库对账。
+
+        `LIMIT 40` 固定按 id 取，不是随机抽样——随机抽样在 CI 上会偶发
+        通过、偶发失败，问题被埋掉。前 40 条已覆盖重复标注、无证据、
+        无编码等各形态（实测这条 SQL 命中的行里 22 组有重复编码）。
+        """
+        ids = [r["id"] for r in db.query(
+            "SELECT id FROM accidents ORDER BY id LIMIT 40"
+        )]
+        assert len(ids) == 40
+        for aid in ids:
+            got = detail.build(aid)
+            n_rows = db.scalar(
+                "SELECT COUNT(*) FROM caics_causes WHERE accident_id = ?",
+                (aid,), default=0,
+            )
+            n_distinct = db.scalar(
+                "SELECT COUNT(DISTINCT code) FROM caics_causes WHERE accident_id = ?",
+                (aid,), default=0,
+            )
+            assert got["causes"]["citations"] == n_rows, aid
+            assert got["causes"]["distinct"] == n_distinct, aid
+            assert sum(c["citation_count"] for c in got["causes"]["items"]) == n_rows, aid
+
+    def test_计数两个口径的关系(self, main_db):
+        """16,323 行 vs 15,985 个 `(accident_id, code)`。
+
+        差 338 = 616 行重复 − 278 组。两个数字都对，只是口径不同：
+        论文与概览页统计卡用**行数**（措辞「16,323 条致因标注」），
+        事故级分析（共现、每事故编码数）必须用**去重口径**。
+        """
+        rows = db.scalar("SELECT COUNT(*) FROM caics_causes", default=0)
+        pairs = db.scalar(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT accident_id, code FROM caics_causes)",
+            default=0,
+        )
+        dup_rows = db.scalar(
+            "SELECT COALESCE(SUM(n), 0) FROM ("
+            "SELECT COUNT(*) AS n FROM caics_causes "
+            "GROUP BY accident_id, code HAVING COUNT(*) > 1)", default=0,
+        )
+        dup_groups = db.scalar(
+            "SELECT COUNT(*) FROM (SELECT 1 FROM caics_causes "
+            "GROUP BY accident_id, code HAVING COUNT(*) > 1)", default=0,
+        )
+        assert (rows, pairs) == (16323, 15985)
+        assert rows - pairs == dup_rows - dup_groups == 338
+
+    def test_共现用去重口径(self, main_db):
+        """H1+M1 按行数 1,968、按事故级去重 1,821。
+
+        概览页的统计卡是行数口径，共现矩阵若照抄行数就会把「同一事故
+        里同一对编码被标了两次」算成两次共现。
+        """
+        by_rows = db.scalar(
+            "SELECT COUNT(*) FROM caics_causes a JOIN caics_causes b "
+            "ON a.accident_id = b.accident_id "
+            "WHERE a.code = 'H1' AND b.code = 'M1'", default=0,
+        )
+        by_pairs = db.scalar(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT accident_id, code FROM caics_causes) a "
+            "JOIN (SELECT DISTINCT accident_id, code FROM caics_causes) b "
+            "ON a.accident_id = b.accident_id "
+            "WHERE a.code = 'H1' AND b.code = 'M1'", default=0,
+        )
+        assert by_rows == 1968
+        assert by_pairs == 1821
 
     def test_工序覆盖与缺失(self, main_db):
         """有值 2,202 条 / 缺 421 条（16%）。缺失是留白，不写成「未标注」。"""

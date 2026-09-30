@@ -20,3 +20,9 @@ views_bp = Blueprint("views", __name__)
 def overview_page():
     """概览与检索。蓝图 04 的落地页。"""
     return render_template("overview.html")
+
+
+@views_bp.get("/accident/<accident_id>")
+def accident_page(accident_id: str):
+    """单事故详情。蓝图 05 §4.1。id 交给前端拉 API，页面本身只出壳。"""
+    return render_template("accident.html", accident_id=accident_id)

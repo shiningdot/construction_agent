@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}事故详情 · CAIEMS{% endblock %}
+
+{% block content %}
+<noscript>
+  <div class="notice">本页内容由浏览器端脚本从
+  <code>/api/accidents/&lt;id&gt;</code> 拉取，请启用 JavaScript。</div>
+</noscript>
+
+{# 服务端只出壳，全部内容由 accident.js 填充——Jinja 拿不到
+   `available` 分档与枚举中文名，那些要查库。 #}
+<div class="detail" id="detail" data-accident-id="{{ accident_id }}">
+  <div class="skeleton-block"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dom.js') }}"></script>
+<script src="{{ url_for('static', filename='accident.js') }}"></script>
+{% endblock %}

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from . import accidents_query, db, overview, province
+from . import accidents_query, db, detail, overview, province
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -48,6 +48,22 @@ def api_accidents():
     """事故列表。参数见 `accidents_query.ListParams`。"""
     params = accidents_query.ListParams.from_request(request.args)
     return jsonify(accidents_query.run(params))
+
+
+@api_bp.get("/accidents/<accident_id>")
+def api_accident_detail(accident_id: str):
+    """单事故详情。一次返回全部内容，前端不再二次请求。
+
+    找不到时返回 **404**（而不是 200 + 空对象）——「没有这条」与「这条
+    什么都没有」是两件事，前端要能分开处理。
+    """
+    data = detail.build(accident_id)
+    if data is None:
+        return jsonify({
+            "error": "accident_not_found",
+            "message": f"事故 {accident_id} 不存在",
+        }), 404
+    return jsonify({"ok": True, "data": data})
 
 
 @api_bp.get("/filters")

@@ -454,7 +454,217 @@ code { font-family: var(--mono); font-size: .88em;
         color: var(--text-2); white-space: nowrap; }
 
 /* ══════════════════════════════════════════════════════════
-   ⑪ 页脚与响应式
+   ⑪ 详情页（accident.html + accident.js）
+   ══════════════════════════════════════════════════════════ */
+
+.detail { display: flex; flex-direction: column; gap: 16px; }
+
+/* 空值与「值为 0」必须能分开——前者用虚线下的长破折号加灰斜体，
+   后者是正常的数字 0。见蓝图 05 §4.1。 */
+.blank {
+  color: var(--muted); font-style: italic;
+  border-bottom: 1px dashed var(--border);
+  cursor: help;
+}
+
+.skeleton-block {
+  height: 260px; border-radius: var(--radius);
+  background: linear-gradient(100deg, var(--surface-2) 30%,
+              var(--surface) 50%, var(--surface-2) 70%);
+  background-size: 220% 100%;
+  animation: sk 1.4s ease-in-out infinite;
+}
+@keyframes sk { from { background-position: 130% 0; } to { background-position: -30% 0; } }
+
+.detail-back { margin: -4px 0 -4px; }
+.back-link { font-size: 13px; }
+
+/* ── 头部 ── */
+.detail-head { padding: 4px 2px 0; }
+.detail-title {
+  margin: 0 0 10px; font-size: 22px; font-weight: 650;
+  line-height: 1.4; letter-spacing: .005em;
+}
+.detail-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.detail-date { font-size: 13px; color: var(--text-2);
+               font-variant-numeric: tabular-nums; }
+.type-badge { background: var(--brand-soft); color: var(--brand-dark);
+              border-color: #CFE4DF; }
+
+.detail-where {
+  margin-top: 10px; display: flex; align-items: baseline; gap: 10px;
+  flex-wrap: wrap; font-size: 13.5px; color: var(--text-2);
+}
+.detail-where .raw {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  max-width: 52ch; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-casualties { margin-top: 12px; display: flex; gap: 22px; flex-wrap: wrap; }
+.detail-casualties .cas { display: flex; align-items: baseline; gap: 5px; }
+.detail-casualties b {
+  font-size: 20px; font-weight: 650;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.detail-casualties i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+
+/* ── 摘要 / 直接原因 ── */
+.text-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.text-block h3 {
+  margin: 0 0 6px; font-size: 12px; font-weight: 600;
+  color: var(--muted); letter-spacing: .04em;
+}
+.text-block p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--text-2); }
+
+/* ── 致因树 ── */
+.layer-group { margin-bottom: 18px; }
+.layer-group:last-of-type { margin-bottom: 6px; }
+
+.layer-head {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 5px 10px; margin-bottom: 9px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border-left: 3px solid var(--border);
+}
+.layer-head .layer-key {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+}
+.layer-head .layer-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.layer-head .layer-n { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+
+.layer-M { border-left-color: var(--layer-M); }
+.layer-M .layer-key { color: var(--layer-M); }
+.layer-F { border-left-color: var(--layer-F); }
+.layer-F .layer-key { color: var(--layer-F); }
+.layer-T { border-left-color: var(--layer-T); }
+.layer-T .layer-key { color: var(--layer-T); }
+.layer-H { border-left-color: var(--layer-H); }
+.layer-H .layer-key { color: var(--layer-H); }
+.layer-C { border-left-color: var(--layer-C); }
+.layer-C .layer-key { color: var(--layer-C); }
+
+.cause-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+.cause {
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.cause[open] { border-color: var(--border); }
+.cause > summary {
+  list-style: none; cursor: pointer; padding: 8px 11px;
+  border-radius: var(--radius-sm);
+}
+.cause > summary::-webkit-details-marker { display: none; }
+.cause > summary:hover { background: var(--surface-2); }
+.cause[open] > summary { border-bottom: 1px solid var(--border-soft);
+                         border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+
+.cause-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.cause-code { font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+              color: var(--text); }
+.cause-name { font-size: 13.5px; color: var(--text-2); margin-right: auto; }
+.cause-count {
+  font-size: 11px; font-family: var(--mono); color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: 999px; padding: 0 6px;
+}
+
+.cause-inner { padding: 9px 11px 11px; }
+.citation-body + .citation-body {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-soft);
+}
+.citation-row { display: flex; gap: 9px; margin-bottom: 6px; font-size: 13px; }
+.citation-row:last-child { margin-bottom: 0; }
+.citation-key {
+  flex: 0 0 2.4em; font-size: 11.5px; color: var(--muted);
+  padding-top: 2px;
+}
+.citation-val { flex: 1; line-height: 1.65; color: var(--text-2); }
+.citation-val.missing { color: var(--muted); font-style: italic; }
+
+.badge.ev-direct   { background: var(--brand-soft); color: var(--ev-direct);
+                     border-color: #CFE4DF; }
+.badge.ev-indirect { background: #FBF0E4; color: var(--ev-indirect);
+                     border-color: #EEDCC4; }
+.badge.ev-weak     { background: var(--surface-2); color: var(--ev-weak);
+                     border-color: var(--border); }
+
+/* ── 字段明细分档 ── */
+.tier, .panel > details {
+  border-top: 1px solid var(--border-soft);
+}
+.tier:first-of-type { border-top: 0; }
+.tier > summary, .panel > details > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: baseline;
+  gap: 10px; padding: 9px 2px; font-size: 13px;
+}
+.tier > summary::-webkit-details-marker,
+.panel > details > summary::-webkit-details-marker { display: none; }
+.tier > summary:hover, .panel > details > summary:hover { background: var(--surface-2); }
+
+.tier-key {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  width: 1.5em; text-align: center; border-radius: 4px; padding: 1px 0;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--border-soft);
+}
+.tier-A .tier-key { background: var(--brand-soft); color: var(--brand-dark);
+                    border-color: #CFE4DF; }
+.tier-label { font-weight: 600; color: var(--text); }
+.tier-n { margin-left: auto; font-size: 11.5px; color: var(--muted);
+          font-variant-numeric: tabular-nums; }
+
+.field-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 0 24px; padding: 4px 2px 12px;
+}
+.field-row {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+.field-key { flex: 0 0 8.5em; font-size: 12.5px; color: var(--muted); }
+.field-val { flex: 1; color: var(--text-2); word-break: break-word; }
+.field-val .mono { font-family: var(--mono); font-size: 12.5px; }
+.field-val .wrap { white-space: normal; word-break: break-all; }
+.enum-code {
+  margin-left: 6px; font-family: var(--mono); font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── 图片 ── */
+.image-list { display: flex; flex-direction: column; gap: 2px; }
+.image-row {
+  display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+}
+.image-row .mono { font-family: var(--mono); font-size: 11.5px;
+                   color: var(--text-2); flex: 1 1 240px; word-break: break-all; }
+.image-tag {
+  font-size: 11.5px; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: 999px; padding: 1px 8px;
+}
+
+/* ── 原文 ── */
+.raw-text {
+  margin: 0; padding: 12px 14px; max-height: 420px; overflow: auto;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.75;
+  color: var(--text-2); white-space: pre-wrap; word-break: break-word;
+}
+
+@media (max-width: 860px) {
+  .text-panel { grid-template-columns: 1fr; }
+  .field-key { flex-basis: 6.5em; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   ⑫ 页脚与响应式
    ══════════════════════════════════════════════════════════ */
 
 .foot {

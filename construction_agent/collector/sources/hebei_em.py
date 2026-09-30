@@ -70,10 +70,14 @@ class HebeiEMCollector(BaseCollector):
         stats = collector.collect()
     """
 
-    def __init__(self, delay: float = 1.0, enable_classify: bool = True):
+    def __init__(self, delay: float = 1.0, enable_classify: bool = True,
+                 data_dir: Optional[Path] = None):
         self._delay = delay
         self._enable_classify = enable_classify
-        self.data_dir = settings.DATA_DIR / "hebei_em"
+        # `data_dir=None` 时落 `settings.DATA_DIR/<源名>`（旧行为）。在线采集
+        # 传一个临时目录进来，`data/<源名>/` 就不再产生——采集产出自 M2 起
+        # 只落工作库的 `raw_accidents` 表（蓝图 01 §3.4）。
+        self.data_dir = data_dir or (settings.DATA_DIR / "hebei_em")
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         self._session = httpx.Client(

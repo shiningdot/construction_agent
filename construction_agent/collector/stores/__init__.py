@@ -50,10 +50,33 @@ class RawAccidentStore:
         self.filepath = filepath or (settings.DATA_DIR / "raw_accidents.json")
         self._data: list[dict] = []
         self._url_index: set[str] = set()  # 已缓存的 URL 哈希
+        # 采集产出改走工作库的 `raw_accidents` 表之后，文件这条路必须关掉
+        # （蓝图 01 §3.4）。默认 None = 维持旧的文件行为——`scripts/` 下的
+        # 批处理与测试还在用它。在线采集由执行器调 `attach()` 切换。
+        self.sink = None
         self._load()
+
+    def attach(self, sink) -> "RawAccidentStore":
+        """切换成「只走回调、不碰文件系统」。
+
+        采集执行器在跑之前调一次。同时**清空 `_load()` 读进来的历史缓存**：
+        那些记录在 JSON 文件里，不在工作库的 `raw_accidents` 表里，拿它们
+        做内存去重的结果是「采集日志写着已抓 N 条、库里查不到」——去重改由
+        `raw_accidents` 的 `UNIQUE(url_hash)` 负责，那才是唯一真源。
+
+        调用方形如 `collector.raw_store.attach(task_sink)`。属性名统一叫
+        `raw_store`（实测 10 个文件、21 个源都是这个名字，属性挂上去即全局
+        生效），所以 24 个源文件一行都不用改。
+        """
+        self.sink = sink
+        self._data = []
+        self._url_index = set()
+        return self
 
     def _load(self):
         """从文件加载已有缓存。"""
+        if self.sink is not None:
+            return
         if self.filepath.exists():
             try:
                 content = self.filepath.read_text(encoding="utf-8")
@@ -78,7 +101,9 @@ class RawAccidentStore:
         logger.info(f"原始缓存已加载: {len(self._data)} 条")
 
     def _save(self):
-        """保存到文件。"""
+        """保存到文件。挂了 sink 就只落库、不动磁盘。"""
+        if self.sink is not None:
+            return
         self.filepath.write_text(
             json.dumps(self._data, ensure_ascii=False, indent=2, default=str),
             encoding="utf-8",
@@ -132,6 +157,11 @@ class RawAccidentStore:
 
         self._data.append(record)
         self._url_index.add(rid)
+        # 挂了 sink 就把记录交出去（在线采集写工作库的 `raw_accidents`）。
+        # 放在 `_data.append` 之后、`return rid` 之前：内存去重与结果返回
+        # 保持原语义，只有「多出一条写库通路」这一件事变了。
+        if self.sink is not None:
+            self.sink(record)
         return rid
 
     def add_batch(self, items: list[dict]) -> int:

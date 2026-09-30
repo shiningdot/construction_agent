@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS collect_tasks (
     task_id       TEXT PRIMARY KEY,         -- uuid4 hex[:12]
     source_keys   TEXT NOT NULL,            -- JSON 数组，支持多源一次任务
     params        TEXT,                     -- JSON: {since, until, limit, keywords}
-    status        TEXT NOT NULL,            -- pending|running|paused|done|failed|cancelled
+    -- cancelling 是中间态：用户点了取消、任务还在收尾（适配器没有可中断的
+    -- yield 点，粒度只能到源级）。跑完时它落成 cancelled，不落成 done。
+    status        TEXT NOT NULL,            -- pending|running|cancelling|paused|done|failed|cancelled
     created_at    TEXT NOT NULL,
     started_at    TEXT,
     finished_at   TEXT,

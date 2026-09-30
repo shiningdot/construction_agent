@@ -20,6 +20,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urljoin
@@ -353,6 +354,26 @@ class TrsCmsCollector(BaseCollector):
                     "classification": classification,
                     "classification_reason": class_reason,
                     "classification_confidence": class_confidence,
+                    "status": status,
+                    # ── 附件通路（2026-10-01 补）─────────────────────────
+                    #
+                    # 这两行之前**根本不存在**，于是 PDF 那条路断在这里：
+                    # `_download_and_extract_pdf` 下载了、提取了、落盘了，
+                    # 但 URL 和本地路径谁都没往外传。后果有两层——
+                    #
+                    # 1. `executor._ASSET_KEYS` 是按**键名**认附件的
+                    #    （`pdf_urls` → `asset_type="pdf"`）。产出里没有这个
+                    #    键，`raw_accident_assets` 就永远是 0 行：12 个 TRS 源
+                    #    的 PDF 一条都登记不上，阶段② 无从知道该去取哪些文件。
+                    # 2. `local_pdf_path` 在 `collect()` 里被赋值后**再无任何
+                    #    引用**，是个死变量——落盘的文件成了无人认领的孤儿。
+                    #
+                    # 影响面比「少登记几行」大得多：实测 `sh_em` 与 `sx_em`
+                    # 是**全 PDF 型**站点（各 5/5 条样本都挂 PDF），页面 HTML
+                    # 正文只有 631 / 717 字，而 PDF 里有 8,635 / 7,523 字——
+                    # 正文的主体在附件里，附着的是正文本身而不是什么补充材料。
+                    "pdf_urls": [pdf_url] if pdf_url else [],
+                    "needs_ocr": bool(pdf_url) and not pdf_text,
                 },
             )
             # 附加信息通过 metadata 传递
@@ -361,16 +382,8 @@ class TrsCmsCollector(BaseCollector):
 
             # 周期性存储到 RawAccidentStore
             if len(results) % 5 == 0:
-                self.raw_store.add_batch([
-                    {"title": r.title, "content": r.raw_text,
-                     "source_url": r.source_url, "source_name": r.source,
-                     "publish_date": detail_date, "status": status,
-                     "classification": classification,
-                     "classification_reason": class_reason,
-                     "classification_confidence": class_confidence,
-                     "issuing_authority": self.cfg.authority_name}
-                    for r in results[-5:]
-                ])
+                self.raw_store.add_batch(
+                    [self._to_store_item(r) for r in results[-5:]])
                 self.raw_store._save()
 
         # 最后一批写入
@@ -388,6 +401,35 @@ class TrsCmsCollector(BaseCollector):
         return results
 
     # ── 内部方法 ──
+
+    def _to_store_item(self, raw: RawAccidentText) -> dict:
+        """`RawAccidentText` → `RawAccidentStore.add_batch` 的一项。
+
+        **每一项的字段都从这个 `raw` 自己身上取，不碰任何循环外的变量。**
+        原先这里是一段内联的列表推导式，`publish_date` / `status` /
+        `classification` 直接引用外层变量，而 `results[-5:]` 取的是**前五条**：
+        于是同一批 5 条全部被写上**最后一条**的日期与状态。
+
+        这种错位单条测试永远测不出来——`results` 不足 5 条时压根不走这条分支，
+        恰好 5 条时最后一条又是对的。只有跨批次（第 6 条开始）才现形。
+
+        `status` 从 `extra` 里取：它是在构造 `RawAccidentText` 时连同分类结果
+        一起存进去的，这里取回来交给 `add_batch` 当标准字段——`add_batch` 的
+        `standard_fields` 里有 `status`，放在 dict 顶层就会被正确识别。
+        """
+        extra = dict(raw.extra or {})
+        extra["issuing_authority"] = self.cfg.authority_name
+        status = extra.pop("status", "new")
+        return {
+            "title": raw.title,
+            "content": raw.raw_text,
+            "source_url": raw.source_url,
+            "source_name": raw.source,
+            "publish_date": (raw.extracted_date.isoformat()
+                             if raw.extracted_date else ""),
+            "status": status,
+            **extra,
+        }
 
     def _discover_pages(self) -> list[str]:
         """发现所有分页 URL。
@@ -551,7 +593,24 @@ class TrsCmsCollector(BaseCollector):
     def _download_and_extract_pdf(
         self, pdf_url: str, title: str, date: str
     ) -> tuple[str, str]:
-        """下载 PDF 并提取全文。返回 (text, local_path)。"""
+        """下载 PDF 并提取全文。返回 `(正文, 本地路径)`，任一环节失败返回 `("", "")`。
+
+        **这里原先是一个 `except Exception: pass`。** 它把四种完全不同的失败
+        压成同一个返回值 `("", "")`，再没有任何痕迹：
+
+        | 情况 | 原表现 | 现在 |
+        |---|---|---|
+        | 网络异常 / 超时 | 静默 | `debug` 日志 |
+        | HTTP 404 / 403 | 静默 | `debug` 日志（带状态码）|
+        | 响应过短（不是 PDF）| 静默 | `debug` 日志（带字节数）|
+        | 磁盘写入失败 | 静默 | `warning` 日志 |
+
+        为什么值得专门拆开：`sh_em` 与 `sx_em` 实测是**全 PDF 型**站点——页面
+        HTML 正文 631 / 717 字，PDF 里 8,635 / 7,523 字，正文主体在附件中。
+        一旦这条路上出任何差错，正文会**悄无声息地掉到十分之一**，而采集日志
+        上「收录 5 条」与成功时一模一样。落盘失败用 `warning` 是因为它属于
+        环境问题（权限、磁盘满），不是数据本身的形态。
+        """
         hash_suffix = hashlib.md5(pdf_url.encode()).hexdigest()[:12]
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50]
         local_path = self.data_dir / f"{date}_{safe_title}_{hash_suffix}.pdf"
@@ -561,12 +620,28 @@ class TrsCmsCollector(BaseCollector):
 
         try:
             resp = self._client.get(pdf_url)
-            if resp.status_code == 200 and len(resp.content) >= 100:
-                local_path.write_bytes(resp.content)
-                return extract_pdf_text(local_path), str(local_path)
-        except Exception:
-            pass
-        return "", ""
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[{self.cfg.source_name}] PDF 下载异常: {pdf_url} — "
+                         f"{type(e).__name__}: {e}")
+            return "", ""
+
+        if resp.status_code != 200:
+            logger.debug(f"[{self.cfg.source_name}] PDF HTTP {resp.status_code}: "
+                         f"{pdf_url}")
+            return "", ""
+        if len(resp.content) < 100:
+            logger.debug(f"[{self.cfg.source_name}] PDF 响应过短"
+                         f"（{len(resp.content)} 字节）: {pdf_url}")
+            return "", ""
+
+        try:
+            local_path.write_bytes(resp.content)
+        except OSError as e:
+            logger.warning(f"[{self.cfg.source_name}] PDF 落盘失败: "
+                           f"{local_path} — {e}")
+            return "", ""
+
+        return extract_pdf_text(local_path), str(local_path)
 
     def _fetch(self, url: str) -> Optional[str]:
         """HTTP GET 带重试。
@@ -597,14 +672,41 @@ class TrsCmsCollector(BaseCollector):
         return None
 
     @staticmethod
-    def _parse_date_str(date_str: str) -> Optional[str]:
-        """解析日期字符串为 ISO 格式。"""
+    def _parse_date_str(date_str: str) -> Optional[date]:
+        """把 `YYYY-MM-DD` 解析成 `date` 对象；格式不符或值非法时返回 `None`。
+
+        **返回类型是 `date`，不是 `str`。** 原先最后一行写的是
+        `return date_str`——名字叫 parse，做的却是「验一下格式，然后原样返回
+        那个字符串」。而 `RawAccidentText.extracted_date` 的注解是
+        `Optional[date]`，于是 12 个 TRS 源交出去的对象里这个字段实际是 `str`。
+
+        下游全都按 `date` 用它，两处当场崩：
+
+        - `base.py::generate_fingerprint()` → `.strftime("%Y-%m")`
+        - `executor._row_from_raw_item()`（通路 B）→ `.isoformat()`
+
+        第二条是致命的：executor 对 `collect()` 返回的每一个
+        `RawAccidentText` 都调它，异常一路冒泡到 `_run_source` 的 `except`，
+        **这个源本轮的结果全部作废**——连已经攒在 `sink.rows` 里的通路 A
+        记录一起丢，因为写库发生在 `feed()` 之后。
+
+        为什么长期没暴露：健康检查与各探针挂的是只计数的 `NullSink`，
+        从不做 `_row_from_raw_item` 这个转换，而装载后真实转换只发生在
+        executor 里。**计数一路正常，数据其实一条都没进库。** 与 `gd_em`
+        那次「健康检查看不见」是同一类问题。
+
+        校验放在构造 `date` 时兜：正则认的是形状，`2026-02-30` 这种形状对、
+        值不对的要在 `date()` 那里挡下来。
+        """
         if not date_str:
             return None
         m = re.match(r"(\d{4})-(\d{2})-(\d{2})", date_str)
-        if m:
-            return date_str
-        return None
+        if not m:
+            return None
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
 
     def __del__(self):
         try:

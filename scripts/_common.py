@@ -1,7 +1,8 @@
-"""e2e 脚本的公共路径解析。
+"""`scripts/` 下各脚本的公共路径解析。
 
-有四个 e2e 脚本要拿**主仓库**的最终库（`e2e_verify_main` / `e2e_pipeline` /
-`e2e_extract` / `e2e_click_m3`），而它们可能在两处被运行：
+要拿**主仓库**数据的有两组：四个 e2e 脚本（`e2e_verify_main` / `e2e_pipeline` /
+`e2e_extract` / `e2e_click_m3`）要最终库，`screenshot_web` 要最终库 + 工作库 +
+图片根。而它们可能在两处被运行：
 
 - `.claude/worktrees/<name>/` —— 开发期，worktree 隔离
 - 主仓库根 —— 用户实际执行的地方
@@ -28,8 +29,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-#: 四个脚本都在 `scripts/e2e/x.py`，上溯两级即**本仓库**（worktree 或主仓库）
-REPO_ROOT = Path(__file__).resolve().parents[2]
+#: 本模块在 `scripts/` 下，上溯一级即**本仓库**（worktree 或主仓库）
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 DB_FILENAME = "caiems_v2.db"
 

@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -49,12 +50,26 @@ def clean_vlm_text(value: Any) -> str:
     return _EMPHASIS.sub("", str(value)).strip()
 
 
+#: 图片根的覆盖开关。与最终库的 `CAIEMS_DB`、工作库的 `CAIEMS_STAGING_DB` 对称
+#: ——三者的默认值都从 `settings.DATA_DIR` 派生，但另两个可覆盖而图片根原先不能。
+ENV_DATA_DIR = "CAIEMS_DATA_DIR"
+
+
 def media_root() -> Path:
     """图片资产的根（`data/`）。
 
     `rel_path` 自带版本目录段（`imageV3/xxx/yyy.jpg`），所以根就是 `data/`，
     不再往版本目录里下沉一层。
+
+    默认值 `settings.DATA_DIR` 跟着**被导入的包**走：在 worktree 下运行时会
+    指向 worktree 自己的 `data/`，而那里没有图片目录（`.gitignore` 忽略了，
+    图片留在主仓库），于是详情页的图全部 404——2026-10-01 截图验收时实测到，
+    7 张图 7 个 404。库路径早就用环境变量解决了同一类问题，图片根漏了这一环，
+    这里补上：`CAIEMS_DATA_DIR=/path/to/data` 即可指过去。
     """
+    raw = os.environ.get(ENV_DATA_DIR)
+    if raw:
+        return Path(raw).expanduser().resolve()
     return Path(settings.DATA_DIR).resolve()
 
 

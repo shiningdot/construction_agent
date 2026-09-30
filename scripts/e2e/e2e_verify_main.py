@@ -38,7 +38,7 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(__file__).resolve().parent))     # 同目录的 _common
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # scripts/_common
 
 from _common import main_db_path  # noqa: E402
 

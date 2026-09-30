@@ -57,10 +57,11 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | `scripts/check_field_alignment.py` | 前端读的名字 ↔ 后端返回的字段；**反向**：`accidents` 的列 ↔ 详情页四档 | 不起服务（`app.test_client()`） |
 | `scripts/check_blueprint_alignment.py` | 蓝图规定的接口 ↔ 代码注册的路由 | 不起服务（纯静态分析） |
 | `scripts/check_api_contract.py` | 蓝图画的响应样例 ↔ 真实响应的**字段** | 不起服务（`app.test_client()`） |
+| `scripts/check_enum_alignment.py` | `staging_schema.py` 注释声明的枚举取值 ↔ 前端标签表的键，外加后端写入的字面量 | 不起服务（纯静态分析） |
 
-五条都只读不写，跑几次都行。它们的结论与判据记在
+六条都只读不写，跑几次都行。它们的结论与判据记在
 `docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互、
-§九 蓝图↔实现、§十 响应契约）。
+§九 蓝图↔实现、§十 响应契约、§十一 枚举取值）。
 
 `check_api_contract.py` 跟上面四个各管一头：字段核查问「前端有没有人读它」，
 蓝图核查问「路由在不在」，**中间空着「文档写了这个字段、实现给没给」**——这一格

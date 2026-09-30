@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS collect_tasks (
     params        TEXT,                     -- JSON: {since, until, limit, keywords}
     -- cancelling 是中间态：用户点了取消、任务还在收尾（适配器没有可中断的
     -- yield 点，粒度只能到源级）。跑完时它落成 cancelled，不落成 done。
-    status        TEXT NOT NULL,            -- pending|running|cancelling|paused|done|failed|cancelled
+    status        TEXT NOT NULL,            -- pending|running|cancelling|done|failed|cancelled
     created_at    TEXT NOT NULL,
     started_at    TEXT,
     finished_at   TEXT,
@@ -127,7 +127,9 @@ CREATE TABLE IF NOT EXISTS extract_tasks (
     raw_ids        TEXT NOT NULL,           -- JSON 数组
     stages         TEXT NOT NULL,           -- JSON: ["S1","S2","S3","S4"]
     enable_split   INTEGER DEFAULT 1,       -- MULTI 是否拆分
-    status         TEXT NOT NULL,           -- pending|running|done|failed|cancelled
+    -- cancelling 与采集侧同样处理：用户点了取消、任务还在收尾（这里粒度能到条，
+    -- 每条跑完检查一次标志位）。跑完落成 cancelled。
+    status         TEXT NOT NULL,           -- pending|running|cancelling|done|failed|cancelled
     created_at     TEXT NOT NULL,
     started_at     TEXT,
     finished_at    TEXT,

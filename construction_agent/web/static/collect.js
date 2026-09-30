@@ -54,6 +54,15 @@
     pending: '排队中', running: '运行中', cancelling: '取消中',
     done: '已完成', failed: '失败', cancelled: '已取消',
   };
+  // `raw_accident_assets` 的两列。取值域写在 `staging_schema.py:111/115` 的列注释里，
+  // 由 `scripts/check_enum_alignment.py` 核两侧是否一一对应——**加取值先加注释**，
+  // 否则这里漏一个键就是静默漏一次翻译，页面上直接冒英文码。
+  var ASSET_TYPE_LABEL = {
+    pdf: 'PDF 文档', image: '图片', attachment: '附件',
+  };
+  var OCR_LABEL = {
+    pending: '待处理', done: '已完成', failed: '失败', skipped: '已跳过',
+  };
 
   function badge(text, cls, title) {
     if (!text) return blank();
@@ -820,14 +829,16 @@
       var list = el('ul', { cls: 'asset-list' });
       d.assets.forEach(function (a) {
         var li = el('li', {});
-        li.appendChild(el('span', { cls: 'asset-type', text: a.asset_type }));
+        li.appendChild(el('span', { cls: 'asset-type',
+          text: ASSET_TYPE_LABEL[a.asset_type] || a.asset_type }));
         if (a.url) {
           li.appendChild(el('a', { text: a.url, cls: 'ext mono',
             attrs: { href: a.url, target: '_blank',
                      rel: 'noopener noreferrer' } }));
         }
         if (a.ocr_status) {
-          li.appendChild(el('span', { cls: 'muted', text: 'OCR: ' + a.ocr_status }));
+          li.appendChild(el('span', { cls: 'muted',
+            text: 'OCR ' + (OCR_LABEL[a.ocr_status] || a.ocr_status) }));
         }
         list.appendChild(li);
       });

@@ -320,6 +320,21 @@ def run_one(raw: dict, task_id: str) -> ItemOutcome:
             # 会再挂一份完全相同的编码——暂存区就翻倍了。
             if inserted and causes:
                 con.executemany(_INSERT_CAUSE, causes)
+            # 生命周期回填，与暂存行**同一个事务**：分开写会留下「暂存行已经有了、
+            # raw 还停在 gated」的中间态，而采集页的漏斗正是查这一列的。
+            #
+            # `status='promoted'` 取「已送提取」这一层语义——提取跑完并产出了
+            # 暂存行。它与「已并入最终库」不是一回事，后者由 `promote_log`
+            # 与暂存行的 `review_status` 表达，审核页另有自己的漏斗。
+            #
+            # 只在**首次插入**时写：重跑时 `_stage_row` 新生成的那个 stage_id
+            # 会被 UNIQUE(raw_id, split_index) 丢掉，行里留着的仍是旧 id，
+            # 无条件回填会把 `stage_id` 指到一条不存在的暂存行上。
+            if inserted:
+                con.execute(
+                    "UPDATE raw_accidents SET status = 'promoted', "
+                    "promoted_at = ?, stage_id = ? WHERE raw_id = ?",
+                    (_now(), row["stage_id"], rid))
     except Exception as e:  # noqa: BLE001
         out.status, out.stage = "failed", "DB"
         out.error = f"{type(e).__name__}: {e}"[:500]

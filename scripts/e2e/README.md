@@ -58,10 +58,11 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | `scripts/check_blueprint_alignment.py` | 蓝图规定的接口 ↔ 代码注册的路由 | 不起服务（纯静态分析） |
 | `scripts/check_api_contract.py` | 蓝图画的响应样例 ↔ 真实响应的**字段** | 不起服务（`app.test_client()`） |
 | `scripts/check_enum_alignment.py` | 三节：① `staging_schema.py` 注释声明的枚举取值 ↔ 前端标签表的键，外加后端写入的字面量（静态）；② 编码列（`work_task` 等）在详情 / 列表 / 审核三页有没有中文名（**打接口，要连库**） | 前两节纯静态；第三节 `app.test_client()`，靠 `CAIEMS_DB` / `CAIEMS_STAGING_DB` 指定库 |
+| `scripts/check_query_plan.py` | 带筛选的列表查询，`EXPLAIN QUERY PLAN` 走没走索引（蓝图 07 §四 M1 的验收条目）。抓的是**真跑出来的 SQL**，不照抄源码 | 不起服务（打补丁抓 SQL） |
 
-六条都只读不写，跑几次都行。它们的结论与判据记在
+七条都只读不写，跑几次都行。它们的结论与判据记在
 `docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互、
-§九 蓝图↔实现、§十 响应契约、§十一 枚举取值、§十二 编码列的中文名）。
+§九 蓝图↔实现、§十 响应契约、§十一 枚举取值、§十二 编码列的中文名、§十三 查询计划）。
 
 `check_api_contract.py` 跟上面四个各管一头：字段核查问「前端有没有人读它」，
 蓝图核查问「路由在不在」，**中间空着「文档写了这个字段、实现给没给」**——这一格

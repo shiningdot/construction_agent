@@ -12,7 +12,9 @@
 真实库 48 列（少 lighting / day_of_week / season / time_period / is_night_shift
 五列，多 work_task_enum）。**脚本、注释、真实库三者互不相同。**
 
-本脚本把这 7 个索引补齐，并追加展示层高频筛选所需的 2 个。
+本脚本把这 7 个索引补齐，并追加展示层高频筛选所需的 4 个——后 2 个
+（`project_type` / `construction_phase`）是 2026-10-01 由 `scripts/check_query_plan.py`
+查出来的：它们是列表页的筛选维度，却一直在全表扫描。详见 `INDEXES` 里的注释。
 
 用法
 ----
@@ -51,6 +53,17 @@ INDEXES: list[tuple[str, str, str]] = [
     # --- 展示层需要、脚本未声明的 2 个（蓝图 00 第 3.3 节）---
     ("idx_acc_province", "accidents", "province"),
     ("idx_cause_quality", "caics_causes", "evidence_quality"),
+    # --- 2026-10-01 由 check_query_plan.py 查出来的 2 个 ---
+    #
+    # 这两个是列表页的筛选维度（`MULTI_FIELDS` 里的 project_type 与
+    # construction_phase），上面那批索引漏了它们。症状不是报错，是**慢得看不出来**：
+    # 筛选器照常工作、页面照常出结果，只是 `WHERE project_type IN (?)` 走的是
+    # `SCAN a`——实测 1.44 ms，而同样 9 个取值的列走索引是 0.03 ms 量级。
+    #
+    # 条目「列表筛选下推到 SQL，EXPLAIN QUERY PLAN 显示走索引」（蓝图 07 §四 M1）
+    # 此前在这两维上是不成立的，且**没有任何东西会发现**——直到给查询计划写了核查。
+    ("idx_acc_project", "accidents", "project_type"),
+    ("idx_acc_phase", "accidents", "construction_phase"),
 ]
 
 TABLES = ("accidents", "caics_causes")
@@ -102,7 +115,7 @@ def main() -> int:
         print(f"           caics_causes {sorted(before['caics_causes'])}")
 
         if not todo:
-            print("\n✓ 9 个索引已全部存在，无需操作")
+            print(f"\n✓ {len(INDEXES)} 个索引已全部存在，无需操作")
             return 0
 
         print(f"\n待创建 {len(todo)} 个：")
@@ -141,7 +154,7 @@ def main() -> int:
             print(f"\n✗ 仍有索引未建成：{missing}", file=sys.stderr)
             return 1
 
-        print(f"\n✓ 9 个索引全部就绪")
+        print(f"\n✓ {len(INDEXES)} 个索引全部就绪")
         return 0
     finally:
         con.close()

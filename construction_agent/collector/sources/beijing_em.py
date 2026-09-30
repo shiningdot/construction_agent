@@ -8,6 +8,7 @@
 - PDF 路径在列表页直接暴露，无需爬详情页即可获取
 - 一级筛选：标题宽松关键词 → 候选集（~31篇）
 - 二级筛选：PDF全文提取 → classify_v2() → 高置信度自动分类 / 低置信度入审核队列
+- 提出的正文留作 content（改前只喂分类、用完即弃，正文因此从未入库）
 
 域名注意：不带 www，使用 HTTP 协议
 """
@@ -89,7 +90,10 @@ class BeijingEMCollector(BaseCollector):
         self,
         delay: float = 1.0,
         crawl_details: bool = False,
-        enable_pdf_classify: bool = True,  # 是否启用 PDF 全文分类
+        # 这个开关同时管两件事：下载 PDF 提正文、拿正文跑 classify_v2。
+        # 本源的正文**只在 PDF 里**（列表页那条 HTML 只有标题和附件链接），
+        # 所以关掉它等于关掉正文来源，不只是关分类。
+        enable_pdf_classify: bool = True,
         data_dir: Optional[Path] = None,
     ):
         self._delay = delay
@@ -193,6 +197,12 @@ class BeijingEMCollector(BaseCollector):
             classification_confidence = "low"
             item_status = "review"
 
+            # 提出来的正文要留到下面构建 item 用。改之前这里只把 `pdf_text`
+            # 喂给 `classify_v2`，分类完随作用域丢掉，item 的 content 写死成
+            # `[PDF 报告] 标题`——**这个源的正文因此从来没进过库**：主库 12 条
+            # beijing_em 记录的 raw_text 全是 106–206 字的占位，最长那条
+            # （206 字）也只是把一长串承包单位名字塞进了标题。
+            pdf_text = ""
             if self._enable_pdf_classify and pdf_url:
                 # 下载 PDF
                 pdf_text = self._download_and_extract(pdf_url)
@@ -231,13 +241,17 @@ class BeijingEMCollector(BaseCollector):
             # 构建记录
             item = {
                 "title": title,
-                "content": f"[PDF 报告] {title}\n发布单位: {unit}\nPDF: {pdf_url}",
+                # 正文已在 PDF 里提出 → 直接当正文用；提不出（扫描件、404、
+                # 或压根没开下载）才退回占位——这时由 `needs_ocr` 标出来，
+                # 下游才知道该走 OCR 而不是以为正文已经拿到。
+                "content": (pdf_text or
+                            f"[PDF 报告] {title}\n发布单位: {unit}\nPDF: {pdf_url}"),
                 "source_url": article_url or BJEM_LIST_URL,
                 "source_name": "beijing_em",
                 "publish_date": "",
                 "status": item_status,
                 "pdf_urls": [pdf_url],
-                "needs_ocr": True,
+                "needs_ocr": not pdf_text,
                 "issuing_authority": unit,
                 "pdf_path": pdf_path,
                 "classification": classification,

@@ -40,9 +40,19 @@ GROUP_LABELS = {
     "academic": "学术库（未启用）",
 }
 
-# 采集阶段不跑 LLM 分类的源：这几个构造器有 `enable_classify` 开关，默认 True。
+# 采集阶段不跑二级筛选的源：这几个构造器有 `enable_classify` 开关，默认 True。
 # 在线采集只负责「把原始文本拿回来」，三分类是阶段②的活（蓝图 02）。
-# 在采集器里跑一遍等于同一批文本被分类两次，多花一次模型调用。
+#
+# **这里原先写着「多花一次模型调用」，是错的。** 这些开关背后调的是
+# `collector/classifier.py::classify_v2`——一个 242 行的纯关键词规则函数，
+# 全文没有一处网络或 LLM 调用（`grep -nE 'anthropic|openai|httpx|requests|api_key'`
+# 零命中）。关掉它**省不下任何模型成本**；真实代价是反过来的：没有二级筛选
+# 的判据，条目一律落 `status=review`（各源 `item_status` 的初值），人工审核
+# 队列只会更长。
+#
+# 那为什么还留着？因为它买到的是**不丢数据**：`classify_v2` 判「高置信度
+# 非建筑」时各源直接 `continue` 丢弃整条，规则误判不可逆。采集阶段不筛，
+# 把判定留给阶段②带证据的流程更稳。
 _NO_CLASSIFY: tuple[tuple[str, Any], ...] = (("enable_classify", False),)
 
 # `MohurdCollector` 的构造器默认 `collect_mem=True`——那是它早期兼管两个部委
@@ -102,11 +112,20 @@ def _s(key: str, name: str, group: str, authority: str, url: str,
 # 省级应急管理厅局一律 `enable_classify=False`（见 `_NO_CLASSIFY` 的注释）；
 # 只有 5 个源有这个参数，别的源不传就是过滤掉，不会报错。
 SOURCES: dict[str, SourceSpec] = dict([
+    # 唯一**不挂** `_NO_CLASSIFY` 的省级源。它的正文只存在于 PDF 里（列表页
+    # 那段 HTML 只有标题、发布单位和附件路径），而「下载 PDF 提正文」与
+    # 「跑 `classify_v2`」共用同一个开关 `enable_pdf_classify`——挂上去等于
+    # 把正文来源一并关掉。
+    #
+    # 这里原先写的就是 `_NO_CLASSIFY`，但常量的键是 `enable_classify`，与本源
+    # 构造器的 `enable_pdf_classify` 对不上；`build()` 会把构造器不认识的参数
+    # **静默丢掉**（只记一条 `logger.debug`），所以它一次也没生效过——实测
+    # 实例上 `_enable_pdf_classify is True`。摘掉只是把既成事实写实。
     _s("beijing_em", "北京市应急管理局", "province", "北京市应急管理局",
        "http://yjglj.beijing.gov.cn/col/col4520/index.html", 1.0,
        "beijing_em", "BeijingEMCollector",
-       kwargs=_NO_CLASSIFY,
-       note="省级站里少数不建 data_dir 目录的源（实测）"),
+       note="正文只存在于 PDF 里，故不挂 _NO_CLASSIFY（见上方注释）；"
+            "实测会建 data_dir 目录（原 note 说「不建」，与现状不符）"),
     _s("cq_em", "重庆市应急管理局", "province", "重庆市应急管理局",
        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/", 1.0,
        "cq_em", "CqEMCollector"),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""字段级对齐核查：前端读的属性 ↔ 后端返回的字段。
+"""字段级对齐核查：前端读的属性 ↔ 后端返回的字段，外加反向的「表列 ↔ 详情分档」。
 
 前几层验收判的都是「通不通」——路由对不对得上、页面打不打得开、渲染有没有
 崩。它们都看不见一类静默错配：**后端返回 `death_count`、前端读 `deaths`**。
@@ -26,6 +26,20 @@
 
 `--verbose` 会把每一层放过的名字全打出来，可以翻。
 
+## 反方向那一半：`accidents` 的列 ↔ 详情页四档
+
+上面那一半只查「前端读了什么」。缺口还有一种形态：**后端表里有值、页面上
+从未出现**——前端不会去读一个后端没下发的名字，所以它读不出来，也就永远不会
+被上面那一半抓到。
+
+这一半查详情接口：`accidents` 的每一列，要么进 `CONTENT_TIERS` 四档、要么进
+`META_FIELDS`、要么在 `DETAIL_NOT_SHOWN` 里写明为什么不展示。三者都不是就是缺口。
+
+查出来过真问题：`project_type`、`construction_phase`、`collapse_subtype` 三列
+有值率 100%，列表页有、概览页有筛选，唯独详情页看不到——蓝图 05 §2.1 的分档表
+（43 个列名）漏列了它们，实现照抄分档表。**缺口是从文档抄进代码的**，所以这个
+核查同时也盯着「分档表列全了没有」。
+
 ## 两个已知的假信号（写在这里免得下次又查一遍）
 
 - **注释里的文件名**。`/* … overview.js 里还有一份… */` 会被当成 `.js` 属性读取。
@@ -38,7 +52,7 @@
     .venv/bin/python3 scripts/check_field_alignment.py
     .venv/bin/python3 scripts/check_field_alignment.py --verbose
 
-退出码 `0` = 没有未归类的读取，`1` = 有（可直接接 CI）。
+退出码 `0` = 没有未归类的读取、也没有未收进详情页的列；`1` = 两者任一存在（可直接接 CI）。
 """
 from __future__ import annotations
 
@@ -55,6 +69,40 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))      # scripts/_common
 from _common import main_db_path, main_repo_root              # noqa: E402
 
 WEB = ROOT / "construction_agent" / "web"
+
+#: `accidents` 里详情接口**有意不展示**的列。每条都得有理由——没有理由的就是缺口。
+DETAIL_NOT_SHOWN = {
+    "raw_text": "不进 `fields`，在响应顶层单独下发（前端读它渲染原文）",
+    "work_task_enum": "1.0 残留列，703 条编码在枚举表里根本不存在（蓝图 05 §2.3）",
+}
+
+
+def detail_tier_gaps(main_db: str) -> list[str]:
+    """`accidents` 的列里，详情页「内容四档 + 元数据区」一个都没收的。
+
+    这是**反方向**的一查。上面查的是「前端读了、后端没有的名字」，这里查
+    「后端表里有、页面上永远不显示的值」。两类缺口的症状一模一样：不报错、
+    不空白、控制台干净，只是那几列数据从来没人看见。
+
+    这个方向查出过真问题：`project_type` 与 `construction_phase` 有值率 100%、
+    列表页有这两列、概览页有这两维筛选，但蓝图 05 §2.1 的分档表（43 个列名）
+    漏了它们——实现照抄分档表，详情页就一直看不到这两列。
+
+    「有没有值」不参与判断：一列只要有值就该有归宿，至于进了哪一档、那一档
+    折不折叠，是分档表的事。
+    """
+    import sqlite3
+
+    # 延迟 import：本脚本其余部分只读文件与库，不必拉起整个 web 包
+    from construction_agent.web.detail import CONTENT_TIERS, META_FIELDS
+
+    covered = {n for _, _, names in CONTENT_TIERS for n in names} | set(META_FIELDS)
+    con = sqlite3.connect(f"file:{main_db}?mode=ro", uri=True)
+    try:
+        cols = [r[1] for r in con.execute("PRAGMA table_info(accidents)")]
+    finally:
+        con.close()
+    return [c for c in cols if c not in covered and c not in DETAIL_NOT_SHOWN]
 
 #: JS 语言与 DOM 自带的名字，以及本项目 `dom.js` 导出的工具。
 #: 判断依据是「这个名字在前端是读浏览器对象，不是读后端 JSON」。
@@ -269,6 +317,14 @@ def main() -> int:
     print(f"  └ 后端源码里出现过   {len(passed_src):>4}")
     print(f"未归类               {len(unclassified):>4}")
 
+    gaps = detail_tier_gaps(main_db)
+    print(f"详情页未收列         {len(gaps):>4}  （`accidents` 的列不在四档 + 元数据区里）")
+    if gaps:
+        for c in gaps:
+            print(f"    {c}")
+        print("  这些列的值后端有、页面上永远不显示。要么补进 `detail.CONTENT_TIERS`，")
+        print("  要么进 `DETAIL_NOT_SHOWN` 并写清为什么不展示。")
+
     if holes:
         print(f"\n⚠ {len(holes)} 个端点的数组是空的，元素字段无从验证：")
         for path, blanks in holes:
@@ -290,10 +346,13 @@ def main() -> int:
             print(f"    {a:<24} 出现在 {', '.join(where)}")
         print("\n  逐个看：要么是后端该返回而没返回（真错配），"
               "要么该补进 JS_AND_DOM 白名单。")
+
+    if unclassified or gaps:
         return 1
 
     print("\n✓ 前端读的每个名字都能归到「后端返回」「DOM 自带」「前端内部」「后端源码」"
-          "四者之一。")
+          "四者之一；")
+    print("  `accidents` 的每一列也都有归宿。")
     return 0
 
 

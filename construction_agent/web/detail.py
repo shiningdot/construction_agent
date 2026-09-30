@@ -62,10 +62,22 @@ NO_EVIDENCE_TEXT = "未提供证据文本"
 # 字段分档
 # ══════════════════════════════════════════════════════════════
 
+# `project_type` / `construction_phase` / `collapse_subtype` 是后来补进分档的。
+# 前两列**有值率 100%**却一度不在任何档里——列表页有这两列（「工程类型」），
+# 概览页有这两维筛选，唯独详情页看不到；原因是蓝图 05 §2.1 的分档表漏列了它们
+# （表里 43 个列名，而 `accidents` 是 48 列），实现照抄分档表，缺口就跟着进了代码。
+# 补的位置按有值率与语义定：前两列是核心分类、与 `accident_type` 同类，进 A 档；
+# `collapse_subtype` 见下面的哨兵说明，进 C 档。
+#
+# **哨兵值**：step1 给「仅某类事故才填」的字段约定了一个字面量「不适用」
+# （`collapse_subtype` 用它在非坍塌事故上占位）。它不是数据，读的时候要当缺失。
+NOT_APPLICABLE = "不适用"
+
 CONTENT_TIERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("A", "必显", (
         "title", "date", "province", "city", "accident_location_detail",
-        "accident_type", "severity", "deaths", "injuries",
+        "accident_type", "project_type", "construction_phase", "severity",
+        "deaths", "injuries",
         "summary", "direct_cause",
     )),
     ("B", "有则显示", (
@@ -74,7 +86,7 @@ CONTENT_TIERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     )),
     ("C", "折叠", (
         "material_involved", "contractor", "equipment_involved",
-        "direct_economic_loss", "contractor_type",
+        "direct_economic_loss", "contractor_type", "collapse_subtype",
     )),
     ("D", "高级折叠", (
         "trapped_count", "developer", "fall_height", "building_structure",
@@ -217,6 +229,14 @@ def build(
     for _, _, names in CONTENT_TIERS:
         for n in names:
             fields[n] = row.get(n)
+
+    # `collapse_subtype` 的「不适用」是 step1 定义的**哨兵**，不是数据——
+    # 「仅坍塌/土方坍塌类填写。非坍塌类填'不适用'」（`step1_basic_extractor.py`）。
+    # 归一成缺失，否则 1,320 条非坍塌事故会各显示一行「坍塌子类型：不适用」，
+    # C 档的 `available` 也会被顶成满值。`fall_height` 是同一类「仅某类填写」
+    # 的字段，只是它没填就是 NULL，没有哨兵要处理。
+    if fields.get("collapse_subtype") == NOT_APPLICABLE:
+        fields["collapse_subtype"] = None
 
     for column in ENUM_COLUMNS:
         fields[column + "_label"] = _label_of(column, fields.get(column), db_path)

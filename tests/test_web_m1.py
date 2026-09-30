@@ -33,7 +33,7 @@ CREATE TABLE accidents (
     province TEXT, city TEXT, district TEXT,
     accident_type TEXT, severity TEXT,
     deaths INTEGER, injuries INTEGER, trapped_count INTEGER,
-    project_type TEXT, construction_phase TEXT,
+    project_type TEXT, construction_phase TEXT, collapse_subtype TEXT,
     source_name TEXT, summary TEXT, direct_cause TEXT,
     work_task TEXT
 );
@@ -56,8 +56,8 @@ CREATE TABLE image_analyses (
 
 ACCIDENT_COLS = (
     "id,title,date,accident_time,province,city,district,accident_type,severity,"
-    "deaths,injuries,trapped_count,project_type,construction_phase,source_name,"
-    "summary,direct_cause,work_task"
+    "deaths,injuries,trapped_count,project_type,construction_phase,"
+    "collapse_subtype,source_name,summary,direct_cause,work_task"
 )
 
 # 10 条，覆盖：标准省（含跨记录同省）、地址级脏值、境外两种写法、
@@ -69,10 +69,15 @@ ACCIDENT_COLS = (
 ACCIDENTS: list[dict] = [
     dict(id="a1", title="四川某工地坍塌事故", date="2024-01-01", province="四川省",
          accident_type="坍塌", severity="重大事故", deaths=16, injuries=39,
+         project_type="房屋建筑", construction_phase="主体结构",
+         collapse_subtype="脚手架坍塌",
          source_name="safehoo", direct_cause="边坡未按规定放坡",
          work_task="WT01"),
+    # a2 是**非坍塌**事故，`collapse_subtype` 按 step1 的约定填哨兵「不适用」——
+    # 详情页必须把它读成缺失，否则这一栏会显示「不适用」且把 C 档顶成满值。
     dict(id="a2", title="成都高处坠落事故", date="2023-05-05", province="四川省",
          accident_type="高处坠落", severity="一般事故", deaths=0, injuries=1,
+         collapse_subtype="不适用",
          source_name="safehoo", work_task="WT01"),
     dict(id="a3", title="广东脚手架坍塌", date="2022-03-03", province="广东省",
          accident_type="坍塌", severity="较大事故", deaths=3, injuries=2,
@@ -728,13 +733,39 @@ class TestDetail:
         tiers = client.get("/api/accidents/a1").get_json()["data"]["tiers"]
         assert [t["key"] for t in tiers] == ["A", "B", "C", "D"]
         a = tiers[0]
-        assert a["total"] == 11
-        # a1 有值 8 项：title/date/province/type/severity/deaths/injuries/direct_cause
+        assert a["total"] == 13
+        # a1 有值 10 项：title/date/province/type/project_type/construction_phase/
+        # severity/deaths/injuries/direct_cause
         # 缺 3 项：city / accident_location_detail / summary
-        assert a["available"] == 8
+        assert a["available"] == 10
         d = tiers[3]
         assert "trapped_count" in d["fields"]
         assert "weather" in d["fields"]
+
+    def test_三类核心分类列都在_A_档(self, client):
+        """`project_type` / `construction_phase` 有值率 100% 却曾不在任何档里。
+
+        根因是蓝图 05 §2.1 的分档表漏列（表里 43 个列名、标题写 48 列），实现
+        照抄表格。这一条护住补档结果，`scripts/check_field_alignment.py` 另有
+        一条按 `accidents` 全列核的判据。
+        """
+        a = client.get("/api/accidents/a1").get_json()["data"]["tiers"][0]
+        assert "project_type" in a["fields"]
+        assert "construction_phase" in a["fields"]
+
+    def test_坍塌子类的哨兵值读成缺失(self, client):
+        """「不适用」是 step1 定的哨兵，不是数据。
+
+        `collapse_subtype` 非坍塌类填「不适用」（`step1_basic_extractor.py`），
+        主库 2,623 行里 1,320 行是这个值。原样下发的话，触电、坠落这些事故会各
+        显示一行「坍塌子类：不适用」，C 档的 `available` 也被顶成满值。
+        """
+        c = client.get("/api/accidents/a1").get_json()["data"]      # 坍塌
+        assert c["fields"]["collapse_subtype"] == "脚手架坍塌"
+        c = client.get("/api/accidents/a2").get_json()["data"]      # 高处坠落
+        assert c["fields"]["collapse_subtype"] is None
+        tiers = {t["key"]: t for t in c["tiers"]}
+        assert "collapse_subtype" in tiers["C"]["fields"]           # 在档里，只是没值
 
     def test_空值与零可区分(self, client):
         """a2 的 `deaths=0` 算有值。

@@ -1,16 +1,16 @@
 """批量管线: 原始数据 → 分类 → 提取 → 编码 → 入库。"""
 
-import json, sqlite3, sys, time, logging, hashlib
+import json, sqlite3, sys, logging, hashlib
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from construction_agent.collector.llm_classifier import AccidentClassifier
-from construction_agent.extraction.step1_basic_extractor import Step1BasicExtractor
-from construction_agent.extraction.step2_caics_encoder import Step2CaicsEncoder
-from construction_agent.extraction.search_enhancer import SearchEnhancer
-from construction_agent.collector.base import RawAccidentText
+from construction_agent.extraction.caics_pipeline import (
+    STATUS_COMPLETED,
+    STATUS_PURGED,
+    CaicsPipeline,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -142,17 +142,28 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
 
 
 def run_batch(n: int = BATCH_SIZE):
-    """运行批量管线。"""
+    """运行批量管线。
+
+    编排已抽到 `CaicsPipeline`（S1–S4 的唯一实现），本函数只管三件事：
+    读原始数据、调度、入库统计。
+
+    **行为与抽提前的内联版本一致**，逐条对照见
+    `construction_agent/extraction/caics_pipeline.py` 的模块 docstring。
+    唯一的差异是错误处置的粒度：
+
+        原版      S1/S2 抛异常会中断整个批次（循环体里没有 try）
+        现在      归为该条 failed，批次继续
+
+    这一点在 caics_pipeline 的增量清单里已标注，属修复而非改变语义。
+    S3/S4 的失败处置与原版逐字相同（S3 失败跳过该条，S4 失败仍入库）。
+    """
     # 加载数据
     with open(RAW_PATH) as f:
         raw = json.load(f)
     raw = raw[:n]
     logger.info(f"处理 {len(raw)} 条")
 
-    classifier = AccidentClassifier()
-    extractor = Step1BasicExtractor()
-    encoder = Step2CaicsEncoder()
-    enhancer = SearchEnhancer()
+    pipe = CaicsPipeline()
     conn = sqlite3.connect(DB_PATH)
 
     success = 0
@@ -161,64 +172,40 @@ def run_batch(n: int = BATCH_SIZE):
 
     for i, d in enumerate(raw):
         title = d.get("title", "")
-        content = d.get("content", "")
-        meta = {"publish_date": d.get("publish_date", ""), "source_name": d.get("source_name", "")}
-        t0 = time.time()
-
         logger.info(f"[{i+1}/{n}] {title[:50]}")
 
-        # Step 0: 文本类型
-        tt = classifier.classify_text_type(title, content)
-        if tt.text_type.should_purge():
+        out = pipe.run_once(
+            title=title,
+            text=d.get("content", ""),
+            publish_date=d.get("publish_date", ""),
+            source_id=d.get("id", ""),
+            source_name=d.get("source_name", ""),
+        )
+
+        # 两道闸门拦下 → 与原版同样计入 purged
+        if out.status == STATUS_PURGED:
             purged += 1
-            logger.info(f"  ⛔ 文本类型={tt.text_type.value}, 跳过")
+            logger.info(f"  ⛔ {out.purge_reason}, 跳过")
             continue
 
-        # Step 0.5: 事故分类
-        item = RawAccidentText(title=title, raw_text=content)
-        item.id = d.get("id", ""); item.source_name = d.get("source_name", "")
-        cl = classifier.classify(item)
-        if not cl.is_construction:
-            purged += 1
-            logger.info(f"  ⛔ 非施工, 跳过")
+        if out.status != STATUS_COMPLETED:
+            failed += 1
+            logger.error(f"  ✗ {out.purge_reason}")
             continue
-
-        # Step 1
-        try:
-            s1 = extractor.extract(content, metadata=meta)
-            if not s1:
-                failed += 1; continue
-        except Exception as e:
-            failed += 1; logger.error(f"Step1 异常: {e}"); continue
-        s1d = s1.to_dict()
-
-        # 搜索增强
-        search_result = None
-        try:
-            if enhancer.needs_search(content, s1d):
-                sr = enhancer.enhance(content, s1d)
-                if sr["same_accident_count"] > 0:
-                    search_result = sr
-                    s1 = extractor.extract(sr["enriched_text"], metadata=meta)
-                    if s1: s1d = s1.to_dict()
-        except Exception as e:
-            logger.warning(f"搜索增强异常: {e}")
-
-        # Step 2
-        s2 = None
-        try:
-            s2 = encoder.encode(content, basic_info=s1d)
-        except Exception as e:
-            logger.error(f"Step2 异常: {e}")
 
         # 入库
         try:
-            elapsed_ms = int((time.time() - t0) * 1000)
-            insert_accident(conn, s1d, s2, d, tt, cl, search_result, elapsed_ms)
+            insert_accident(
+                conn, out.basic.to_dict(), out.causes, d,
+                out.text_type, out.classification, out.search, out.total_ms,
+            )
             conn.commit()
             success += 1
-            codes_str = ",".join(s2.caics_codes) if s2 else "?"
-            logger.info(f"  ✅ {s1d.get('accident_type','?')} | {len(s2.causes) if s2 else 0}编码: {codes_str}")
+            codes_str = ",".join(out.caics_codes) if out.causes else "?"
+            logger.info(
+                f"  ✅ {out.basic.accident_type or '?'} | "
+                f"{len(out.caics_codes)}编码: {codes_str}"
+            )
         except Exception as e:
             conn.rollback()
             failed += 1

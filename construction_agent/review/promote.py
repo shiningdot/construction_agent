@@ -25,13 +25,13 @@ token 与 `stage_ids` 集合绑定——防的是「用户改了选择却沿用�
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from ..database.backup import safe_backup
 from ..web import db as final_db
 from ..web import staging_db
 
@@ -391,9 +391,15 @@ def backup_final_db(db_path: Path | None = None) -> Path:
         raise PromoteError(f"最终库不存在：{path}")
     out_dir = path.parent / BACKUP_DIRNAME
     out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 时间戳带微秒：同一秒内连续两次并入会撞名。撞名时 safe_backup 会拒绝写入，
+    # 而"两次并入各留一份备份"本来就更该是行为——旧写法 copy2 是静默覆盖，
+    # 第一次并入前的状态会被第二次冲掉
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     dest = out_dir / f"{path.name}.bak.before_promote_{ts}"
-    shutil.copy2(path, dest)
+    # 不用 shutil.copy2：本模块的 _connect_writable 会把最终库切成 WAL，而 WAL
+    # 是写进文件头的持久属性——从那以后库一直是 WAL，文件级复制会静默丢数据。
+    # 这份备份是 rollback docstring 里说的「手工恢复的最后手段」，不能是坏的。
+    safe_backup(path, dest)
     return dest
 
 

@@ -27,7 +27,6 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from datetime import datetime
@@ -35,6 +34,7 @@ from pathlib import Path
 
 # 复用 web 层的库路径解析，避免又一处「路径漂移」
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from construction_agent.database.backup import safe_backup  # noqa: E402
 from construction_agent.web.db import resolve_db_path  # noqa: E402
 
 # (索引名, 表名, 列名) —— 命名沿用 create_db_v2.py 的既有风格，不另起一套
@@ -113,9 +113,12 @@ def main() -> int:
             return 0
 
         if not args.no_backup:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 带微秒，避免同一秒内连跑两次撞名（safe_backup 拒绝覆盖已有备份）
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             backup = db_path.parent / f"{db_path.name}.bak.before_indexes_{ts}"
-            shutil.copy2(db_path, backup)
+            # 不用 shutil.copy2：库若处于 WAL，主文件在 checkpoint 之前是滞后的，
+            # 文件级复制会静默丢数据（实测 51 行只备到 1 行）
+            safe_backup(db_path, backup)
             size_mb = backup.stat().st_size / 1024 / 1024
             print(f"\n已备份 → {backup}  ({size_mb:.1f} MB)")
 

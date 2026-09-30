@@ -36,13 +36,13 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from construction_agent.database.backup import safe_backup  # noqa: E402
 
 # 表定义以真实库（data/caiems_v2.db）为准逐列核对得来，不要凭记忆改。
 # `accidents` 48 列 —— 派生时间字段（lighting/day_of_week/season/time_period/
@@ -294,13 +294,22 @@ def create_database(db_path: str | None = None, *, rebuild: bool = False,
         return None
 
     if db_path.exists() and rebuild:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # 带微秒，避免同一秒内连跑两次撞名（safe_backup 拒绝覆盖已有备份）
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         backup = db_path.parent / f"{db_path.name}.bak.before_rebuild_{ts}"
-        shutil.copy2(db_path, backup)
+        # 不用 shutil.copy2：库若处于 WAL，主文件在 checkpoint 之前是滞后的，
+        # 文件级复制会静默丢数据（见 construction_agent/database/backup.py）
+        safe_backup(db_path, backup)
         size_mb = backup.stat().st_size / 1024 / 1024
         print(f"已备份 → {backup}  ({size_mb:.1f} MB)")
-        db_path.unlink()
-        print(f"已删除旧库：{db_path}")
+        # WAL 的 -wal / -shm 旁文件必须一并删掉：只删主文件的话，紧跟着新建的
+        # 同名库会被 SQLite 配上那个孤儿 -wal，读出的状态是错乱的。
+        # `create_staging_db.py --drop` 一直这么做，这边漏了。
+        for suffix in ("", "-wal", "-shm"):
+            side = Path(str(db_path) + suffix)
+            if side.exists():
+                side.unlink()
+        print(f"已删除旧库及其旁文件：{db_path}")
     elif db_path.exists():
         print(f"库已存在，只补缺失的表与索引（不删数据）：{db_path}")
 

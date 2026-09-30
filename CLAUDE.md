@@ -116,6 +116,7 @@ python -m construction_agent.main
 - **Python 解释器**：`/home/suntianhao/construction_agent/.venv/bin/python3`（系统 python 缺 dotenv/anthropic）
 - **模型与 key 配置分散三处**，切档位需同步改：`~/.bashrc`、`~/.claude/settings.json`、`construction_agent/.env`（后者 `override=True`，对项目代码有最终决定权）
 - **模型不一致风险**：论文实验脚本硬编码 `deepseek-v4-pro`，主管道读 `.env`（现为 `deepseek-v4-flash`）；补跑数据前先确认档位
+- **WAL 是持久属性；库一旦被切成 WAL，就不能再用 `shutil.copy2` 备份**：`scripts/create_db_v2.py` 建库、`review/promote.py` 并入都会 `PRAGMA journal_mode=WAL`（写进文件头，此后一直是 WAL）。WAL 模式下主文件在 checkpoint 之前是滞后的，文件级复制只拿到旧状态（实测 51 行只备到 1 行）。备份一律用 `construction_agent.database.backup.safe_backup`
 - **禁止裸 `git stash`**（与其它 worktree 共享栈）；worktree 会话禁止操作主仓库 git
 - 调用 DeepSeek 时思考块会吃掉输出预算，`max_tokens` 需 ≥16384，否则返回空文本
 - 会话记录与备份文件中留有 API key 明文，勿同步到云端

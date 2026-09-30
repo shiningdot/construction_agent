@@ -14,14 +14,31 @@ from __future__ import annotations
 from flask import Blueprint, abort, current_app, render_template, send_file
 
 from ..collector import executor as collect_executor
+from ..extraction import staging_executor as extract_executor
 from . import images
 
 views_bp = Blueprint("views", __name__)
 
-# 进程重启后 `collect_tasks` 里会留下几行写着 `running` 的僵死任务（线程池
-# 随进程没了）。清理只需要做一次，放在页面入口而不是 `create_app()`：工厂
-# 会被测试反复调用几十次，每次都去写一次库既慢又脏。
+# 进程重启后 `collect_tasks` / `extract_tasks` 里会留下几行写着 `running` 的
+# 僵死任务（线程池随进程没了）。清理只需要做一次，放在页面入口而不是
+# `create_app()`：工厂会被测试反复调用几十次，每次都去写一次库既慢又脏。
 _reconciled = False
+
+
+def _reconcile_once() -> None:
+    """两个执行器各清一次僵死任务。工作库没建时静默跳过。"""
+    global _reconciled
+    if _reconciled:
+        return
+    _reconciled = True
+    for name, fn in (("采集", collect_executor.reconcile_stale_tasks),
+                     ("提取", extract_executor.reconcile_stale_tasks)):
+        try:
+            n = fn()
+            if n:
+                current_app.logger.info("清理了 %d 个中断的%s任务", n, name)
+        except Exception as e:  # noqa: BLE001 —— 库没建时不该拦住页面
+            current_app.logger.debug("跳过%s僵死任务清理: %s", name, e)
 
 
 @views_bp.get("/")
@@ -33,16 +50,15 @@ def overview_page():
 @views_bp.get("/collect")
 def collect_page():
     """在线采集。蓝图 01 的落地页，对应流水线的阶段①。"""
-    global _reconciled
-    if not _reconciled:
-        _reconciled = True
-        try:
-            n = collect_executor.reconcile_stale_tasks()
-            if n:
-                current_app.logger.info("清理了 %d 个中断的采集任务", n)
-        except Exception as e:  # noqa: BLE001 —— 库没建时不该拦住页面
-            current_app.logger.debug("跳过僵死任务清理: %s", e)
+    _reconcile_once()
     return render_template("collect.html")
+
+
+@views_bp.get("/extract")
+def extract_page():
+    """在线提取。蓝图 02 的落地页，对应流水线的阶段②。"""
+    _reconcile_once()
+    return render_template("extract.html")
 
 
 @views_bp.get("/accident/<accident_id>")

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}在线提取 · CAIEMS{% endblock %}
+
+{# 流水线阶段②的工作台：待提取队列 → 建任务（成本确认）→ 跑 S1–S4 → 暂存结果。
+
+   页面本身只有骨架，数据全走 /api/extract/*。 #}
+
+{% block content %}
+<noscript>
+  <div class="notice">本页的数据由浏览器端脚本从 <code>/api/extract/*</code>
+  拉取，请启用 JavaScript。</div>
+</noscript>
+
+<div class="notice notice-warn" id="dbNotice" hidden></div>
+
+{# ── ① 理论版本 ──────────────────────────────────────────── #}
+<section class="panel" id="taxPanel">
+  <div class="panel-head">
+    <h2>理论版本</h2>
+    <div class="head-tools">
+      <span class="result-count" id="taxMeta"></span>
+      <button type="button" class="btn btn-sm" id="taxToggle">展开 19 类</button>
+    </div>
+  </div>
+  <div class="chips" id="taxChips"></div>
+  <div id="taxClasses" hidden>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>层</th>
+            <th>编码</th>
+            <th>名称</th>
+            <th class="col-num">主库现有条数</th>
+          </tr>
+        </thead>
+        <tbody id="taxBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <p class="panel-note">
+    提取用的编码表直接查主库 <code>caics_causes</code>，不在这里另存一份——
+    类名与版本号只有一个真相来源，页面显示什么，跑出来的就是什么。
+  </p>
+</section>
+
+{# ── ② 待提取队列 ────────────────────────────────────────── #}
+<section class="panel" id="pendingPanel">
+  <div class="panel-head">
+    <h2>待提取队列</h2>
+    <div class="head-tools">
+      <span class="result-count" id="pendCount"></span>
+      <button type="button" class="btn btn-sm" id="pendAll">全选</button>
+      <button type="button" class="btn btn-sm" id="pendNone">清空</button>
+      <button type="button" class="btn btn-sm" id="pendRefresh">刷新</button>
+    </div>
+  </div>
+
+  <p class="panel-note">
+    这里是<strong>已标为相关、还没提取过</strong>的原文。判据是暂存区里有没有
+    这条记录，不是任务状态——任务可以删、可以重跑，暂存行才是事实。
+  </p>
+
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="col-pick"></th>
+          <th class="col-title">标题</th>
+          <th class="col-src">来源</th>
+          <th class="col-date">发布日</th>
+          <th class="col-num">正文字数</th>
+          <th class="col-num">附件</th>
+        </tr>
+      </thead>
+      <tbody id="pendBody"></tbody>
+    </table>
+  </div>
+  <div class="pager" id="pendPager"></div>
+</section>
+
+{# ── ③ 任务队列 ──────────────────────────────────────────── #}
+<section class="panel" id="tasksPanel">
+  <div class="panel-head">
+    <h2>提取任务</h2>
+    <div class="head-tools">
+      <span class="result-count" id="taskCount"></span>
+      <button type="button" class="btn btn-sm" id="refreshTasks">刷新</button>
+    </div>
+  </div>
+  <div id="taskList"></div>
+</section>
+
+{# ── ④ 暂存结果 ──────────────────────────────────────────── #}
+<section class="panel" id="resultsPanel">
+  <div class="panel-head">
+    <h2>暂存结果</h2>
+    <span class="result-count" id="resCount"></span>
+  </div>
+  <p class="panel-note">
+    提取产出先进暂存区，人工确认后才并入最终库（阶段③）。这里看到的每条
+    都带完整证据链，点开可以逐条核对。
+  </p>
+
+  <form class="filters" id="resFilters" autocomplete="off">
+    <div class="filters-row">
+      <label class="field">
+        <span>任务</span>
+        <select id="f_task"><option value="">全部</option></select>
+      </label>
+      <label class="field">
+        <span>类型</span>
+        <select id="f_text">
+          <option value="">全部</option>
+          <option value="single">单个事故</option>
+          <option value="multi">多事故</option>
+          <option value="regulatory">通报文件</option>
+          <option value="aggregate">统计汇总</option>
+          <option value="training">培训材料</option>
+          <option value="other">其它</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>相关性</span>
+        <select id="f_rel">
+          <option value="">全部</option>
+          <option value="construction">施工相关</option>
+          <option value="non_construction">非施工</option>
+          <option value="insufficient">信息不足</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>编码</span>
+        <select id="f_cause">
+          <option value="">全部</option>
+          <option value="1">仅看没编出来的</option>
+        </select>
+      </label>
+      <label class="field field-grow">
+        <span>关键词</span>
+        <input type="search" id="f_q" placeholder="标题或摘要">
+      </label>
+      <label class="field">
+        <span>每页</span>
+        <select id="f_size">
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </label>
+    </div>
+    <div class="filters-actions">
+      <button type="submit" class="btn btn-primary">查询</button>
+      <button type="button" class="btn" id="resReset">重置</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="col-title">标题</th>
+          <th>类型</th>
+          <th>等级</th>
+          <th class="col-num">死亡</th>
+          <th class="col-num">受伤</th>
+          <th>地点</th>
+          <th class="col-num">编码</th>
+          <th class="col-num">S3</th>
+          <th class="col-num">S4</th>
+          <th class="col-date">入库时间</th>
+          <th class="col-act"></th>
+        </tr>
+      </thead>
+      <tbody id="resBody"></tbody>
+    </table>
+  </div>
+  <div class="pager" id="resPager"></div>
+</section>
+
+{# ── ⑤ 选择操作条 ────────────────────────────────────────── #}
+<div class="bulkbar" id="bulkBar" hidden>
+  <span class="bulk-count" id="bulkCount"></span>
+  <span class="hint-inline" id="bulkEst"></span>
+  <button type="button" class="btn btn-primary btn-sm" id="bulkPlan">建提取任务</button>
+  <button type="button" class="btn btn-sm" id="bulkClear">取消选择</button>
+</div>
+
+{# ── 抽屉：单条暂存产出 ──────────────────────────────────── #}
+<aside class="drawer" id="drawer" role="dialog" aria-modal="false"
+       aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-inner">
+    <div class="drawer-head">
+      <h3 id="drawerTitle">暂存产出</h3>
+      <div class="head-tools">
+        <button type="button" class="btn btn-sm" id="rerunBtn">重跑</button>
+        <button type="button" class="btn btn-sm" id="drawerClose">关闭</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </div>
+</aside>
+
+{# ── 成本确认弹层 ──────────────────────────────────────────
+   这是全页唯一会花钱的入口。建任务只写一行 pending，一次 LLM 调用都不发；
+   点了「确认执行」才开始跑。 #}
+<div class="modal" id="costModal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="costTitle">
+  <div class="modal-box">
+    <h3 id="costTitle">确认提取</h3>
+    <div id="costBody"></div>
+    <p class="task-error" id="costErr" hidden></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="costRun">确认执行</button>
+      <button type="button" class="btn" id="costQueue">仅建任务（稍后启动）</button>
+      <button type="button" class="btn" id="costCancel">取消</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dom.js') }}"></script>
+<script src="{{ url_for('static', filename='extract.js') }}"></script>
+{% endblock %}

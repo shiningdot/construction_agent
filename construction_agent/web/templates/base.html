@@ -20,11 +20,13 @@
     </a>
     {# 当前页高亮按 endpoint 判，不靠各页自己传参——详情页也想让「概览」
        保持高亮（它是从列表点进来的），per-page 变量传起来反而绕 #}
-    {# 顺序按流水线的四个阶段排：采集 → （提取审核，M3 再挂）→ 展示。
-       顺序本身就是信息——用户从左边点起，走的就是数据进来的那条路 #}
+    {# 顺序按流水线的四个阶段排：采集 → 提取（阶段②）→ 展示。顺序本身就是
+       信息——用户从左边点起，走的就是数据进来的那条路 #}
     <nav class="topnav">
       <a href="{{ url_for('views.collect_page') }}"
          class="{{ 'is-active' if request.endpoint == 'views.collect_page' else '' }}">在线采集</a>
+      <a href="{{ url_for('views.extract_page') }}"
+         class="{{ 'is-active' if request.endpoint == 'views.extract_page' else '' }}">在线提取</a>
       <a href="{{ url_for('views.overview_page') }}"
          class="{{ 'is-active' if request.endpoint in ('views.overview_page', 'views.accident_page') else '' }}">概览与检索</a>
       <a href="{{ url_for('views.causes_page') }}"

@@ -286,29 +286,195 @@
 
   /* ── ⑤ 图片 ────────────────────────────────────────────── */
 
+  /* 灯箱。做成单例：一次建好，开关只切类名。
+     每次点击重建 DOM 会让图片重新解码（几百 KB 一张），也留不住键盘焦点。 */
+  const Lightbox = (function () {
+    let host = null, img = null, cap = null, prev = null, next = null;
+    let items = [], idx = 0;
+
+    function show(i) {
+      idx = (i + items.length) % items.length;   // 两端循环
+      const it = items[idx];
+      img.src = it.url;
+      img.alt = it.filename;
+
+      clear(cap);
+      const line = el('div', { cls: 'lb-line' }, [
+        el('span', { cls: 'lb-file mono', text: it.filename }),
+        el('span', { cls: 'lb-idx',
+                     text: (idx + 1) + ' / ' + items.length }),
+      ]);
+      cap.appendChild(line);
+
+      // VLM 结论只在灯箱里展示，不占画廊的空间——226 张里 204 张有分析
+      // 结论，把它们铺在缩略图下面会把画廊淹掉。
+      //
+      // 只展示 `phase1_scene_type`：同一张表里 `phase2_consistency`、
+      // `phase2_confidence`、`width`、`height` 实测**整列为空**（0/226），
+      // 摆出来就是四行「—」。那会让人分不清「模型没判」和「这张图没分析
+      // 过」——两者在数据里是不同的状态，页面上也必须不同。
+      const facts = [];
+      if (it.phase1_scene_type) {
+        facts.push(['场景', it.phase1_scene_type]);
+      }
+      if (it.vlm_model) {
+        facts.push(['分析模型', it.vlm_model]);
+      }
+      if (facts.length) {
+        const grid = el('div', { cls: 'lb-facts' });
+        facts.forEach(function (f) {
+          grid.appendChild(el('div', { cls: 'lb-fact' }, [
+            el('span', { cls: 'lb-key', text: f[0] }),
+            el('span', { cls: 'lb-val', text: f[1] }),
+          ]));
+        });
+        cap.appendChild(grid);
+      } else if (it.analyzed) {
+        cap.appendChild(el('p', { cls: 'lb-note',
+                                  text: '已做多模态分析，但未给出场景判定。' }));
+      } else {
+        cap.appendChild(el('p', { cls: 'lb-note',
+                                  text: '这张图没有多模态分析结论。' }));
+      }
+
+      if (it.shared) {
+        cap.appendChild(el('p', { cls: 'lb-warn', text:
+          '这张图的内容同时出现在多起事故的目录里（多为图床返回的默认图），'
+          + '不一定是本事故的现场照片。' }));
+      }
+
+      if (it.source_url) {
+        cap.appendChild(el('p', { cls: 'lb-src' }, [
+          el('span', { cls: 'lb-key', text: '来源' }),
+          el('a', { text: it.source_url,
+                    attrs: { href: it.source_url, target: '_blank',
+                             rel: 'noopener noreferrer' } }),
+        ]));
+      }
+    }
+
+    function open(list, i) {
+      items = list;
+      if (!host) build();
+      prev.style.display = next.style.display =
+        items.length > 1 ? '' : 'none';
+      show(i);
+      host.classList.add('is-open');
+      host.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('lb-locked');
+      next.focus();
+    }
+
+    function close() {
+      if (!host) return;
+      host.classList.remove('is-open');
+      host.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('lb-locked');
+      img.src = '';
+    }
+
+    function build() {
+      img = el('img', { cls: 'lb-img', attrs: { alt: '' } });
+      cap = el('div', { cls: 'lb-cap' });
+      prev = el('button', { cls: 'lb-nav lb-prev', text: '‹',
+                            attrs: { type: 'button', 'aria-label': '上一张' } });
+      next = el('button', { cls: 'lb-nav lb-next', text: '›',
+                            attrs: { type: 'button', 'aria-label': '下一张' } });
+      const closeBtn = el('button', { cls: 'lb-close', text: '×',
+                                      attrs: { type: 'button',
+                                               'aria-label': '关闭' } });
+      const stage = el('div', { cls: 'lb-stage' }, [img, prev, next]);
+      const inner = el('div', { cls: 'lb-inner' }, [closeBtn, stage, cap]);
+
+      host = el('div', { cls: 'lightbox',
+                         attrs: { role: 'dialog', 'aria-modal': 'true',
+                                  'aria-hidden': 'true',
+                                  'aria-label': '现场图片' } }, [inner]);
+      document.body.appendChild(host);
+
+      prev.addEventListener('click', function (e) { e.stopPropagation(); show(idx - 1); });
+      next.addEventListener('click', function (e) { e.stopPropagation(); show(idx + 1); });
+      closeBtn.addEventListener('click', close);
+      // 点遮罩关闭，点图片本身或说明面板不关——用户在那里看来源链接
+      host.addEventListener('click', function (e) {
+        if (e.target === host || e.target === stage) close();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (!host.classList.contains('is-open')) return;
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowLeft') show(idx - 1);
+        else if (e.key === 'ArrowRight') show(idx + 1);
+      });
+    }
+
+    return { open: open, close: close };
+  })();
+
+  function imageTile(it, i, all) {
+    const tile = el('button', { cls: 'img-tile',
+                                attrs: { type: 'button',
+                                         title: it.filename } });
+    // loading="lazy"：226 个文件里最大的几百 KB，画廊一屏放不下
+    tile.appendChild(el('img', {
+      cls: 'img-thumb',
+      attrs: { src: it.url, alt: it.filename, loading: 'lazy' },
+    }));
+    if (it.analyzed) {
+      tile.appendChild(el('span', { cls: 'img-flag', text: '已分析' }));
+    }
+    if (it.shared) {
+      tile.appendChild(el('span', { cls: 'img-flag is-warn', text: '多事故共用',
+                                    attrs: { title: '同一内容出现在多起事故的目录里，' +
+                                                    '不一定是本事故的现场照片' } }));
+    }
+    tile.addEventListener('click', function () { Lightbox.open(all, i); });
+    return tile;
+  }
+
   function renderImages(d) {
-    if (!d.images.length) return null;
+    // 「这条事故没有图片」与「图片索引还没重建」是两件事：前者是数据事实，
+    // 后者要去跑 scripts/build_image_manifest.py。分开说。
+    if (!d.images.length && d.images_available) {
+      const panel = el('section', { cls: 'panel' });
+      panel.appendChild(el('div', { cls: 'panel-head' }, [
+        el('h2', { text: '现场图片' }),
+      ]));
+      panel.appendChild(el('div', { cls: 'empty' }, [
+        el('strong', { text: '该事故无现场图片' }),
+        el('span', { text: '主库 2,623 条事故中 193 条有图片，覆盖率 7.4%。' }),
+      ]));
+      return panel;
+    }
+    if (!d.images.length) {
+      const panel = el('section', { cls: 'panel' });
+      panel.appendChild(el('div', { cls: 'panel-head' }, [
+        el('h2', { text: '现场图片' }),
+      ]));
+      panel.appendChild(el('div', { cls: 'empty' }, [
+        el('strong', { text: '图片索引未重建' }),
+        el('span', { text: '图片登记表与磁盘对不上，需要先跑 ' +
+                           'scripts/build_image_manifest.py。' }),
+      ]));
+      return panel;
+    }
+
     const panel = el('section', { cls: 'panel' });
+    const analyzed = d.images.filter(function (x) { return x.analyzed; }).length;
     panel.appendChild(el('div', { cls: 'panel-head' }, [
       el('h2', { text: '现场图片' }),
-      el('div', { cls: 'result-count', text: d.images.length + ' 条分析记录' }),
+      el('div', { cls: 'result-count', text:
+        d.images.length + ' 张 · ' + analyzed + ' 张有多模态分析' }),
     ]));
 
-    const list = el('div', { cls: 'image-list' });
-    d.images.forEach(function (im) {
-      list.appendChild(el('div', { cls: 'image-row' }, [
-        el('span', { cls: 'mono wrap', text: im.local_path || '—' }),
-        el('span', { cls: 'image-tag', text: im.phase1_scene_type || '场景未标注' }),
-        im.phase1_damage
-          ? el('span', { cls: 'image-tag', text: im.phase1_damage }) : null,
-      ]));
+    const grid = el('div', { cls: 'image-grid' });
+    d.images.forEach(function (it, i) {
+      grid.appendChild(imageTile(it, i, d.images));
     });
-    panel.appendChild(list);
+    panel.appendChild(grid);
 
-    // 缩略图渲染待 image_manifest 重建方案（蓝图 06）——现有 local_path
-    // 指向三版目录混存的位置，直接拼 URL 会有一半 404。
     panel.appendChild(el('p', { cls: 'panel-note', text:
-      '图片文件路径对齐与缩略图见蓝图 06；此处只列已登记的分析记录。' }));
+      '点击图片查看大图与多模态分析结论。图片来自最终版目录 imageV3，'
+      + '早期版本（images/、imageV2/）不参与展示。' }));
 
     return panel;
   }

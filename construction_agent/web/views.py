@@ -11,7 +11,9 @@ JS 执行，对一个内网查询工具可以接受。
 
 from __future__ import annotations
 
-from flask import Blueprint, render_template
+from flask import Blueprint, abort, render_template, send_file
+
+from . import images
 
 views_bp = Blueprint("views", __name__)
 
@@ -32,3 +34,22 @@ def accident_page(accident_id: str):
 def causes_page():
     """致因分析。蓝图 05 §4.2。四张图各自拉一个端点，筛选条件放 URL hash。"""
     return render_template("causes.html")
+
+
+@views_bp.get("/media/<path:rel_path>")
+def media(rel_path: str):
+    """事故图片。蓝图 06 §4。
+
+    只服务 `imageV3/`（最终版）——`images/` 与 `imageV2/` 不给，三版里同一
+    事故可能有重复图片，放出来读者没法判断哪张是最终采用的。越界与不存在
+    都由 `images.resolve_media_path()` 挡掉，这里只负责 404 与缓存头。
+    """
+    path = images.resolve_media_path(rel_path)
+    if path is None:
+        abort(404)
+
+    resp = send_file(path, conditional=True)
+    # 图片文件本身不会变（改了就是换文件），可以长缓存。用 max-age 而不是
+    # immutable：将来若同名替换，immutable 会让浏览器一年都不再回源。
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp

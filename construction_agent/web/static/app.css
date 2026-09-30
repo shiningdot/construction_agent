@@ -649,20 +649,109 @@ code { font-family: var(--mono); font-size: .88em;
   color: var(--muted);
 }
 
-/* ── 图片 ── */
-.image-list { display: flex; flex-direction: column; gap: 2px; }
-.image-row {
-  display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
-  padding: 7px 0; border-bottom: 1px solid var(--border-soft);
-  font-size: 12.5px;
+/* ── 图片画廊 ── */
+
+/* 自适应列数：一屏放得下就好，不设固定列宽。min 150px 是按最窄的
+   200×150 缩略图定的——再窄就看不出拍的是什么了。 */
+.image-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
-.image-row .mono { font-family: var(--mono); font-size: 11.5px;
-                   color: var(--text-2); flex: 1 1 240px; word-break: break-all; }
-.image-tag {
-  font-size: 11.5px; color: var(--muted);
-  background: var(--surface-2); border: 1px solid var(--border-soft);
-  border-radius: 999px; padding: 1px 8px;
+
+/* 缩略图是 <button> 不是 <a>：点击只开灯箱，不跳转、不改 URL，
+   history 里不该多出一条记录。 */
+.img-tile {
+  position: relative; display: block; padding: 0; border: 0;
+  aspect-ratio: 4 / 3; overflow: hidden; cursor: zoom-in;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--border-soft);
 }
+.img-tile:hover { box-shadow: 0 0 0 1px var(--brand); }
+.img-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.img-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 角标压在图右上角。深底 + 白字是为了在任何一张图的任意位置上都能读——
+   浅色角标压在雪地或墙面的照片上会直接消失。 */
+.img-flag {
+  position: absolute; top: 6px; right: 6px;
+  padding: 1px 7px; border-radius: 999px;
+  background: rgba(42, 39, 36, .78); color: #fff;
+  font-size: 10.5px; line-height: 1.6;
+}
+.img-flag + .img-flag { top: 28px; }
+.img-flag.is-warn { background: rgba(142, 47, 47, .88); }
+
+/* ── 灯箱 ── */
+.lightbox {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  background: rgba(24, 22, 20, .86);
+  padding: 24px; overflow: auto;
+}
+.lightbox.is-open { display: flex; align-items: center; justify-content: center; }
+body.lb-locked { overflow: hidden; }
+
+/* 面板宽度跟着图片走：`fit-content` 让 145×97 的小图不会拖出一条
+   1000px 的黑带（实测财新转载的配图就是 145×97）。`min-width` 是下限，
+   免得小图把下面的说明文字挤成一列；`max-width` 是上限。
+   `.lb-cap` 的 `width: 0; min-width: 100%` 是配套的——文字再长也只在
+   图片宽度内换行，不会反过来把面板撑开（经典的最小宽度技巧）。 */
+.lb-inner {
+  position: relative; display: flex; flex-direction: column;
+  width: fit-content; max-width: min(1000px, 100%); max-height: 100%;
+  background: var(--surface); border-radius: var(--radius);
+  overflow: hidden; box-shadow: 0 12px 48px rgba(0, 0, 0, .4);
+}
+
+.lb-stage {
+  position: relative; background: #1B1917;
+  min-height: 120px; min-width: min(560px, 88vw);
+}
+.lb-img {
+  display: block; margin: 0 auto;
+  max-width: 100%; max-height: 68vh; object-fit: contain;
+}
+
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .16); color: #fff;
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.lb-nav:hover { background: rgba(255, 255, 255, .3); }
+.lb-prev { left: 10px; }
+.lb-next { right: 10px; }
+
+.lb-close {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: rgba(42, 39, 36, .6); color: #fff;
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.lb-close:hover { background: rgba(42, 39, 36, .85); }
+
+.lb-cap {
+  padding: 12px 16px 14px; overflow: auto; max-height: 26vh;
+  border-top: 1px solid var(--border-soft); font-size: 12.5px;
+  width: 0; min-width: 100%;
+}
+.lb-line { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.lb-file { flex: 1; color: var(--text-2); word-break: break-all; }
+.lb-idx { color: var(--muted); white-space: nowrap; }
+
+.lb-facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 6px; }
+.lb-fact { display: flex; gap: 6px; }
+.lb-key { color: var(--muted); white-space: nowrap; }
+.lb-val { color: var(--text); }
+
+.lb-note, .lb-warn { margin: 6px 0 0; }
+.lb-note { color: var(--muted); }
+.lb-warn {
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  background: #FBF0EE; color: #8E2F2F;
+}
+.lb-src { margin: 8px 0 0; display: flex; gap: 6px; }
+.lb-src a { color: var(--link); word-break: break-all; }
 
 /* ── 原文 ── */
 .raw-more {

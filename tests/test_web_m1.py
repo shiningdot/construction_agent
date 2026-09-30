@@ -16,9 +16,11 @@ from pathlib import Path
 
 import pytest
 
+from construction_agent.config import settings
 from construction_agent.web import (
-    accidents_query, causes, db, detail, overview, province,
+    accidents_query, causes, db, detail, images, overview, province,
 )
+from construction_agent.web import staging_db as sdb
 from construction_agent.web.factory import create_app
 
 # ══════════════════════════════════════════════════════════════
@@ -150,6 +152,9 @@ def tiny_db(tmp_path, monkeypatch) -> Path:
     con.close()
 
     monkeypatch.setenv(db.ENV_DB_PATH, str(path))
+    # 隔离工作库：默认路径指向 settings.DATA_DIR，在跑过重建脚本的机器上
+    # 那是**真实**工作库，图片类断言会读到项目数据而不是测试数据
+    monkeypatch.setenv(sdb.ENV_STAGING_DB, str(tmp_path / "no-staging.db"))
     province.reset_cache()
     overview.reset_cache()
     accidents_query.reset_cache()
@@ -545,8 +550,39 @@ class TestWorkTask:
 
 
 @pytest.fixture
-def dup_client(tiny_db):
-    """在 tiny_db 上追加「同一编码多条标注」与图片记录。
+def tiny_staging(tmp_path, monkeypatch) -> Path:
+    """建一座小工作库，并把展示层的图片数据源指过去。
+
+    图片**不在最终库**：`image_files.local_path` 三版混存（`imageV2/` 550 +
+    `images/` 276 + `imageV3/` 211），与磁盘对不上的是「247 条登记找不到目录、
+    198 个目录没登记」，按它拼 URL 会大面积 404（蓝图 06 §2.1）。所以展示层
+    改读工作库的 `image_manifest`，测试也就需要有工作库。
+
+    顺带造两张真文件：`/media` 的路径校验必须能真的把文件送出去，而不是只
+    测到 404 分支。
+    """
+    path = tmp_path / "staging.db"
+    sdb.init_db(path)
+    monkeypatch.setenv(sdb.ENV_STAGING_DB, str(path))
+
+    data_dir = tmp_path / "data"
+    v3 = data_dir / "imageV3" / "a1"
+    v3.mkdir(parents=True)
+    (v3 / "1.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-one")
+    (v3 / "2.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-two")
+    # 旧版目录也建上，用来验证 /media 不服务它们
+    v2 = data_dir / "imageV2" / "a1"
+    v2.mkdir(parents=True)
+    (v2 / "old.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-old")
+
+    # images.media_root() 读 settings.DATA_DIR，不指过来会去项目的真实 data/
+    monkeypatch.setattr(settings, "DATA_DIR", data_dir)
+    yield path
+
+
+@pytest.fixture
+def dup_client(tiny_db, tiny_staging):
+    """追加「同一编码多条标注」（最终库）与图片清单（工作库）。
 
     单独开一个 fixture 是为了不动共用的 `ACCIDENTS` / `CAUSES`——概览与
     列表的断言依赖那两组的计数。`caics_causes` 对 `(accident_id, code)`
@@ -566,18 +602,27 @@ def dup_client(tiny_db):
             ("a1", "F2", "防护设施缺失", "临边无护栏", "", "direct_quote", 12),
         ],
     )
-    con.execute(
-        "INSERT INTO image_analyses (accident_id,local_path,source_url,"
-        "phase1_scene_type,phase1_damage,phase2_consistency) "
-        "VALUES ('a1','data/imageV3/a1/1.jpg','http://example.invalid/1.jpg',"
-        "'坍塌现场','结构破坏','一致')"
-    )
-    con.execute(
-        "INSERT INTO image_analyses (accident_id,local_path,phase1_scene_type) "
-        "VALUES ('a1','data/imageV3/a1/2.jpg','救援现场')"
-    )
     con.commit()
     con.close()
+
+    stg = sqlite3.connect(tiny_staging)
+    stg.executemany(
+        "INSERT INTO image_manifest (accident_id, rel_path, filename, ext, "
+        "bytes, sha1, source_url, phase1_scene_type, phase2_consistency, "
+        "analyzed, version, manifest_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            # VLM 的原始返回里带 Markdown 强调标记（主库实测形如
+            # `**坍塌 / 土方坍塌**`），展示前要剥掉
+            ("a1", "imageV3/a1/1.jpg", "1.jpg", "jpg", 1024, "sha-one",
+             "http://example.invalid/1.jpg", "**坍塌现场**", "一致", 1,
+             "v3", "2026-09-30 12:00:00"),
+            ("a1", "imageV3/a1/2.jpg", "2.jpg", "jpg", 512, "sha-two",
+             None, None, None, 0, "v3", "2026-09-30 12:00:00"),
+        ],
+    )
+    stg.commit()
+    stg.close()
+
     accidents_query.reset_cache()
     return create_app({"TESTING": True}).test_client()
 
@@ -699,6 +744,127 @@ class TestDetail:
         d = client.get("/api/accidents/a1").get_json()["data"]
         all_fields = [f for t in d["tiers"] for f in t["fields"]]
         assert "source_url" not in all_fields
+
+
+# ══════════════════════════════════════════════════════════════
+# 图片（蓝图 06）
+# ══════════════════════════════════════════════════════════════
+
+
+class TestImages:
+    """图片来自工作库的 `image_manifest`，不是最终库的 `image_files`。
+
+    `image_files.local_path` 三版混存，按它拼 URL 会大面积 404——这条是
+    整块图片展示重做的起因，也是下面「不服务旧版目录」那条断言的由来。
+    """
+
+    def test_media_把文件送出去(self, dup_client):
+        r = dup_client.get("/media/imageV3/a1/1.jpg")
+        assert r.status_code == 200
+        assert r.data.startswith(b"\xff\xd8"), "返回的不是图片内容"
+        assert "max-age=86400" in r.headers["Cache-Control"]
+
+    def test_media_不服务旧版目录(self, dup_client):
+        """`images/` 与 `imageV2/` 不是最终版。
+
+        同一事故在两版里可能有不同图片，放出来读者没法判断哪张是最终采用的。
+        """
+        assert dup_client.get("/media/imageV2/a1/old.jpg").status_code == 404
+        assert dup_client.get("/media/images/a1/old.jpg").status_code == 404
+
+    def test_media_挡住目录穿越(self, dup_client):
+        """路径校验两道关：必须以 imageV3/ 开头，且 realpath 后仍在根内。"""
+        for p in ("imageV3/../imageV2/a1/old.jpg",
+                  "imageV3/a1/../../imageV2/a1/old.jpg",
+                  "imageV3/%2e%2e/imageV2/a1/old.jpg",
+                  "imageV3//etc/passwd",
+                  "etc/passwd",
+                  "../data/imageV3/a1/1.jpg"):
+            assert dup_client.get("/media/" + p).status_code == 404, p
+
+    def test_media_不存在返回_404(self, dup_client):
+        assert dup_client.get("/media/imageV3/a1/nope.jpg").status_code == 404
+
+    def test_图片清单带_url_与分析标记(self, dup_client):
+        d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
+        assert d["count"] == 2
+        assert d["available"] is True
+        first = d["items"][0]
+        assert first["url"] == "/media/imageV3/a1/1.jpg"
+        assert first["analyzed"] is True
+        assert first["phase2_consistency"] == "一致"
+        assert d["items"][1]["analyzed"] is False
+
+    def test_vlm_文本剥掉_markdown_强调(self, dup_client):
+        """VLM 返回里夹 `**` 强调标记，那是模型的输出格式不是字段语义。
+
+        括号里的补充说明（主库实测有「实为人工拆除作业被误报为坍塌」这种）
+        是分析结论的一部分，剥标记时不能连它一起丢。
+        """
+        d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
+        assert d["items"][0]["phase1_scene_type"] == "坍塌现场"
+
+        assert images.clean_vlm_text("**坍塌**") == "坍塌"
+        assert images.clean_vlm_text("__一致__") == "一致"
+        assert images.clean_vlm_text(None) == ""
+        assert (images.clean_vlm_text("**其他**（或疑似**火灾/坍塌**类事故）")
+                == "其他（或疑似火灾/坍塌类事故）")
+
+    def test_共用图片的判据是_3_条事故(self, dup_client):
+        """同一张图配给多条事故时打标，阈值取 3。
+
+        实测 226 条里 70 条（31%）的内容出现在多个事故目录。23 组重复里
+        15 组只有 2 条——那可能真的是两条事故共用一张图（同一工程的分支
+        事故、转载配图）；覆盖 ≥3 条的 8 组，事故还按地域聚堆（武汉一批、
+        广州一批），来源 URL 里带 `n.sinaimg.cn/default/`，那才是图床返回
+        的默认占位图。
+
+        **打标不隐藏**——数据里就是这样，藏起来反而让人以为每条事故都有
+        独立的现场照片。
+        """
+        def add(accident_id):
+            con = sqlite3.connect(sdb.resolve_staging_path())
+            con.execute(
+                "INSERT INTO image_manifest (accident_id, rel_path, filename, "
+                "ext, bytes, sha1, analyzed, version, manifest_at) VALUES "
+                "(?,?,?,'jpg',10,'sha-one',0,'v3','x')",
+                (accident_id, f"imageV3/{accident_id}/9.jpg", "9.jpg"))
+            con.commit()
+            con.close()
+
+        def shared():
+            d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
+            return [it["shared"] for it in d["items"]]
+
+        assert shared() == [False, False], "sha-one 一开始只有 a1 一条"
+
+        add("a2")
+        assert shared() == [False, False], "2 条事故共用不打标"
+
+        add("a3")
+        assert shared() == [True, False], "3 条事故共用才打标"
+
+    def test_工作库不可用时降级不报错(self, client):
+        """工作库不存在时给空清单 + available=false。
+
+        「这条事故没有图片」与「图片索引还没重建」是两件事，前端要能分开
+        处理——前者是数据事实，后者要去跑 `build_image_manifest.py`。
+        """
+        d = client.get("/api/accidents/a1/images").get_json()["data"]
+        assert d == {"accident_id": "a1", "count": 0, "available": False,
+                     "items": []}
+        assert client.get("/api/accidents/a1").get_json(
+        )["data"]["images_available"] is False
+
+    def test_图片统计(self, dup_client):
+        d = dup_client.get("/api/images/stats").get_json()["data"]
+        assert d["files"] == 2
+        assert d["accidents_with_images"] == 1
+        assert d["analyzed"] == 1
+        assert d["accidents_total"] == 10          # tiny 库的事故总数
+        assert d["coverage"] == pytest.approx(0.1)
+        assert d["by_ext"] == [{"ext": "jpg", "count": 2}]
+        assert d["available"] is True
 
 
 class TestApi:

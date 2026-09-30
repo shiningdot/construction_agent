@@ -31,7 +31,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import accidents_query, db, overview, province
+from . import accidents_query, db, images, overview, province
 
 LAYER_LABELS = overview.LAYER_LABELS
 EVIDENCE_LABELS = overview.EVIDENCE_LABELS
@@ -85,6 +85,10 @@ CONTENT_TIERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 # 过程元数据区（独立折叠面板「处理信息」）。`classification_verdict` 在这里
 # 出现是有意的：它记录「这条数据是怎么进来的」（网络轨 / 文献轨 / LLM 仲裁），
 # 是数据来源可追溯的抓手。
+#
+# `source_count` 下发但**前端不展示**：主库 2,623 条实测全部等于 1，是恒量
+# 不是信息。留在响应里是因为它对 API 的其它消费者仍有意义（判断某条是否
+# 来自多源合并），页面上摆出来只会让人以为「每条事故只有一个来源」。
 META_FIELDS: tuple[str, ...] = (
     "id", "source_name", "source_url", "crawl_date",
     "report_type", "text_type",
@@ -124,13 +128,6 @@ WHERE accident_id = ?
 ORDER BY sort_order, code, id
 """
 
-_SQL_IMAGES = """
-SELECT local_path, source_url, phase1_scene_type, phase1_objects,
-       phase1_damage, phase2_consistency, phase2_confidence
-FROM image_analyses
-WHERE accident_id = ?
-ORDER BY id
-"""
 
 
 # ══════════════════════════════════════════════════════════════
@@ -215,7 +212,6 @@ def build(
             return None
         row = dict(row)
         cause_rows = [dict(r) for r in con.execute(_SQL_CAUSES, (accident_id,))]
-        images = [dict(r) for r in con.execute(_SQL_IMAGES, (accident_id,))]
 
     fields: dict[str, Any] = {}
     for _, _, names in CONTENT_TIERS:
@@ -231,6 +227,14 @@ def build(
 
     meta = {k: row.get(k) for k in META_FIELDS}
 
+    # 图片来自**工作库**的 image_manifest（蓝图 06），不是最终库的
+    # image_files——后者的 local_path 三版混存，按它拼 URL 会大面积 404。
+    # 工作库不可用时给空清单 + 标志位，前端据此区分「没有图」与「索引没重建」。
+    image_items = images.for_accident(accident_id)
+    suspicious = images.suspicious_sha1s()
+    for it in image_items:
+        it["shared"] = bool(it.get("sha1") and it["sha1"] in suspicious)
+
     return {
         "id": row["id"],
         "fields": fields,
@@ -241,6 +245,7 @@ def build(
             "citations": len(cause_rows),
         },
         "meta": meta,
-        "images": images,
+        "images": image_items,
+        "images_available": images.available(),
         "raw_text": row.get("raw_text"),
     }

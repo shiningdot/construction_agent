@@ -40,12 +40,25 @@ WHERE 骗出九条假阳性）。
   0.126 ms 的差别没人感知得到，3 条记录归错年份是实打实的数据错。**这一处不改是
   决定，不是遗漏**；哪天有人"顺手优化"成范围比较，这个脚本要能拦住他
 
+## 连哪张库：**真主库**，与其余六条核查同一口径
+
+用 `_common.main_db_path()`（`CAIEMS_MAIN_DB` → 主仓库根的 `data/caiems_v2.db`），
+**不是** `settings.DATA_DIR` 那套。两套解析在 worktree 里会指向不同的文件：前者上溯
+到 `.git` 目录（主仓库），后者是 `config.py` 的上两级（worktree 自己的 `data/`）。
+
+这个区别在本脚本上**有实际后果**，别的核查没有：worktree 的 `data/` 下有一份主库
+的副本（数据逐表相同，但**预先建过 9 个索引**），而主仓库的真库一个自建索引都没有。
+连副本，脚本报「只有 `project_type` / `construction_phase` 两个缺」（9 个已建）；
+连真库，报「8 个都缺」——**后者才是用户还没执行 `add_indexes.py` 时的事实**。
+连错库会把这份待办掩盖掉，所以这里必须是真库。
+
 ## 用法
 
     .venv/bin/python3 scripts/check_query_plan.py
-    .venv/bin/python3 scripts/check_query_plan.py --db <path>
+    .venv/bin/python3 scripts/check_query_plan.py --main-db <path>
 
 退出码 `0` = 所有带筛选的查询都走了索引（豁免项除外）；`1` = 有筛选没走索引。
+**库里还没建索引时退 `1` 是预期的**——它正指着 `10_待执行清单.md` 第 4 步。
 """
 from __future__ import annotations
 
@@ -56,6 +69,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))                      # scripts/_common
+
+from _common import main_db_path                                             # noqa: E402
 
 #: (SQL 里的片段, 为什么可以接受)。**窄匹配**：只认这些具体写法，不认「凡是扫」。
 #: 写宽了等于没有判据。
@@ -67,8 +83,9 @@ EXEMPT: tuple[tuple[str, str], ...] = (
      "「有编码 / 无编码」筛选走 EXISTS 相关子查询，主表侧没有可索引的列可用；"
      "且有编码的占 2,618/2,623，扫过去本就接近最优"),
     ("GROUP BY province",
-     "筛选器的省份计数（`ListParams.normalized()`）：要给出每个省各多少条就得遍历"
-     "所有分组，索引帮不上；它走的是 idx_acc_province 的覆盖索引，已是最优"),
+     "筛选器的省份计数（`ListParams.normalized()`）：它不是筛选，是聚合——要给出"
+     "每个省各多少条，两侧都得把 2,623 行过一遍，有没有索引都逃不掉（有 idx_acc_province "
+     "时退化成扫覆盖索引 0.03 ms，没有时扫表 1.4 ms）。两种都不是「筛选没走上索引」"),
 )
 
 
@@ -189,12 +206,15 @@ _db_path = ""
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--db", help="库文件路径（默认按 CAIEMS_DB > settings.DATA_DIR 解析）")
+    ap.add_argument("--main-db",
+                    help="库文件路径（默认按 CAIEMS_MAIN_DB > 主仓库 data/caiems_v2.db 解析）")
     args = ap.parse_args()
 
     global _db_path
-    from construction_agent.web.db import resolve_db_path
-    _db_path = str(Path(args.db).expanduser().resolve() if args.db else resolve_db_path())
+    _db_path = str(Path(args.main_db).expanduser().resolve()
+                   if args.main_db else main_db_path())
+    # 打印库路径：连错库时结论会反，别让「跑了哪个文件」靠猜
+    print(f"核查库：{_db_path}")
     if not Path(_db_path).exists():
         print(f"✗ 库文件不存在：{_db_path}", file=sys.stderr)
         return 2

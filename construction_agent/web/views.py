@@ -82,11 +82,12 @@ def causes_page():
 
 @views_bp.get("/media/<path:rel_path>")
 def media(rel_path: str):
-    """事故图片。蓝图 06 §4。
+    """事故图片。蓝图 06 §4；取材范围见 `docs/web/08_图片资产复核与更正.md`。
 
-    只服务 `imageV3/`（最终版）——`images/` 与 `imageV2/` 不给，三版里同一
-    事故可能有重复图片，放出来读者没法判断哪张是最终采用的。越界与不存在
-    都由 `images.resolve_media_path()` 挡掉，这里只负责 404 与缓存头。
+    服务 `images/` + `imageV2/` + `imageV3/` 三版。原先只给 `imageV3/`，实测
+    因此丢掉 558 张唯一图、300 个有图事故（63%）看不到图；版本差异改由界面
+    角标呈现，让读者自己判断。越界与不存在都由 `images.resolve_media_path()`
+    挡掉，这里只负责 404 与缓存头。
     """
     path = images.resolve_media_path(rel_path)
     if path is None:

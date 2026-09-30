@@ -554,12 +554,14 @@ def tiny_staging(tmp_path, monkeypatch) -> Path:
     """建一座小工作库，并把展示层的图片数据源指过去。
 
     图片**不在最终库**：`image_files.local_path` 三版混存（`imageV2/` 550 +
-    `images/` 276 + `imageV3/` 211），与磁盘对不上的是「247 条登记找不到目录、
-    198 个目录没登记」，按它拼 URL 会大面积 404（蓝图 06 §2.1）。所以展示层
-    改读工作库的 `image_manifest`，测试也就需要有工作库。
+    `images/` 276 + `imageV3/` 211）。展示层因此改读工作库的
+    `image_manifest`——那份清单以文件系统为真源（蓝图 06 §3），测试也就
+    需要有工作库。
 
-    顺带造两张真文件：`/media` 的路径校验必须能真的把文件送出去，而不是只
-    测到 404 分支。
+    三版目录都造出来，是因为**三版都服务**：`local_path` 逐条 stat 命中
+    1,037/1,037，只放 `imageV3/` 会让 366 个有图事故一张图都看不到
+    （`docs/web/08_图片资产复核与更正.md`）。`/media` 的路径校验必须能真的
+    把文件送出去，而不是只测到 404 分支。
     """
     path = tmp_path / "staging.db"
     sdb.init_db(path)
@@ -570,10 +572,11 @@ def tiny_staging(tmp_path, monkeypatch) -> Path:
     v3.mkdir(parents=True)
     (v3 / "1.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-one")
     (v3 / "2.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-two")
-    # 旧版目录也建上，用来验证 /media 不服务它们
-    v2 = data_dir / "imageV2" / "a1"
-    v2.mkdir(parents=True)
-    (v2 / "old.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-old")
+    # 旧两版也建上：它们要能被服务（`/media` 的白名单含三版），不是当反例
+    for vdir in ("images", "imageV2"):
+        d = data_dir / vdir / "a1"
+        d.mkdir(parents=True)
+        (d / "old.jpg").write_bytes(b"\xff\xd8\xff\xe0-fake-jpeg-old")
 
     # images.media_root() 读 settings.DATA_DIR，不指过来会去项目的真实 data/
     monkeypatch.setattr(settings, "DATA_DIR", data_dir)
@@ -618,6 +621,11 @@ def dup_client(tiny_db, tiny_staging):
              "v3", "2026-09-30 12:00:00"),
             ("a1", "imageV3/a1/2.jpg", "2.jpg", "jpg", 512, "sha-two",
              None, None, None, 0, "v3", "2026-09-30 12:00:00"),
+            # 历史版本的图。主库 476 个有图事故里 57 个跨版本都有图，只造
+            # v3 会把排序与角标这两条路径整个漏掉。哈希用独立值，免得搅进
+            # 「多事故共用」的判定。
+            ("a1", "imageV2/a1/old.jpg", "old.jpg", "jpg", 256, "sha-old",
+             None, None, None, 0, "v2", "2026-09-30 12:00:00"),
         ],
     )
     stg.commit()
@@ -726,7 +734,7 @@ class TestDetail:
 
     def test_图片按事故过滤(self, dup_client, client):
         assert len(dup_client.get("/api/accidents/a1").get_json()
-                   ["data"]["images"]) == 2
+                   ["data"]["images"]) == 3
         assert client.get("/api/accidents/a2").get_json()["data"]["images"] == []
 
     def test_元信息含分类判定路径(self, client):
@@ -764,16 +772,23 @@ class TestImages:
         assert r.data.startswith(b"\xff\xd8"), "返回的不是图片内容"
         assert "max-age=86400" in r.headers["Cache-Control"]
 
-    def test_media_不服务旧版目录(self, dup_client):
-        """`images/` 与 `imageV2/` 不是最终版。
+    def test_media_服务三版目录(self, dup_client):
+        """`images/`、`imageV2/`、`imageV3/` 都服务。
 
-        同一事故在两版里可能有不同图片，放出来读者没法判断哪张是最终采用的。
+        「只放最终版」的原始理由是躲开跨版本重复图，但实测真重复只有 19
+        组 / 38 张，代价是 725 张图、366 个有图事故看不到图。版本差异改由
+        角标呈现，不再靠隐藏。
         """
-        assert dup_client.get("/media/imageV2/a1/old.jpg").status_code == 404
-        assert dup_client.get("/media/images/a1/old.jpg").status_code == 404
+        for vdir, name in (("images", "old.jpg"), ("imageV2", "old.jpg"),
+                           ("imageV3", "1.jpg")):
+            r = dup_client.get(f"/media/{vdir}/a1/{name}")
+            assert r.status_code == 200, vdir
+            assert r.data.startswith(b"\xff\xd8"), vdir
 
     def test_media_挡住目录穿越(self, dup_client):
-        """路径校验两道关：必须以 imageV3/ 开头，且 realpath 后仍在根内。"""
+        """路径校验两道关：第一段必须在版本白名单内，且 realpath 后仍在
+        某个版本目录之内。`..` 一律直接拒——`imageV3/../imageV2/x` 这种
+        「绕出去又落回白名单目录」的写法，只靠 realpath 是放行的。"""
         for p in ("imageV3/../imageV2/a1/old.jpg",
                   "imageV3/a1/../../imageV2/a1/old.jpg",
                   "imageV3/%2e%2e/imageV2/a1/old.jpg",
@@ -787,13 +802,24 @@ class TestImages:
 
     def test_图片清单带_url_与分析标记(self, dup_client):
         d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
-        assert d["count"] == 2
+        assert d["count"] == 3
         assert d["available"] is True
         first = d["items"][0]
         assert first["url"] == "/media/imageV3/a1/1.jpg"
         assert first["analyzed"] is True
         assert first["phase2_consistency"] == "一致"
         assert d["items"][1]["analyzed"] is False
+
+    def test_图片按版本排序且带角标(self, dup_client):
+        """最终版排最前，历史版本在后，每条带展示用角标。
+
+        排序不是小事：同一事故跨版本都有图时（主库 57 个），读者先看到的
+        必须是最终采用的那一版。
+        """
+        items = dup_client.get("/api/accidents/a1/images").get_json()["data"]["items"]
+        assert [it["version"] for it in items] == ["v3", "v3", "v2"]
+        assert [it["version_badge"] for it in items] == ["最终版", "最终版", "历史版本"]
+        assert items[2]["url"] == "/media/imageV2/a1/old.jpg"
 
     def test_vlm_文本剥掉_markdown_强调(self, dup_client):
         """VLM 返回里夹 `**` 强调标记，那是模型的输出格式不是字段语义。
@@ -813,9 +839,9 @@ class TestImages:
     def test_共用图片的判据是_3_条事故(self, dup_client):
         """同一张图配给多条事故时打标，阈值取 3。
 
-        实测 226 条里 70 条（31%）的内容出现在多个事故目录。23 组重复里
-        15 组只有 2 条——那可能真的是两条事故共用一张图（同一工程的分支
-        事故、转载配图）；覆盖 ≥3 条的 8 组，事故还按地域聚堆（武汉一批、
+        三版合并后实测 951 条里 356 条（37.4%）出现在多个事故目录。92 组里
+        48 组只有 2 条——那可能真的是两条事故共用一张图（同一工程的分支
+        事故、转载配图）；覆盖 ≥3 条的 44 组，事故还按地域聚堆（武汉一批、
         广州一批），来源 URL 里带 `n.sinaimg.cn/default/`，那才是图床返回
         的默认占位图。
 
@@ -836,13 +862,14 @@ class TestImages:
             d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
             return [it["shared"] for it in d["items"]]
 
-        assert shared() == [False, False], "sha-one 一开始只有 a1 一条"
+        # 三条：v3 的 1.jpg / 2.jpg，v2 的 old.jpg（哈希独立，不参与判定）
+        assert shared() == [False, False, False], "sha-one 一开始只有 a1 一条"
 
         add("a2")
-        assert shared() == [False, False], "2 条事故共用不打标"
+        assert shared() == [False, False, False], "2 条事故共用不打标"
 
         add("a3")
-        assert shared() == [True, False], "3 条事故共用才打标"
+        assert shared() == [True, False, False], "3 条事故共用才打标"
 
     def test_工作库不可用时降级不报错(self, client):
         """工作库不存在时给空清单 + available=false。
@@ -858,12 +885,15 @@ class TestImages:
 
     def test_图片统计(self, dup_client):
         d = dup_client.get("/api/images/stats").get_json()["data"]
-        assert d["files"] == 2
+        assert d["files"] == 3                     # 三版合并口径，不截到 v3
         assert d["accidents_with_images"] == 1
-        assert d["analyzed"] == 1
+        assert d["analyzed"] == 1                  # 只有 v3 的 1.jpg 有结论
         assert d["accidents_total"] == 10          # tiny 库的事故总数
         assert d["coverage"] == pytest.approx(0.1)
-        assert d["by_ext"] == [{"ext": "jpg", "count": 2}]
+        # a1 有 v3 的图，所以它不是「只靠历史版本」——这个计数得是 0 而不是
+        # 把 a1 也算进去
+        assert d["accidents_with_images_legacy_only"] == 0
+        assert d["by_ext"] == [{"ext": "jpg", "count": 3}]
         assert d["available"] is True
 
 

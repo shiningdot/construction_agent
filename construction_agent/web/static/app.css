@@ -679,8 +679,15 @@ code { font-family: var(--mono); font-size: .88em;
   background: rgba(42, 39, 36, .78); color: #fff;
   font-size: 10.5px; line-height: 1.6;
 }
+/* 最多三个角标（历史版本 / 已分析 / 多事故共用），逐个下移不叠在一起。
+   用相邻选择器连写而不是 nth-of-type：角标是按需追加的，位置取决于前面
+   挂了几个。 */
 .img-flag + .img-flag { top: 28px; }
+.img-flag + .img-flag + .img-flag { top: 50px; }
 .img-flag.is-warn { background: rgba(142, 47, 47, .88); }
+/* 历史版本用暖褐而不是红：它不是错误，只是旧一轮采集的产物；红会读成
+   告警，把「这张图来自早期目录」说成「这张图有问题」。 */
+.img-flag.is-version { background: rgba(120, 94, 47, .88); }
 
 /* ── 灯箱 ── */
 .lightbox {

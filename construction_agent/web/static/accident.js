@@ -314,6 +314,11 @@
       // 摆出来就是四行「—」。那会让人分不清「模型没判」和「这张图没分析
       // 过」——两者在数据里是不同的状态，页面上也必须不同。
       const facts = [];
+      // 版本摆在最前：同一事故在三版目录里都可能有图，读者得先知道看的
+      // 是哪一版，才谈得上判断这张是不是最终采用的。
+      if (it.version && it.version_badge) {
+        facts.push(['版本', it.version_badge + '（' + it.version + '）']);
+      }
       if (it.phase1_scene_type) {
         facts.push(['场景', it.phase1_scene_type]);
       }
@@ -414,11 +419,20 @@
     const tile = el('button', { cls: 'img-tile',
                                 attrs: { type: 'button',
                                          title: it.filename } });
-    // loading="lazy"：226 个文件里最大的几百 KB，画廊一屏放不下
+    // loading="lazy"：三版共 951 个文件，最大的几百 KB，画廊一屏放不下
     tile.appendChild(el('img', {
       cls: 'img-thumb',
       attrs: { src: it.url, alt: it.filename, loading: 'lazy' },
     }));
+    // 只有历史版本挂角标。v3 是绝大多数（也是默认取材），每张都挂一个
+    // 「最终版」只是噪音；标注的意义是让读者一眼挑出**不是**最终版的那些。
+    // 角标依次下移（CSS `.img-flag + .img-flag` 按序定位），三个不重叠。
+    if (it.version && it.version !== 'v3') {
+      tile.appendChild(el('span', { cls: 'img-flag is-version',
+                                    text: it.version_badge || '历史版本',
+                                    attrs: { title: '来自历史版本目录 '
+                                                    + it.version + '/' } }));
+    }
     if (it.analyzed) {
       tile.appendChild(el('span', { cls: 'img-flag', text: '已分析' }));
     }
@@ -441,7 +455,11 @@
       ]));
       panel.appendChild(el('div', { cls: 'empty' }, [
         el('strong', { text: '该事故无现场图片' }),
-        el('span', { text: '主库 2,623 条事故中 193 条有图片，覆盖率 7.4%。' }),
+        // 不写死覆盖率。原先那句「193 条 / 7.4%」不但是硬编码，取数还只
+        // 算了最终版目录——三版合并后是 476 条 / 18.1%，写死的数字必然
+        // 过时。全局口径摆在概览页的图片统计里，那里是直接从
+        // image_manifest 聚合出来的。
+        el('span', { text: '多数事故没有现场图片，完整覆盖率见概览页的图片统计。' }),
       ]));
       return panel;
     }
@@ -472,9 +490,17 @@
     });
     panel.appendChild(grid);
 
+    // 历史版本的张数按实际数出来再说，没有就不提——固定文案会在只有
+    // 最终版的事故上凭空提到「历史版本」。
+    const legacy = d.images.filter(function (x) {
+      return x.version && x.version !== 'v3';
+    }).length;
     panel.appendChild(el('p', { cls: 'panel-note', text:
-      '点击图片查看大图与多模态分析结论。图片来自最终版目录 imageV3，'
-      + '早期版本（images/、imageV2/）不参与展示。' }));
+      '点击图片查看大图与多模态分析结论。最终版（imageV3/）排在最前'
+      + (legacy
+         ? '，带「历史版本」角标的 ' + legacy + ' 张来自早期目录'
+           + '（images/、imageV2/），未必是最终采用的版本。'
+         : '。') }));
 
     return panel;
   }

@@ -3,9 +3,12 @@
 数据源是**工作库**的 `image_manifest`，不是最终库的 `image_files`。
 
 为什么不在最终库里取图：`image_files` 的 `local_path` 三版混存
-（`imageV2/` 550 + `images/` 276 + `imageV3/` 211），与磁盘对不上的情况是
-「247 条登记找不到目录、198 个目录没登记」。按它直接拼 URL 会大面积 404。
-重建后的 `image_manifest` 以文件系统为真源，226 个文件一条不多一条不少。
+（`imageV2/` 550 + `images/` 276 + `imageV3/` 211），当初据此判断「按它直接
+拼 URL 会大面积 404」——**那个判断是错的**：逐条 stat 命中 1,037/1,037，
+一条都没错配（复核见 `docs/web/08_图片资产复核与更正.md`）。真正的理由更
+朴素：那份登记是旧的审计留痕，与磁盘差了 123 张 / 83 个事故，不该拿它当
+展示的真源。重建后的 `image_manifest` 以文件系统为真源，三版共 951 个可
+展示文件、559 个有图事故。
 
 工作库不可用时**降级不报错**：详情页照常渲染，图片区给一句提示说明需要先跑
 `scripts/build_image_manifest.py`。展示层的其它部分不依赖工作库。
@@ -22,9 +25,16 @@ from ..config import settings
 from . import db as rodb
 from . import staging_db
 
-# 只服务最终版。`images/` 与 `imageV2/` 不给——三版里同一事故可能有重复
-# 图片，放出来读者没法判断哪张是最终采用的。
-MEDIA_ROOT_DIRNAME = "imageV3"
+# 三版都服务。原先只给 `imageV3/`（最终版），理由是「三版里同一事故可能有
+# 重复图片，读者没法判断哪张是最终采用的」——实测真重复（同事故 + 同内容 +
+# 跨版本）**只有 19 组 / 38 张**，却因此丢掉 725 张图、366 个有图事故（65%）
+# 完全没图。改用版本角标让读者自己判断，比隐藏更符合「让数据说话」。复核与
+# 数据见 `docs/web/08_图片资产复核与更正.md`。
+MEDIA_ROOT_DIRNAMES: tuple[str, ...] = ("images", "imageV2", "imageV3")
+
+# 版本短名 → 展示标签。`v3` 是最终版；旧两版保留是因为图片本身在磁盘上、
+# 也在数据库里登记着，藏起来只是让数据库显得比实际更空。
+VERSION_BADGES = {"v1": "历史版本", "v2": "历史版本", "v3": "最终版"}
 
 # VLM 的返回里夹着 Markdown 强调标记（`.phase1_scene_type` 实测形如
 # `**坍塌 / 土方坍塌**`）。那是模型的输出格式，不是字段语义，展示前剥掉。
@@ -40,7 +50,12 @@ def clean_vlm_text(value: Any) -> str:
 
 
 def media_root() -> Path:
-    return (Path(settings.DATA_DIR) / MEDIA_ROOT_DIRNAME).resolve()
+    """图片资产的根（`data/`）。
+
+    `rel_path` 自带版本目录段（`imageV3/xxx/yyy.jpg`），所以根就是 `data/`，
+    不再往版本目录里下沉一层。
+    """
+    return Path(settings.DATA_DIR).resolve()
 
 
 def _conn() -> sqlite3.Connection | None:
@@ -77,11 +92,13 @@ def for_accident(accident_id: str) -> list[dict[str, Any]]:
     try:
         rows = con.execute(
             "SELECT rel_path, filename, ext, bytes, sha1, source_url, "
-            "       source_page_url, width, height, "
+            "       source_page_url, width, height, version, "
             "       phase1_scene_type, phase2_consistency, phase2_confidence, "
             "       vlm_model, analyzed "
             "FROM image_manifest WHERE accident_id = ? "
-            "ORDER BY filename",
+            # 最终版排前：同一事故的图先看到 v3，历史版本在后
+            "ORDER BY CASE version WHEN 'v3' THEN 0 WHEN 'v2' THEN 1 ELSE 2 END, "
+            "         filename",
             (accident_id,),
         ).fetchall()
     except sqlite3.Error:
@@ -94,6 +111,7 @@ def for_accident(accident_id: str) -> list[dict[str, Any]]:
         d = dict(r)
         d["url"] = "/media/" + d["rel_path"]
         d["analyzed"] = bool(d["analyzed"])
+        d["version_badge"] = VERSION_BADGES.get(d.get("version"), "历史版本")
         d["phase1_scene_type"] = clean_vlm_text(d["phase1_scene_type"])
         d["phase2_consistency"] = clean_vlm_text(d["phase2_consistency"])
         items.append(d)
@@ -103,9 +121,10 @@ def for_accident(accident_id: str) -> list[dict[str, Any]]:
 def suspicious_sha1s(min_accidents: int = 3) -> set[str]:
     """被 ≥N 个事故共用的图片内容哈希。
 
-    实测 226 条里有 70 条（31%）的内容出现在多个事故目录，其中 8 组覆盖
-    ≥3 个事故——事故还按地域聚成一堆（武汉一批、广州一批），来源 URL 里
-    有 `n.sinaimg.cn/default/`。那基本是图床返回的默认占位图，不是现场照片。
+    三版合并后实测 951 条里有 356 条（37.4%）的内容出现在多个事故目录，
+    其中 44 组覆盖 ≥3 个事故——事故还按地域聚成一堆（武汉一批、广州一批），
+    来源 URL 里有 `n.sinaimg.cn/default/`。那基本是图床返回的默认占位图，
+    不是现场照片。
 
     展示层拿它给图片打角标「多起事故共用」，**不隐藏**：数据里就是这样，
     藏起来反而让人以为每条事故都有独立的现场照片。
@@ -130,6 +149,7 @@ def stats() -> dict[str, Any]:
     """图片覆盖统计（概览页与 `/api/images/stats`）。"""
     empty: dict[str, Any] = {
         "files": 0, "accidents_with_images": 0, "accidents_total": 0,
+        "accidents_with_images_legacy_only": 0,
         "coverage": 0.0, "by_ext": [], "analyzed": 0, "generated_at": None,
         "available": False,
     }
@@ -144,6 +164,13 @@ def stats() -> dict[str, Any]:
             "       SUM(COALESCE(analyzed, 0)) AS analyzed, "
             "       MAX(manifest_at) AS at "
             "FROM image_manifest").fetchone()
+        # 「只有历史版本有图」的事故数：它们一张最终版图都没有。截断到
+        # imageV3 的时候，这批事故在界面上是「无图片」——这个数字就是
+        # 截断代价的直接度量。
+        legacy_only = con.execute(
+            "SELECT COUNT(*) FROM (SELECT accident_id FROM image_manifest "
+            "GROUP BY accident_id HAVING SUM(version = 'v3') = 0)"
+        ).fetchone()[0]
         by_ext = [dict(r) for r in con.execute(
             "SELECT ext, COUNT(*) AS count FROM image_manifest "
             "GROUP BY ext ORDER BY count DESC")]
@@ -163,8 +190,15 @@ def stats() -> dict[str, Any]:
         "files": files,
         "accidents_with_images": accs,
         "accidents_total": total,
-        # 覆盖率只有 7.4%（193/2,623）。这个数字**必须显式呈现**——它是采集
-        # 完整性的真实反映，藏起来才像缺陷。
+        "accidents_with_images_legacy_only": legacy_only,
+        # 覆盖率是**三版合并 + 以文件系统为真源**的口径：559/2,623 ≈ 21.3%。
+        # 原先这里的注释写「7.4%（193/2,623）」，那是只扫 imageV3 时的值——
+        # 它不是采集完整性的反映，只是取材范围被截断的反映（把偏高的事实
+        # 显示成了偏低）。数字仍**必须显式呈现**，藏起来才像缺陷。
+        #
+        # 注意 559 与 `image_files` 口径的 476 不是一回事：前者数磁盘目录，
+        # 后者数旧登记里的 accident_id。差 83 个事故是「磁盘有图、登记里
+        # 没有」——旧登记漏登的规模。两个数都对，别混用。
         "coverage": (accs / total) if total else 0.0,
         "by_ext": by_ext,
         "analyzed": row["analyzed"] or 0,
@@ -176,23 +210,30 @@ def stats() -> dict[str, Any]:
 def resolve_media_path(rel_path: str) -> Path | None:
     """把 `/media/<rel_path>` 映射到磁盘文件，越界或不存在都返回 None。
 
-    两道关：`rel_path` 必须以 `imageV3/` 开头（不接受绝对路径、`..`、其它
-    版本目录），且 `realpath` 之后仍要落在 `imageV3/` 之内。只做前者挡不住
-    符号链接，只做后者挡不住 `imageV2/` 被顺手放进来。
+    两道关：第一段必须是白名单里的版本目录（挡掉绝对路径、`..` 开头，以及
+    `datasets/` 这类非图片目录），且 `realpath` 之后仍要落在某个版本目录之内。
+    两条缺一不可——只看第一段挡不住符号链接；只看 realpath 挡不住
+    `imageV3/../datasets/x` 这种用 `..` 绕出去、结果仍落在 `data/` 里的写法。
     """
     if not rel_path:
         return None
     rel = rel_path.replace("\\", "/").lstrip("/")
-    root = media_root()
-    prefix = MEDIA_ROOT_DIRNAME + "/"
-    if not rel.startswith(prefix):
+    parts = [p for p in rel.split("/") if p]
+    # manifest 里的 rel_path 由 relative_to() 生成，正常绝不含 `..`；出现了
+    # 就是有人手改了 URL。直接拒，不靠 resolve 之后的判断去兜——那条路对
+    # `imageV3/../imageV2/x` 这种"绕出去又落回白名单目录"的写法是放行的。
+    if ".." in parts or len(parts) < 2 or parts[0] not in MEDIA_ROOT_DIRNAMES:
         return None
 
-    candidate = (root.parent / rel).resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return None
+    root = media_root()
+    candidate = (root / rel).resolve()
     if not candidate.is_file():
         return None
-    return candidate
+
+    for name in MEDIA_ROOT_DIRNAMES:
+        try:
+            candidate.relative_to((root / name).resolve())
+            return candidate
+        except ValueError:
+            continue
+    return None

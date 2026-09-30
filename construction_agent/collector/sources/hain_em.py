@@ -24,7 +24,14 @@ class HainEMCollector(TrsCmsCollector):
             authority_name="海南省应急管理厅",
             base_url="https://yjglt.hainan.gov.cn",
             list_url="https://yjglt.hainan.gov.cn/xxgk/sgdcbg/",
-            list_page_pattern="",  # 单页
+            # **零基分页**。原注释写「单页」，而页面自己的脚本写着：
+            #     createPageHTML(38, 2, 0, "index", "html")
+            # 即 (总数 38, 总页数 2, 当前页索引 0, 文件名, 扩展名)——
+            # 索引从 0 起、共 2 页。实测 19 条（2021-04…2026-09）+
+            # `index_1.html` 18 条（2019-01…2020-09），日期正好接上。
+            list_page_pattern="index_{n}.html",
+            list_page_start=0,
+            list_page_max_probe=30,
             list_link_pattern=r"/\d{6}/t\d{8}_\d+\.html",
             delay=delay,
             timeout=30,

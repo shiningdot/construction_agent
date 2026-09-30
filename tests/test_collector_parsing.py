@@ -347,17 +347,94 @@ def test_分页探测不许用HEAD():
         pytest.fail("找不到 `_discover_pages`——测试失效了")
 
 
-def test_探测过的列表页不再重复请求(paging_collectors):
+def test_翻到空页也要停(tmp_path):
+    """超出末页不一定给 404：`hain_em` 的 `index_2.html` 是 **HTTP 200 的空列表模板**。
+
+    只看状态码的话，一路探到 `list_page_max_probe` 为止，每页都白请求一遍。
+
+    （这个测试改 `cfg` 与 `_client`，所以自建采集器，不用 module 级 fixture，
+    免得污染同一个对象上的其它测试。）
+    """
+    from construction_agent.collector.sources.sh_em import ShEMCollector
+
+    c = ShEMCollector(data_dir=tmp_path)
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, text):
+            self.text = text
+
+    class _Client:
+        def __init__(self):
+            self.n = 0
+
+        def get(self, url, timeout=None):
+            self.n += 1
+            # 第 2 页有条目，第 3 页返回 200 但空列表
+            return _Resp("<ul></ul>" if self.n >= 2 else
+                         '<ul><li><a href="/sgdcbg/20260101/t20260101_1.html">'
+                         "某坍塌事故调查报告</a></li></ul>")
+
+    c._client = _Client()
+    c.cfg = dataclasses.replace(c.cfg, list_page_max_probe=30)
+    c._page_cache.clear()
+    pages = c._discover_pages()
+    assert len(pages) == 2, f"空页没停下，探出了 {len(pages)} 页"
+
+
+def test_零基站的第一张分页是index_1(cq_collector):
+    """**两套页码约定**，别把其中一套当成普遍规律：
+
+    | 站点 | 第 1 页 | 第 2 页 | `list_page_start` |
+    |---|---|---|---|
+    | `sh_em` `shaanxi_em` | `index_1.html` | `index_2.html` | 1 |
+    | `cq_em` `gz_em` `hain_em` `tj_em` | 目录本身 | `index_1.html` | 0 |
+
+    零基站的第 1 页就是 `list_url` 那个目录，编号从 0 起但 0 号没有独立文件，
+    所以「第 2 页」写作 `index_1.html`。`list_page_start` 的语义是
+    「`list_url` 的页码」，配 0 就对了。
+    """
+    assert cq_collector._build_page_url(1) == (
+        "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/index_1.html"
+    )
+
+
+def test_分页起始页只能是0或1():
+    """`list_page_start` 写 2 是笔误，而它**看不出错**。
+
+    2026-10-01 两个分页源都写着 2，而 `_discover_pages` 从 `start + 1` 起探——
+    于是**第 2 页从未被抓过**。这个笔误在分页整个没跑起来时无从发现
+    （当时两个源都只抓到第一页，写几都一样），修好 URL 之后才露出来。
+    """
+    bad = []
+    for path in _source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "TrsSiteConfig"):
+                continue
+            for k in node.keywords:
+                if k.arg == "list_page_start" and getattr(k.value, "value", 0) not in (0, 1):
+                    bad.append(f"{path.name}: list_page_start={k.value.value}")
+    assert not bad, "分页起始页只该是 0（零基）或 1（一基）：\n" + "\n".join(bad)
+
+
+def test_探测过的列表页不再重复请求(tmp_path):
     """`_discover_pages` 已经 GET 到正文，`collect()` 里的 `_fetch` 该直接取用。
 
     否则每个列表页发两遍请求——不算错，但没有理由。
     """
-    c = paging_collectors[0]
+    from construction_agent.collector.sources.sh_em import ShEMCollector
+
+    c = ShEMCollector(data_dir=tmp_path)
     requested = []
+
+    html = ('<ul><li><a href="/xxgk/zfxxgk/zcwj/sgdcbg/20260101/t1.html">'
+            "某坍塌事故调查报告</a></li></ul>")
 
     class _Resp:
         status_code = 200
-        text = "<ul></ul>"
+        text = html
 
     class _Client:
         def get(self, url, timeout=None):
@@ -372,9 +449,8 @@ def test_探测过的列表页不再重复请求(paging_collectors):
     assert len(pages) == 3
     before = len(requested)
 
-    assert c._fetch(pages[1]) == "<ul></ul>"   # 第 2 页：走缓存
+    assert c._fetch(pages[1]) == html         # 第 2 页：走缓存
     assert len(requested) == before, "探测过的列表页又发了一次请求"
-    assert c._fetch("https://example.com/never.json") is None or len(requested) > before
 
 
 # ═══════════════════════════════════════════════════════════════════

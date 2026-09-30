@@ -308,20 +308,33 @@ class HenanEMCollector(BaseCollector):
         return self._make_stats(time.time() - t_start)
 
     def _discover_pages(self) -> list[str]:
-        """探测所有列表页 URL（index.html ~ index_5.html）。"""
+        """探测所有列表页 URL。
+
+        两处都错过，合起来的效果是**这个源一直只抓第一页**：
+
+        - **编号是零基的**。`list_url`（`.../sgxx/`）是第 1 页，第 2 页写作
+          `index_1.html`。原先 `range(2, 20)` 从 `index_2.html` 起探，
+          **`index_1.html` 从未被访问过**——而它正是第 2 页。
+        - **判据用 GET，不用 HEAD**。原先发 HEAD，与 `shaanxi_em` 是同一个坑：
+          站点的 HEAD 响应不可信，403 或超时会被读成「页面不存在」。
+          这里加一条「本页解析出 0 条也停」——超出末页时不一定给 404。
+
+        实测（2026-10-01）：`index_1` / `index_2` / `index_3` 各 16 条，
+        **32 条是新条目**，挂牌督办编号从〔2026〕3 号递减到〔2024〕1 号。
+        """
         pages = [HNEM_LIST_URL]
 
-        # 先访问首页确认结构，再探测后续页面
-        for page_num in range(2, 20):
+        for page_num in range(1, 30):
             url = f"{HNEM_BASE}/zwgk/xxgkml/sgxx/index_{page_num}.html"
             try:
-                resp = self._client.head(url, timeout=10)
-                if resp.status_code == 200:
-                    pages.append(url)
-                else:
-                    break  # 页面不存在，停止探测
+                resp = self._client.get(url, timeout=15)
             except Exception:
                 break
+            if resp.status_code != 200:
+                break
+            if not self._parse_list_page(resp.text):
+                break
+            pages.append(url)
 
         logger.info(f"探测到 {len(pages)} 个列表页")
         return pages

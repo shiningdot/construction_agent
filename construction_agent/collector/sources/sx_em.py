@@ -30,7 +30,17 @@ class SxEMCollector(TrsCmsCollector):
             authority_name="山西省应急管理厅",
             base_url="https://yjt.shanxi.gov.cn",
             list_url="https://yjt.shanxi.gov.cn/zwgk_0/zfxxgk_78327/fdzdgknr_78331/gszl/sgdc_78341/",
-            list_page_pattern="",  # 单页，无分页
+            # **零基分页，且后缀是 `.shtml` 不是 `.html`**（原注释写「单页，无分页」）。
+            # 页面自己的脚本写着：
+            #     var currentPage = 0;//所在页从0开始
+            #     var countPage = 2//共多少页
+            #     document.write("…<a href=\"index"+"_"+(countPage-1)+"."+"shtml\">尾页</a>…")
+            # 即第 2 页 = `index_1.shtml`（尾页 = `index_{countPage-1}.shtml`）。
+            # 实测 `index_1.shtml` → HTTP 200 / 14 条，`index_2.shtml` → 404。
+            # 注意别只试 `.html`：`index_1.html` 也是 404，会让人以为「确实只有一页」。
+            list_page_pattern="index_{n}.shtml",
+            list_page_start=0,
+            list_page_max_probe=30,
             list_link_pattern=r"/\d{6}/t\d{8}_\d+\.shtml",
             construction_keywords=SX_CONSTRUCTION_KW,
             delay=delay,

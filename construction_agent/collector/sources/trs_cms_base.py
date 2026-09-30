@@ -413,6 +413,11 @@ class TrsCmsCollector(BaseCollector):
                     f"判定分页结束（共 {len(pages)} 页）"
                 )
                 break
+            # **0 条也停**：超出末页时不一定给 404。`hain_em` 的 `index_2.html`
+            # 返回 HTTP 200，正文却是空列表模板——只看状态码会一路探到 `max_probe`。
+            if not self._parse_list(resp.text, page_url):
+                logger.info(f"[{self.cfg.source_name}] 第 {n} 页 0 条，判定分页结束")
+                break
             self._page_cache[page_url] = resp.text
             pages.append(page_url)
         return pages

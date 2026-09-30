@@ -30,7 +30,12 @@ class TjEMCollector(TrsCmsCollector):
             authority_name="天津市应急管理局",
             base_url="https://yjgl.tj.gov.cn",
             list_url="https://yjgl.tj.gov.cn/ZWGK6939/SGDCBG354/",
-            list_page_pattern="",  # 单页
+            # **零基分页**。原注释写「单页」，实际 2 页 15 条（实测 8 + 7）。
+            # 证据是接缝：第 1 页最旧 2021-12-24，`index_1.html` 最新 2021-12-17，
+            # 七天之隔正好接上，且两个集合无一条重复。
+            list_page_pattern="index_{n}.html",
+            list_page_start=0,
+            list_page_max_probe=30,
             list_link_pattern=r"/\d{6}/t\d{8}_\d+\.html",
             construction_keywords=TJ_CONSTRUCTION_KW,
             delay=delay,

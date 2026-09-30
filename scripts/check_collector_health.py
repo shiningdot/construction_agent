@@ -146,6 +146,7 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
     started = time.monotonic()
     note = ""
     sink = None
+    collector = None
     try:
         sink = _Sink(work / f"{key}.jsonl", limit)
         data_dir = tmp_root / key
@@ -177,6 +178,23 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
     finally:
         if sink is not None:
             sink.close()
+    # **列表条目数**——本轮新加的判据。它测的是「这个源在列表页上一共列了多少篇」，
+    # 与「收到了几条」是两件事：早停会让后者恒等于 `--limit`，看不出列表有多长。
+    # 2026-10-01 第五轮就是栽在这上面：`shaanxi_em` / `sh_em` 都只抓了列表第一页
+    # （真实 472 / 94 条，抓到 20 / 15 条），而「有数据」这一栏把它们判绿，
+    # 因为「这个站本来就少」听起来完全合理。有这一栏，**列表只有一页就露出来了**。
+    # 三个属性名，因为采集器有两套实现：TRS 基类用 `_total_listed`，
+    # 独立实现各写各的（`henan_em` 用 `_total_list`，`beijing_em` 用
+    # `_total_records`）。**只认一个名字，读不到的源就显示 `—`**——
+    # 而 `—` 和「这个源没有列表」看起来一样，等于判据对它们失灵。
+    listed = None
+    for attr in ("_total_listed", "_total_list", "_total_records"):
+        v = getattr(collector, attr, None)
+        if isinstance(v, int):
+            listed = v
+            break
+    if listed is not None:
+        (work / f"{key}.listed").write_text(str(listed), encoding="utf-8")
     (work / f"{key}.elapsed").write_text(f"{time.monotonic() - started:.1f}",
                                          encoding="utf-8")
     if note:
@@ -205,6 +223,8 @@ def _read_result(key: str, work: Path) -> dict:
     out["elapsed"] = float(el.read_text()) if el.exists() else None
     nt = work / f"{key}.note"
     out["note"] = nt.read_text() if nt.exists() else ""
+    lst = work / f"{key}.listed"
+    out["listed"] = int(lst.read_text()) if lst.exists() else None
     return out
 
 
@@ -277,8 +297,38 @@ def _fmt_line(res: dict) -> str:
     el = f"{res['elapsed']:.1f}s" if res["elapsed"] is not None else "—"
     chars = [r["chars"] for r in res["rows"]]
     med = _median(chars)
+    listed = res.get("listed")
     extra = f"正文中位 {med} 字" if res["count"] else (res.get("error") or "")[:60]
-    return f"{res['key']:20s} {st:4s} {res['count']:2d} 条 {el:>7s}  {extra}"
+    tail = "" if listed is None else f"列表 {listed}"
+    return f"{res['key']:20s} {st:4s} {res['count']:2d} 条 {el:>7s}  {tail:>10s}  {extra}"
+
+
+# 典型的一页容量。TRS 站的列表页多是 15 / 19 / 20 条一页。
+_PAGE_SIZED = 25
+
+
+def _print_paging_hint(results: list) -> None:
+    """挑出「列表条目数只有一页量级」的源。
+
+    2026-10-01 第五轮：`shaanxi_em` 与 `sh_em` **都只抓了列表第一页**
+    （真实 472 条 / 94 条）。当时健康检查只有「条数 / 正文中位」，两个源都是
+    「有数据」且正文中位是全 24 源里最高的两个，判绿；唯一异常是条数少，
+    而「这个站建站晚、事故通报本来就少」听起来完全合理。这一栏为那种情形而设。
+
+    **这只是提示，不是结论**：单页源本来就该落在这里。要点在于——
+    带分页的站若也落在这里，先怀疑分页没生效，而不是先相信「它只有一页」。
+    """
+    sized = [r for r in results if (r.get("listed") or 0) and r["listed"] <= _PAGE_SIZED]
+    if not sized:
+        return
+    keys = "、".join(f"`{r['key']}`({r['listed']})" for r in sized)
+    print(f"\n> 列表条目数在「一页量级」（≤{_PAGE_SIZED}）的源：{keys}")
+    print("> 单页源落在这里属正常。**两个方向都值得看一眼**：")
+    print("> ① 配了 `list_page_pattern` 却仍只有一页量级 → 分页 URL 可能没拼对；")
+    print("> ② **没配** `list_page_pattern` → 「单页」可能只是一句没查过的注释。")
+    print(">    去页面源码里找分页线索：`index_N.html`、`pagenav_N`、")
+    print(">    `createPageHTML(总数, 页数, 当前索引, 文件名, 扩展名)`——最后这个")
+    print(">    直接把总页数写在参数里。判据里少一维，那一维就不会报警。")
 
 
 def main() -> int:
@@ -322,15 +372,19 @@ def main() -> int:
         order = {s.key: i for i, s in enumerate(specs)}
         results.sort(key=lambda r: order.get(r["key"], 999))
 
-        print("\n| 源 | 分组 | 结果 | 条数 | 正文中位 | 耗时 | 通路 |")
-        print("|---|---|---|---|---|---|---|")
+        print("\n| 源 | 分组 | 结果 | 条数 | 列表 | 正文中位 | 耗时 | 通路 |")
+        print("|---|---|---|---|---|---|---|---|")
         by_key = {s.key: s for s in specs}
         for r in results:
             spec = by_key.get(r["key"])
             chars = [x["chars"] for x in r["rows"]]
             el = f"{r['elapsed']:.1f}s" if r["elapsed"] is not None else "—"
+            listed = r.get("listed")
             print(f"| `{r['key']}` | {spec.group if spec else '?'} | {_status_of(r)} "
-                  f"| {r['count']} | {_median(chars)} | {el} | {r.get('note','')} |")
+                  f"| {r['count']} | {'—' if listed is None else listed} "
+                  f"| {_median(chars)} | {el} | {r.get('note','')} |")
+
+        _print_paging_hint(results)
 
         if args.samples:
             print()

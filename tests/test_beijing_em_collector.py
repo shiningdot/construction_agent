@@ -9,7 +9,8 @@
    丢掉，item 的 `content` 写死成 `[PDF 报告] 标题`。后果是这个源的正文
    **从来没进过库**——主库 12 条 beijing_em 记录的 `raw_text` 全是
    106–206 字的占位。同一批调查还发现 `needs_ocr` 被写死成 `True`，
-   于是提得出正文的条目也被下游当成扫描件。
+   与全项目「有附件 and 没提到正文」的约定相悖（这个标记现在还没人消费，
+   见 `test_提出正文时不再标needs_ocr` 的说明）。
 
 2. **registry 的参数名对不上，而且没人发现。** `_NO_CLASSIFY` 的键是
    `enable_classify`，本源构造器的参数叫 `enable_pdf_classify`；
@@ -99,7 +100,14 @@ def test_PDF提出正文时直接当content(tmp_path):
 def test_提出正文时不再标needs_ocr(tmp_path):
     """`needs_ocr` 原先写死 `True`，把「已拿到正文」的条目也标成待 OCR。
 
-    下游照着这个标记排队做 OCR，等于对着一份已经解析好的文本再花一遍钱。
+    全项目的约定是 `needs_ocr = 有 PDF 附件 and 正文没提出来`——`henan_em`
+    （`bool(pdf_url) and not combined_text`）、`nmg_em`、`ln_em` 三个源都是
+    这么写的，写死 `True` 与它相悖。
+
+    **但别把收益说大了**：这个标记目前没有任何消费方。`raw_accidents` 表里
+    没有这一列，它塞在 `extra` JSON 里；审核模板不显示它，也没有自动 OCR
+    队列在读它（`grep -rn needs_ocr` 除了注释零命中）。所以这里修的是
+    「字段写对」，不是「省下一轮 OCR」——后者要等阶段②真的开始消费它。
     """
     c = _collector(tmp_path)
     c._download_and_extract = lambda url: "事故调查报告正文。" * 200

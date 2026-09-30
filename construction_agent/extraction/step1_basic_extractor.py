@@ -1,6 +1,6 @@
 """Step 1: 建筑施工事故基础信息提取器。
 
-从事故文本中提取 23 个客观字段（不含致因分析）。
+从事故文本中提取 31 个客观字段（不含致因分析）。
 采用 Few-Shot + tool_use 策略（实验证明 F1=0.737 最优），
 自由文本字段（work_task/equipment/worker_type/material）后续经 Phase B 归纳为枚举。
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 STEP1_TOOL = {
     "name": "extract_accident_basic_info",
-    "description": "从建筑施工事故文本中提取基础信息（23个字段），不包含致因分析",
+    "description": "从建筑施工事故文本中提取基础信息（31个字段），不包含致因分析",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -273,6 +273,21 @@ STEP1_TOOL = {
                 "type": "string",
                 "description": "监理单位名称。未提及填null"
             },
+
+            # ── 直接原因 (1) ──
+            # 2026-09-30 补：此字段此前只由旧链路 claude_extractor.py:114 产出，
+            # S1–S4 链路缺失，而它是详情页 A 档必显字段（既有 2,623 条有值率 99.89%）。
+            # 不补上则新管道并入的数据在这一列全为 NULL，新老数据不同构。
+            "direct_cause": {
+                "type": "string",
+                "description": (
+                    "事故直接原因简述，一句话，如'沟槽未按规定放坡致边坡坍塌'、"
+                    "'违规堆放珍珠岩经雨水浸泡增重致屋顶超载'。"
+                    "只写直接致害环节（物的不安全状态或人的不安全行为），"
+                    "不写管理责任、不写整改建议——那部分由致因编码环节负责。"
+                    "不确定填空字符串"
+                )
+            },
         },
         "required": [
             "title", "date", "location", "city",
@@ -315,33 +330,36 @@ STEP1_SYSTEM_PROMPT = """你是一名建筑施工事故基础信息提取专家�
 9. material_involved: 从7类枚举中选择(MAT01-MAT07)。按材质分类，多材料取第一个。
 10. worker_type: 从13类枚举中选择(WKR01-WKR13)。取第一个工种。同义词: 普工≈民工≈工人→WKR01
 11. 无信息=null或0(整数)或"未提及"(字符串)，不要编造
+12. direct_cause: 一句话(≤40字)写直接致害环节，如"沟槽未按规定放坡致边坡坍塌"、
+    "违规堆放珍珠岩经雨水浸泡增重致屋顶超载"。只写直接原因，不写管理责任、
+    不写整改建议(那部分归致因编码环节)。不确定填空字符串
 
 ## Few-Shot 示例
 
 示例1: 坍塌事故
 输入: "2024年3月15日14时30分许，黑龙江省齐齐哈尔市龙沙区第三十四中学体育馆在屋顶防水施工过程中发生坍塌，施工方将珍珠岩违规堆放在屋顶，降雨后珍珠岩增重导致屋顶结构超载坍塌，造成11人死亡、4人受伤。施工单位为黑龙江嘉美建设有限公司，无建筑工程施工资质。监理单位未制止违规堆放。"
 publish_date: "2024-03-16"
-输出: {title:"齐齐哈尔市第三十四中学体育馆屋顶坍塌事故",date:"2024-03-15",accident_time:"14:30",location:"黑龙江省",city:"齐齐哈尔市",district:"龙沙区",project_name:"第三十四中学体育馆",project_type:"房屋建筑",construction_phase:"装饰装修",accident_type:"坍塌",severity:"重大事故",deaths:11,injuries:4,trapped_count:0,collapse_subtype:"建筑结构坍塌",work_task:"WT04",equipment_involved:null,material_involved:"MAT07",worker_type:null,weather:"未提及",contractor:"黑龙江嘉美建设有限公司",contractor_type:"无资质/挂靠",developer:null,supervision_company:null,report_type:"新闻报道",summary:"2024年3月15日14时30分，黑龙江省齐齐哈尔市龙沙区第三十四中学体育馆在屋顶防水施工时，因违规堆放珍珠岩经雨水浸泡增重，导致屋顶结构超载坍塌，造成11人死亡、4人受伤。施工单位无资质承揽，监理单位失职。"}
+输出: {title:"齐齐哈尔市第三十四中学体育馆屋顶坍塌事故",date:"2024-03-15",accident_time:"14:30",location:"黑龙江省",city:"齐齐哈尔市",district:"龙沙区",project_name:"第三十四中学体育馆",project_type:"房屋建筑",construction_phase:"装饰装修",accident_type:"坍塌",severity:"重大事故",deaths:11,injuries:4,trapped_count:0,collapse_subtype:"建筑结构坍塌",work_task:"WT04",equipment_involved:null,material_involved:"MAT07",worker_type:null,weather:"未提及",contractor:"黑龙江嘉美建设有限公司",contractor_type:"无资质/挂靠",developer:null,supervision_company:null,direct_cause:"违规堆放珍珠岩经雨水浸泡增重，超过屋顶结构承载能力致坍塌",report_type:"新闻报道",summary:"2024年3月15日14时30分，黑龙江省齐齐哈尔市龙沙区第三十四中学体育馆在屋顶防水施工时，因违规堆放珍珠岩经雨水浸泡增重，导致屋顶结构超载坍塌，造成11人死亡、4人受伤。施工单位无资质承揽，监理单位失职。"}
 
 示例2: 高处坠落
 输入: "2019年6月18日下午15时许，浙江省杭州市滨江区一在建商业大楼施工现场，一名木工在12层电梯井道作业时，因临边防护栏杆缺失，从约36米高处坠落至底层，当场死亡。"
 publish_date: "2019-06-19"
-输出: {title:"杭州滨江一在建大楼电梯井高处坠落事故",date:"2019-06-18",accident_time:"15:00",location:"浙江省",city:"杭州市",district:"滨江区",project_name:"在建商业大楼",project_type:"房屋建筑",construction_phase:"主体结构",accident_type:"高处坠落",severity:"一般事故",deaths:1,injuries:0,fall_height:36.0,work_task:"WT03",equipment_involved:null,material_involved:null,worker_type:"WKR02",weather:"未提及",contractor:null,contractor_type:"未提及",report_type:"新闻报道",summary:"2019年6月18日15时，杭州市滨江区一在建商业大楼12层电梯井道，一名木工因临边防护栏杆缺失从约36米处坠落，当场死亡。"}
+输出: {title:"杭州滨江一在建大楼电梯井高处坠落事故",date:"2019-06-18",accident_time:"15:00",location:"浙江省",city:"杭州市",district:"滨江区",project_name:"在建商业大楼",project_type:"房屋建筑",construction_phase:"主体结构",accident_type:"高处坠落",severity:"一般事故",deaths:1,injuries:0,fall_height:36.0,work_task:"WT03",equipment_involved:null,material_involved:null,worker_type:"WKR02",weather:"未提及",contractor:null,contractor_type:"未提及",direct_cause:"电梯井临边防护栏杆缺失，木工在12层作业时坠落至底层",report_type:"新闻报道",summary:"2019年6月18日15时，杭州市滨江区一在建商业大楼12层电梯井道，一名木工因临边防护栏杆缺失从约36米处坠落，当场死亡。"}
 
 示例3: 起重伤害
 输入: "2021年7月15日上午10时许，广东省深圳市南山区某超高层项目工地，塔吊在吊运钢筋过程中基础节螺栓松动导致整体倾覆，砸中下方作业面，造成2名钢筋工死亡、1名信号工受伤。施工单位为中建X局，总包单位。"
 publish_date: "2021-07-16"
-输出: {title:"深圳南山超高层项目塔吊倾覆事故",date:"2021-07-15",accident_time:"10:00",location:"广东省",city:"深圳市",district:"南山区",project_name:"超高层项目",project_type:"房屋建筑",construction_phase:"主体结构",accident_type:"起重伤害",severity:"一般事故",deaths:2,injuries:1,work_task:"WT06",equipment_involved:"EQP01",material_involved:"MAT03",worker_type:"WKR04、WKR08",weather:"未提及",contractor:"中建X局",contractor_type:"总包",report_type:"新闻报道",summary:"2021年7月15日10时，深圳市南山区某超高层项目塔吊在吊运钢筋时基础节螺栓松动倾覆，造成2死1伤。"}
+输出: {title:"深圳南山超高层项目塔吊倾覆事故",date:"2021-07-15",accident_time:"10:00",location:"广东省",city:"深圳市",district:"南山区",project_name:"超高层项目",project_type:"房屋建筑",construction_phase:"主体结构",accident_type:"起重伤害",severity:"一般事故",deaths:2,injuries:1,work_task:"WT06",equipment_involved:"EQP01",material_involved:"MAT03",worker_type:"WKR04、WKR08",weather:"未提及",contractor:"中建X局",contractor_type:"总包",direct_cause:"塔吊基础节螺栓松动未紧固，吊运钢筋时整体倾覆",report_type:"新闻报道",summary:"2021年7月15日10时，深圳市南山区某超高层项目塔吊在吊运钢筋时基础节螺栓松动倾覆，造成2死1伤。"}
 
 示例4: 中毒窒息
 输入: "2020年7月3日上午11时许，江苏省泰兴市一污水管网工地，3名工人在未进行气体检测、未佩戴防毒面具的情况下进入井下作业，因硫化氢中毒晕倒。井下通风不良。未制定有限空间作业方案。事故造成1人死亡、2人重伤。"
 publish_date: "2020-07-03"
-输出: {title:"泰兴污水管网工地硫化氢中毒事故",date:"2020-07-03",accident_time:"11:00",location:"江苏省",city:"泰兴市",project_name:"污水管网工程",project_type:"市政工程",construction_phase:"主体结构",accident_type:"中毒窒息",severity:"一般事故",deaths:1,injuries:2,work_task:"WT05",equipment_involved:null,material_involved:"MAT06",worker_type:"WKR01",weather:"未提及",contractor:null,contractor_type:"未提及",report_type:"新闻报道",summary:"2020年7月3日11时，泰兴市污水管网工地3名工人未检测气体、未戴防毒面具进入井下作业，因硫化氢中毒造成1死2伤。"}
+输出: {title:"泰兴污水管网工地硫化氢中毒事故",date:"2020-07-03",accident_time:"11:00",location:"江苏省",city:"泰兴市",project_name:"污水管网工程",project_type:"市政工程",construction_phase:"主体结构",accident_type:"中毒窒息",severity:"一般事故",deaths:1,injuries:2,work_task:"WT05",equipment_involved:null,material_involved:"MAT06",worker_type:"WKR01",weather:"未提及",contractor:null,contractor_type:"未提及",direct_cause:"未进行气体检测、未佩戴防护面具即进入井下作业，硫化氢中毒晕倒",report_type:"新闻报道",summary:"2020年7月3日11时，泰兴市污水管网工地3名工人未检测气体、未戴防毒面具进入井下作业，因硫化氢中毒造成1死2伤。"}
 
 示例5: 土方坍塌
 输入: "2022年8月21日16时左右，四川省成都市天府新区某市政排水管网工程沟槽开挖施工中，因未按规定放坡(实际1:0.3，方案要求1:0.75)，且沟槽边1米范围内堆放弃土，导致边坡突然坍塌，将正在沟槽底部作业的2名工人掩埋致死。当日天气晴。"
 publish_date: "2022-08-22"
-输出: {title:"成都天府新区排水管沟土方坍塌事故",date:"2022-08-21",accident_time:"16:00",location:"四川省",city:"成都市",district:"天府新区",project_name:"市政排水管网工程",project_type:"市政工程",construction_phase:"地基与基础",accident_type:"土方坍塌",severity:"一般事故",deaths:2,injuries:0,collapse_subtype:"土方坍塌",work_task:"WT01",equipment_involved:null,material_involved:"MAT02",worker_type:"WKR01",weather:"晴",contractor:null,contractor_type:"未提及",report_type:"新闻报道",summary:"2022年8月21日16时，成都天府新区排水管沟因未按规定放坡且沟槽边堆土导致边坡坍塌，掩埋2名工人致死。"}"""
+输出: {title:"成都天府新区排水管沟土方坍塌事故",date:"2022-08-21",accident_time:"16:00",location:"四川省",city:"成都市",district:"天府新区",project_name:"市政排水管网工程",project_type:"市政工程",construction_phase:"地基与基础",accident_type:"土方坍塌",severity:"一般事故",deaths:2,injuries:0,collapse_subtype:"土方坍塌",work_task:"WT01",equipment_involved:null,material_involved:"MAT02",worker_type:"WKR01",weather:"晴",contractor:null,contractor_type:"未提及",direct_cause:"沟槽未按规定放坡(实际1:0.3，方案要求1:0.75)且槽边1米内堆土致边坡坍塌",report_type:"新闻报道",summary:"2022年8月21日16时，成都天府新区排水管沟因未按规定放坡且沟槽边堆土导致边坡坍塌，掩埋2名工人致死。"}"""
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -350,7 +368,7 @@ publish_date: "2022-08-22"
 
 @dataclass
 class Step1Result:
-    """Step 1 提取结果。23 个字段的完整集合。"""
+    """Step 1 提取结果。31 个字段的完整集合。"""
 
     # 核心 (8 required + 4 optional)
     title: str = ""
@@ -385,6 +403,9 @@ class Step1Result:
 
     # 人员 (1)
     worker_type: Optional[str] = None
+
+    # 直接原因 (1) —— 2026-09-30 新增，说明见 STEP1_TOOL 中同名字段
+    direct_cause: str = ""
 
     # 元数据 (3)
     report_type: str = "新闻报道"
@@ -427,6 +448,7 @@ class Step1Result:
             "contractor_type": self.contractor_type,
             "developer": self.developer,
             "supervision_company": self.supervision_company,
+            "direct_cause": self.direct_cause,
             "report_type": self.report_type,
             "summary": self.summary,
             "_processing_time": self._processing_time,

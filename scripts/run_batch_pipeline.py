@@ -50,7 +50,7 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
             direct_cause,report_type,text_type,classification_verdict,classification_confidence,
             source_count,summary,raw_text,search_enriched_text,search_performed,
             pipeline_version,step1_duration_ms,step2_duration_ms,created_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         aid,
         s1.get("title",""), raw.get("source_url",""), raw.get("source_name",""),
@@ -90,7 +90,18 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
             (aid, raw["source_url"], raw.get("source_name",""), now),
         )
 
-    # caics_causes
+    # caics_causes —— 先清后写。
+    #
+    # 主表用 INSERT OR REPLACE（重跑=覆盖），子表若裸 INSERT 就会在原有基础上
+    # 再加一遍：同一件事故补跑一次，编码翻倍。而事故详情页会把同一编码显示两遍，
+    # 每份证据单看都成立，不数行数发现不了。用真 schema 实测过：写入两次后
+    # caics_causes 从 2 行变 4 行。同类修法见 `review/promote.py:11` 记的历史
+    # 教训与蓝图 03 §5.3 规则 2。
+    #
+    # 不能靠 UNIQUE(accident_id, code) 来挡：同一类致因在一件事故里有**多条不同
+    # 证据**是正常标注（主库实测 278 组，例如「4 根挑杆未与楼层锚固环连接」与
+    # 「未按方案设置钢丝绳拉接」同属 H1 违反操作规程），加约束会把真实标注当重复删掉。
+    conn.execute("DELETE FROM caics_causes WHERE accident_id = ?", (aid,))
     if s2_result:
         for c in s2_result.causes:
             order = compute_sort_order(c.code)
@@ -101,7 +112,9 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
                 (aid, c.code, c.name, c.evidence, c.inference, eq, order),
             )
 
-    # processing_log
+    # processing_log —— 同样先清后写（无 UNIQUE 可依，重跑会累积多份处理记录，
+    # 而"这条事故处理过几次"正是查退化的入口，多出来的假记录会把排查引偏）
+    conn.execute("DELETE FROM processing_log WHERE accident_id = ?", (aid,))
     conn.execute("""
         INSERT INTO processing_log (
             accident_id,pipeline_version,text_type,text_type_confidence,text_type_reason,
@@ -124,7 +137,9 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
         elapsed_ms, now,
     ))
 
-    # search_logs
+    # search_logs —— 同上。source_urls 不在此列：它有 UNIQUE(accident_id, url)，
+    # INSERT OR IGNORE 已经挡住了重复，再加 DELETE 反而会删掉同一事故的其它来源 URL
+    conn.execute("DELETE FROM search_logs WHERE accident_id = ?", (aid,))
     if search_result and search_result.get("search_performed"):
         conn.execute("""
             INSERT INTO search_logs (accident_id,search_performed,queries_used,total_results,

@@ -67,7 +67,9 @@ def first_row(page) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--port", type=int, default=5098)
+    # 端口约定见 scripts/e2e/README.md：5098 已被 e2e_verify_main（主库对账）占用，
+    # 5099 是截图探针。这里取 5100，各占一个、互不干扰。
+    ap.add_argument("--port", type=int, default=5100)
     ap.add_argument("--main-db", default=None)
     ap.add_argument("--staging-db", default=None)
     args = ap.parse_args()

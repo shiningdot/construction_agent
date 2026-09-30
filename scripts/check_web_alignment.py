@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
-"""端到端对齐核查：后端 API 路由 ↔ 前端调用点，双向比对。
+"""端到端对齐核查：路由维度 + 页面维度。
 
 用法：
     .venv/bin/python3 scripts/check_web_alignment.py
 
-项目要求「每个 web 部分要实现端到端的完美对齐」，落到代码上就是两件不能有的事：
+项目要求「每个 web 部分要实现端到端的完美对齐」，落到代码上有四件不能有的事。
+
+**路由维度**（静态分析，不需要数据库）
 
 - **孤儿端点**：后端实现了、前端从不调用——数据层有、展示层缺，用户够不到
 - **幽灵调用**：前端在请求、后端没有这条路由——点了就 404
+
+**页面维度**（起 app 打真实请求）
+
+- 打不开的页面（蓝图 07 验收第 1 条：全部页面 200 无 500）
+- 没有任何入口的页面——从哪儿都点不到，它等于不存在
+
+页面维度必须真跑起来才判得了：导航写的是 `url_for('views.xxx_page')`，源码里
+没有 `/collect` 这样的字面量，静态分析在这里什么都找不到。同理，列表页的详情
+链接是 JS 拼的（`href: '/accident/' + id`），只数服务端 HTML 里的 href 会把详情页
+误判成「谁也链不到」——所以入口要算两路：渲染后的 href ∪ 该页加载的 JS 里的
+路径字面量。
 
 ## 为什么不用「静态段顺序查找」
 
@@ -98,7 +111,8 @@ def collect_calls() -> dict[str, list[str]]:
     return calls
 
 
-def main() -> int:
+def report_routes() -> list[str]:
+    """路由维度。返回问题清单（空 = 对齐）。"""
     routes, calls = collect_routes(), collect_calls()
     print(f"后端 API 路由 {sum(len(v) for v in routes.values())} 条"
           f"（{len(routes)} 种路径形状）")
@@ -123,9 +137,112 @@ def main() -> int:
     else:
         print("✓ 前端每个调用点都有后端路由")
 
-    if orphans or ghosts:
+    return [f"孤儿端点 {p}" for p in orphans] + [f"幽灵调用 {p}" for p in ghosts]
+
+
+# ══════════════════════════════════════════════════════════════
+# 页面维度
+# ══════════════════════════════════════════════════════════════
+
+# 导航链接是 `url_for('views.xxx_page')` 渲染出来的，源码里没有 `/collect`
+# 这样的字面量——**页面维度必须起 app 打真实请求**，静态分析在这里无效。
+JS_LITERAL = re.compile(r"""['"`](/[\w/-]+/)(?=['"`]|\s*\+)""")
+
+
+def _normalize_link(href: str) -> str | None:
+    h = href.split("#")[0].split("?")[0]
+    if h.startswith("http") or h.startswith("/static") or not h.startswith("/"):
+        return None
+    h = h.rstrip("/") or "/"
+    return "/accident/<accident_id>" if h.startswith("/accident/") else h
+
+
+def report_pages() -> list[str]:
+    """页面维度：可访问性 + 可达性。需要能连上最终库取一个真实 accident_id。"""
+    sys.path.insert(0, str(ROOT))
+    try:
+        from construction_agent.web.factory import create_app
+        app = create_app()
+    except Exception as e:                    # noqa: BLE001
+        print(f"（跳过页面维度：起不了 app —— {e}）")
+        return []
+
+    client = app.test_client()
+    accident_id = None
+    try:
+        from construction_agent.web import db as rodb
+        con = rodb.connect_readonly()
+        try:
+            row = con.execute("SELECT id FROM accidents LIMIT 1").fetchone()
+            accident_id = row[0] if row else None
+        finally:
+            con.close()
+    except Exception:                         # noqa: BLE001
+        pass
+
+    pages: list[tuple[str, str]] = []
+    for rule in sorted(app.url_map.iter_rules(), key=lambda r: str(r)):
+        path = str(rule)
+        if (path.startswith(("/api", "/media", "/static"))
+                or "GET" not in rule.methods):
+            continue
+        if "<accident_id>" in path and not accident_id:
+            continue                          # 库里没数据，这一页没法打
+        pages.append((path, path.replace("<accident_id>", accident_id or "")))
+
+    print("\n── 页面维度 ──")
+    problems: list[str] = []
+    html_of: dict[str, str] = {}
+    for raw, url in pages:
+        r = client.get(url)
+        ok = r.status_code == 200
+        print(f"  {'✓' if ok else '✗'} {r.status_code}  {raw}")
+        if not ok:
+            problems.append(f"页面 {raw} 返回 {r.status_code}")
+        else:
+            html_of[raw] = r.get_data(as_text=True)
+
+    # 可达性：入口 = 渲染后 HTML 的 href ∪ 该页加载的 JS 里的路径字面量。
+    # 少了 JS 这一路，列表页的详情链接（`href: '/accident/' + id`）就看不见，
+    # 详情页会被误判成「谁也链不到」。
+    def outgoing(html: str) -> set[str]:
+        outs = {_normalize_link(m.group(1))
+                for m in re.finditer(r'href="([^"]+)"', html)}
+        names = {m.group(1) for m in
+                 re.finditer(r'<script[^>]+src="[^"]*/([\w.-]+\.js)"', html)}
+        for name in names:
+            f = WEB / "static" / name
+            if f.exists():
+                outs |= {_normalize_link(m.group(1) + "\x00")
+                         for m in JS_LITERAL.finditer(
+                             f.read_text(encoding="utf-8"))}
+        return {o for o in outs if o}
+
+    inbound: dict[str, set[str]] = {p: set() for p, _ in pages}
+    for src, html in html_of.items():
+        for dst in outgoing(html):
+            if dst in inbound and dst != src:
+                inbound[dst].add(src)
+
+    for p, _ in pages:
+        n = len(inbound[p])
+        print(f"  {'✓' if n else '✗'} {n:>2} 个入口  {p}")
+        if not n:
+            problems.append(f"页面 {p} 没有任何入口")
+    return problems
+
+
+def main() -> int:
+    problems = report_routes()
+    print()
+    problems += report_pages()
+
+    if problems:
+        print(f"\n✗ 共 {len(problems)} 处不对齐：")
+        for p in problems:
+            print(f"    - {p}")
         return 1
-    print("\n两侧完全对齐。")
+    print("\n两侧完全对齐（路由 + 页面）。")
     return 0
 
 

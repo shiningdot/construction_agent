@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from bs4 import BeautifulSoup
@@ -74,6 +74,7 @@ class TrsSiteConfig:
     detail_text_selector: str = "body"    # 详情正文容器: "body" / "article" / CSS选择器
     detail_pdf_selector: str = "a[href$='.pdf']"  # PDF 附件链接选择器
     detail_pdf_max: int = 5               # 一条详情页最多下载几个 PDF 附件
+    detail_image_max: int = 50            # 一条详情页最多登记几张内容图（0 = 不抽取）
 
     # ── 筛选配置 ──
     construction_keywords: list[str] = field(default_factory=lambda: DEFAULT_CONSTRUCTION_KW)
@@ -162,6 +163,74 @@ def _absolute(page_url: str, href: str) -> str:
     已是绝对 URL 的 href。
     """
     return urljoin(page_url, href)
+
+
+_IMG_EXT = re.compile(r"\.(png|jpe?g|gif|bmp|webp|tiff?)$", re.I)
+
+
+def _is_page_image(page_url: str, img_url: str) -> bool:
+    """这张图是不是**「这一页自己的图」**——即内容图而非站点模板图。
+
+    判据是「图片 URL 与详情页 URL **同目录**」（或以页面路径为前缀）。看起来
+    平平无奇，但它是**试错试出来的**，而且前一个判据是当场被自己的数据推翻的。
+
+    ### 推翻的那个判据
+
+    直觉上内容图 = **扫描页组**：一份报告转成一串连续编号的图。`sc_em` 实测
+    `…/b3eebb40…/images/0001.jpg` … `0018.jpg`，正是这个形态。于是先立的是
+    「同目录 + 编号/时间戳连续」。
+
+    `tj_em` 立刻给了反例——它有 **10 张同目录、时间戳连续递增**的 TRS 图：
+
+        /qdfy/tytb/202008/W020200824411649201603.png
+        /qdfy/tytb/202008/W020200824411649313338.png
+        /qdfy/tytb/202008/W020200824411649395384.png   …
+
+    形态与 `sc_em` 的扫描页组一模一样。差别只在「它每一页都有」——而
+    **「每一页都有」这个观察要求先看到多页，生产链路是单页采集**。所以那个判据
+    不是不准，是在生产的输入上根本算不出来。
+
+    （当时专门核过：`tj_em` 那四条「样本」确实是四个不同的页面，URL 与
+    `<title>` 两两不同，是 4·15 / 10·24 / 6·10 / 6·25 四起不同事故，却各挂
+    同一批 10 张图——模板图确证。）
+
+    ### 换成的这一条
+
+    把两边的 URL 摆在一起看，内容图与模板图是分开的：
+
+        gz_em   页 /gk/zfxxgk/fdzdgk/dcbg_5888759/202608/t2026…html
+                图 /gk/zfxxgk/fdzdgk/dcbg_5888759/202608/W020260828….png  同目录
+        tj_em   页 /ZWGK6939/SGDCBG354/202608/t2026…html
+                图 /qdfy/tytb/202008/W020200824….png                    不同目录
+
+    **它单页可用**：只要详情页 URL 与图片 URL。
+
+    ### 怎么验的
+
+    用「跨页恒定」——一条来源完全不同的判据（要对比多页才能算）——去对这条
+    （只看单页就能算）。两者一致，「同目录」就是这个形态的可靠代理。
+    10 个源、289 个图 URL 上，**矛盾格（同目录 **且** 每页都有）为 0**；
+    逐源看「同目录数 + 跨页恒定数」恰等于图 URL 总数。
+
+    失败方向也是对的：这条判据**宁可漏，不会误登记**。普查里唯一的例外是一张
+    「异目录且只在一页出现」的图——漏一张扫描页不等于整条记录丢失；反过来若把
+    模板图当内容图登记，那才是给下游塞噪音。
+
+    两种写法都认：
+
+    - **同目录**：`…/202608/page.html` ↔ `…/202608/W020….png`（TRS 常态）
+    - **以页面路径为前缀**：`…/b3eebb….html` ↔ `…/b3eebb…/images/0001.jpg`
+      （`sc_em` 形态：正文目录就是文章 hash 本身）
+
+    host 不同直接判否（图片放在 CDN 的站会全部漏判，但目前 10 个源没有一个
+    这样——真遇到了，这个函数的注释就是查因的入口）。
+    """
+    p, i = urlsplit(page_url), urlsplit(img_url)
+    if p.netloc != i.netloc:
+        return False
+    if p.path.rsplit("/", 1)[0] == i.path.rsplit("/", 1)[0]:
+        return True
+    return i.path.startswith(p.path.rsplit(".", 1)[0] + "/")
 
 
 def _date_from_url(href: str) -> str:
@@ -293,6 +362,7 @@ class TrsCmsCollector(BaseCollector):
             detail_date = (detail or {}).get("date") or list_date
             detail_text = (detail or {}).get("text") or ""
             pdf_urls = (detail or {}).get("pdf_urls") or []
+            image_urls = (detail or {}).get("image_urls") or []
 
             # 下载全部 PDF 并提取全文，**合并**成一份正文。
             #
@@ -397,6 +467,13 @@ class TrsCmsCollector(BaseCollector):
                     # PDF 里 8,635 字，HTML 那份非空不影响「附件里的主体还没
                     # 拿到」这个事实。
                     "needs_ocr": bool(pdf_urls) and not pdf_text,
+                    # ── 内容图通路（2026-10-01 第十八轮补）─────────────
+                    #
+                    # 与 `pdf_urls` 同一套机制：`executor._ASSET_KEYS` 里早有
+                    # `("image_urls", "image")` 这一项，**声明了很久却没有任何
+                    # 采集器往外传**——所以 `raw_accident_assets` 里
+                    # `asset_type='image'` 一直是 0 行。这一行把它接上。
+                    "image_urls": image_urls,
                 },
             )
             # 附加信息通过 metadata 传递
@@ -620,6 +697,36 @@ class TrsCmsCollector(BaseCollector):
                     if full not in pdf_urls:
                         pdf_urls.append(full)
 
+        # 内容图（2026-10-01 第十八轮补）。在此之前 `_crawl_detail` **对图一个字
+        # 都不读**——这是缺陷 C 的直接成因：图片型报告（正文是扫描件）整条记录
+        # 到采集层就没有了图片这个维度，一张都不登记。
+        #
+        # 判据 `_is_page_image` 只看「图片 URL 与详情页 URL 同不同目录」，单页
+        # 可用，且宁可漏不误登记——那里面记着前一个判据是怎么被 `tj_em` 推翻的。
+        #
+        # **只登记 URL，不下载**。与 PDF 那边不同：PDF 必须下载才能提出正文
+        # （正文就在里面），而图片的正文要 OCR，那是阶段②的事；采集层的职责是
+        # 让阶段②**知道哪些图要 OCR**。下载反而有害——`nmg_em` 一个源实测
+        # 121 张内容图，全下就是把采集任务变成图片搬运工。
+        image_urls: list[str] = []
+        if self.cfg.detail_image_max > 0:
+            for tag in soup.find_all(["img", "source"]):
+                src = tag.get("src") or tag.get("data-src") or ""
+                if not src or src.startswith("data:"):
+                    continue
+                full = _absolute(url, src)
+                if not _IMG_EXT.search(full):
+                    continue
+                if not _is_page_image(url, full):
+                    continue
+                if full not in image_urls:
+                    image_urls.append(full)
+            if len(image_urls) > self.cfg.detail_image_max:
+                logger.debug(f"[{self.cfg.source_name}] 内容图 "
+                             f"{len(image_urls)} 张，只登记前 "
+                             f"{self.cfg.detail_image_max} 张: {url}")
+                image_urls = image_urls[: self.cfg.detail_image_max]
+
         # 正文
         text = ""
         if self.cfg.detail_text_selector in ("body", "article"):
@@ -628,7 +735,7 @@ class TrsCmsCollector(BaseCollector):
                 text = body.get_text()
 
         return {"title": title, "date": date, "text": text,
-                "pdf_urls": pdf_urls}
+                "pdf_urls": pdf_urls, "image_urls": image_urls}
 
     def _download_and_extract_pdf(
         self, pdf_url: str, title: str, date: str

@@ -73,18 +73,22 @@ def _list_html() -> str:
 
 
 def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 30,
-                 pdf_hrefs: list[str] | None = None) -> str:
+                 pdf_hrefs: list[str] | None = None,
+                 img_hrefs: list[str] | None = None) -> str:
     hrefs = (pdf_hrefs if pdf_hrefs is not None
              else ([_PDF_HREF] if with_pdf else []))
     tags = "".join(f'<a href="{h}">附件：调查报告</a>' for h in hrefs)
+    imgs = "".join(f'<img src="{h}">' for h in (img_hrefs or []))
     return (f"<html><head><title>{title}</title></head>"
-            f"<body><div class='con'>{body}</div>{tags}</body></html>")
+            f"<body><div class='con'>{body}</div>{tags}{imgs}</body></html>")
 
 
 def _collector(tmp_path: Path, *, with_pdf: bool = True,
                body: str = "页面正文。" * 30,
                pdf_hrefs: list[str] | None = None,
-               pdf_max: int = 5) -> TrsCmsCollector:
+               pdf_max: int = 5,
+               img_hrefs: list[str] | None = None,
+               image_max: int = 50) -> TrsCmsCollector:
     """五条条目的不联网采集器。
 
     五条是刻意的：`collect()` 在 `len(results) % 5 == 0` 时才批量写库，
@@ -101,12 +105,14 @@ def _collector(tmp_path: Path, *, with_pdf: bool = True,
         enable_classify_v2=False,          # 走 pending_review 分支，不跑规则分类
         min_text_length=30,
         detail_pdf_max=pdf_max,
+        detail_image_max=image_max,
         delay=0,
     )
     c = TrsCmsCollector(cfg, data_dir=tmp_path / "src")
     c.raw_store = RawAccidentStore(filepath=tmp_path / "raw.json")
     details = {_detail_url(d, s): _detail_html(t, with_pdf=with_pdf,
-                                               body=body, pdf_hrefs=pdf_hrefs)
+                                               body=body, pdf_hrefs=pdf_hrefs,
+                                               img_hrefs=img_hrefs)
                for t, d, s in _LINKS}
     c._fetch = lambda url: _list_html() if url == _LIST_URL else details.get(url, "")
     return c
@@ -528,5 +534,161 @@ def test_多个附件的条目通路B登记多个asset(tmp_path):
             {"asset_type": "pdf", "url": _PDF_URL},
             {"asset_type": "pdf", "url": _PDF_URL2},
         ]
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# E 组：内容图（缺陷 C，2026-10-01 第十八轮定的判据）
+# --------------------------------------------------------------------------
+#
+# 详情页 URL 是 `https://tsrc.gov.cn/list/202607/t20260713_90611300.html`，
+# 所以：
+#   · 同目录     `./W0202607….png`                      → 内容图
+#   · 路径前缀   `./t20260713_90611300/images/0001.jpg` → 内容图（sc_em 形态）
+#   · 模板图     `/material/2021_static/logo.png`       → 跨目录，必须排除
+
+
+_IMG_HREF = "./W020260713387609310237.png"
+_IMG_URL = _LIST_DIR + "W020260713387609310237.png"
+_IMG_HREF2 = "./W020260713387609310238.png"
+_IMG_URL2 = _LIST_DIR + "W020260713387609310238.png"
+# 模板图：`tj_em` 实测的形态就是「同目录 + 时间戳连续」，所以判据只能靠
+# 目录对不对，不能靠命名。
+_TPL_HREF = "/material/2021_static/logo.png"
+_TPL_URL = "https://tsrc.gov.cn/material/2021_static/logo.png"
+
+
+def test_同目录图登记为内容图(tmp_path):
+    """改前 `_crawl_detail` 对图一个字都不读，图片型报告到采集层就丢了图片这一维。"""
+    c = _collector(tmp_path, img_hrefs=[_IMG_HREF])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL]
+    finally:
+        _close(c)
+
+
+def test_跨目录的模板图不登记(tmp_path):
+    """模板图必须排除。
+
+    `tj_em` 实测每页都挂同一批 10 张 `/qdfy/tytb/202008/` 的图，而它是四个
+    **不同**的详情页（URL 与 `<title>` 两两不同）——那批图是栏目模板图。
+    判据若不看目录，这些图会被逐条登记成「扫描页」。
+    """
+    c = _collector(tmp_path, img_hrefs=[_TPL_HREF])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == []
+    finally:
+        _close(c)
+
+
+def test_以页面路径为前缀的图也算内容图(tmp_path):
+    """`sc_em` 形态：正文目录就是文章 hash 本身。
+
+    实测 `…/b3eebb40….html` 配 `…/b3eebb40…/images/0001.jpg`——**不同目录**，
+    但图片在页面路径之下，是同一篇文章自己的图。
+    """
+    href = "./t20260713_90611300/images/0001.jpg"
+    url = _LIST_DIR + "t20260713_90611300/images/0001.jpg"
+    c = _collector(tmp_path, img_hrefs=[href])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [url]
+    finally:
+        _close(c)
+
+
+def test_同目录图与模板图混在一页时只登记前者(tmp_path):
+    c = _collector(tmp_path, img_hrefs=[_IMG_HREF, _TPL_HREF, _IMG_HREF2])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL, _IMG_URL2]
+    finally:
+        _close(c)
+
+
+def test_同一张图挂两次只登记一次(tmp_path):
+    c = _collector(tmp_path, img_hrefs=[_IMG_HREF, _IMG_HREF])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL]
+    finally:
+        _close(c)
+
+
+def test_超过图片上限只登记前N张(tmp_path):
+    c = _collector(tmp_path, img_hrefs=[f"./W02026071338760931{i:04d}.png"
+                                        for i in range(8)],
+                   image_max=3)
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert len(item["image_urls"]) == 3
+    finally:
+        _close(c)
+
+
+def test_上限为0时不抽取图片(tmp_path):
+    c = _collector(tmp_path, img_hrefs=[_IMG_HREF], image_max=0)
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == []
+    finally:
+        _close(c)
+
+
+def test_内容图的条目通路B登记image类型asset(tmp_path):
+    """`executor._ASSET_KEYS` 里早有 `("image_urls", "image")`，却从来没有源
+    往外传这个键——`raw_accident_assets` 里 `asset_type='image'` 一直是 0 行。"""
+    from construction_agent.collector.executor import _row_from_raw_item
+    c = _collector(tmp_path, with_pdf=False, img_hrefs=[_IMG_HREF])
+    try:
+        ret = c.collect()
+        row = _row_from_raw_item(ret[0], "tsrc", "task1")
+        assert row["_assets"] == [{"asset_type": "image", "url": _IMG_URL}]
+    finally:
+        _close(c)
+
+
+def test_图片与PDF可以挂在同一条上(tmp_path):
+    """`sh_em` 实测有页面既挂 PDF 又带插图，两条通路互不干扰。"""
+    from construction_agent.collector.executor import _row_from_raw_item
+    c = _collector(tmp_path, pdf_hrefs=[_PDF_HREF], img_hrefs=[_IMG_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("PDF 正文", "/x/a.pdf")
+    try:
+        ret = c.collect()
+        row = _row_from_raw_item(ret[0], "tsrc", "task1")
+        assert row["_assets"] == [
+            {"asset_type": "pdf", "url": _PDF_URL},
+            {"asset_type": "image", "url": _IMG_URL},
+        ]
+    finally:
+        _close(c)
+
+
+def test_图片走的是URL而不是下载(tmp_path):
+    """采集层只登记 URL，**不下载图片**——下载是阶段② OCR 时的事。
+
+    `nmg_em` 一个源实测 121 张内容图，全下等于把采集任务变成图片搬运工。
+    """
+    c = _collector(tmp_path, img_hrefs=[_IMG_HREF], with_pdf=False)
+    calls: list[str] = []
+
+    def _spy(url, *a, **kw):
+        calls.append(url)
+        raise AssertionError(f"不该下载图片: {url}")
+
+    c._client.get = _spy
+    try:
+        c.collect()
+        assert calls == []
     finally:
         _close(c)

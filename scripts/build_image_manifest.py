@@ -40,6 +40,14 @@
 `--version-dir` 可给多个目录名；只重建某几版时**不会**动其它版本已有的行。
 `--data-dir` 同时决定图片根目录与默认的报告输出位置。工作库不存在时会提
 醒先跑 `scripts/create_staging_db.py`。
+
+两条容易吃亏的地方（2026-10-01 补）：
+
+- **`--data-dir` 默认走主仓库根**（上溯 `.git`），不是 `settings.DATA_DIR`。
+  后者在 worktree 里指向 worktree 自己的 `data/`——那里只有一个空的 `images/`，
+  照着扫会得到一份 0 张的清单。**扫到 0 张现在退 `2`**，不再安静地"成功"。
+- **报告默认写在 `--data-dir` 下**。于是从 worktree 跑，报告会落到**主仓库**的
+  `data/` 里（因为图片资产在那儿）。只存疑不想留下痕迹时，记得显式 `--report`。
 """
 
 from __future__ import annotations
@@ -54,10 +62,10 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))        # scripts/_common
 
-from construction_agent.config import settings  # noqa: E402
+from _common import main_repo_root  # noqa: E402
 from construction_agent.web import staging_db as sdb  # noqa: E402
-from construction_agent.web.db import resolve_db_path  # noqa: E402
 
 # 只认这些扩展名。imageV3 实测只有 jpg(168) / png(55) / webp(3) 三种，
 # 多列几个是防御——真出现了会在报告里的 by_ext 看到。
@@ -268,7 +276,8 @@ INSERT OR REPLACE INTO image_manifest (
 def main() -> int:
     ap = argparse.ArgumentParser(description="重建 image_manifest（蓝图 06 §3）")
     ap.add_argument("--data-dir", default=None,
-                    help="data 根目录（图片目录在其中）。默认 settings.DATA_DIR")
+                    help="data 根目录（图片目录在其中）。默认按主仓库根解析"
+                         "（上溯 .git），与七条只读核查同一口径")
     ap.add_argument("--version-dir", nargs="+", default=list(VERSION_DIRS),
                     help="要扫描的版本目录名，可给多个；默认三版全部"
                          f"（{'、'.join(VERSION_DIRS)}）。只想重建最终版就 "
@@ -281,8 +290,12 @@ def main() -> int:
                     help="只扫描与报告，不写工作库")
     args = ap.parse_args()
 
+    # 默认走**主仓库**的 data/，不用 `settings.DATA_DIR`。两套解析在 worktree 里
+    # 指向不同的目录：后者是 `config.py` 的上两级（worktree 自己的 `data/`，那里
+    # 只有一份空的 `images/`，没有 `imageV2`/`imageV3`），照它扫会得到一份 0 张的
+    # 「成功」清单。图片资产在真仓库里，脚本就该往那儿看。
     data_dir = (Path(args.data_dir).expanduser().resolve()
-                if args.data_dir else Path(settings.DATA_DIR).resolve())
+                if args.data_dir else main_repo_root() / "data")
     unknown_dirs_arg = [v for v in args.version_dir if v not in VERSION_DIRS]
     if unknown_dirs_arg:
         print(f"未知的版本目录：{'、'.join(unknown_dirs_arg)}"
@@ -290,7 +303,8 @@ def main() -> int:
         return 2
 
     final_db = (Path(args.final_db).expanduser().resolve()
-                if args.final_db else resolve_db_path())
+                if args.final_db
+                else main_repo_root() / "data" / "caiems_v2.db")
     staging_path = (Path(args.staging_db).expanduser().resolve()
                     if args.staging_db
                     else sdb.resolve_staging_path())
@@ -327,6 +341,16 @@ def main() -> int:
               f"（空目录 {len(scanned['empty_dirs'])}{note}）")
     if not scans:
         print("三版图片目录都不存在，无从扫描。", file=sys.stderr)
+        return 2
+    if not records:
+        # 「目录在、里面一张图都没有」和「目录不存在」是同一件事的两副面孔，
+        # 原先只有后者退非 0，前者会安静地走完全程、把一份空清单写进工作库。
+        # 空清单不是重建成功，是扫错了地方——这类判据两头都真，等于没有判据。
+        print(f"\n✗ 扫到 0 张图——这不是「重建成功」，是「扫错了地方」。", file=sys.stderr)
+        print(f"  data 根目录：{data_dir}", file=sys.stderr)
+        print("  真图片资产在**主仓库根**的 data/ 下（images/ + imageV2/ + imageV3/）。",
+              file=sys.stderr)
+        print("  若确实要扫别处，显式传 --data-dir。", file=sys.stderr)
         return 2
     print(f"  图片文件 : {len(records)}")
     print(f"  扩展名   : {Counter(r['ext'] for r in records).most_common()}")

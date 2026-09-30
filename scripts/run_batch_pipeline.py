@@ -181,6 +181,11 @@ def run_batch(n: int = BATCH_SIZE):
 
     pipe = CaicsPipeline()
     conn = sqlite3.connect(DB_PATH)
+    # 外键是连接级开关，SQLite 默认 OFF。不开的话 schema 里那六张子表写的
+    # `ON DELETE CASCADE` 形同虚设：孤儿行插得进去，且本文件下面"先清后写"
+    # 之外的重跑保护也没有——REPLACE 删父行时子行会留着。开了之后 CASCADE
+    # 接管，与下面的 DELETE 形成双保险。
+    conn.execute("PRAGMA foreign_keys = ON")
 
     success = 0
     purged = 0

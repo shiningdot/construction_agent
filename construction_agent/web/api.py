@@ -11,7 +11,6 @@
 | GET | `/api/overview` | 概览统计（totals / 五张分布 / CAICS 类目 / 省份分组） |
 | GET | `/api/accidents` | 事故列表（筛选 / 排序 / 分页） |
 | GET | `/api/accidents/<id>` | 单事故详情（字段 / 致因 / 图片 / 元信息，一次返回） |
-| GET | `/api/accidents/<id>/images` | 该事故的图片清单（画廊单独刷新用） |
 | GET | `/api/images/stats` | 图片覆盖统计 |
 | GET | `/api/filters` | 筛选器各字段的可选值与计数 |
 | GET | `/api/causes/framework` | CAICS 体系定义（19 类 + 层归属 + 计数） |
@@ -77,34 +76,22 @@ def api_accident_detail(accident_id: str):
     return jsonify({"ok": True, "data": data})
 
 
-@api_bp.get("/accidents/<accident_id>/images")
-def api_accident_images(accident_id: str):
-    """某事故的图片清单。蓝图 06 §4。
-
-    详情接口已经带了 `images`，这个端点供画廊单独刷新。图片来自工作库的
-    `image_manifest`——工作库不可用时返回空清单 + `available: false`，
-    前端据此给「索引未重建」的提示，而不是显示成「这条事故没有图片」。
-    """
-    items = images.for_accident(accident_id)
-    suspicious = images.suspicious_sha1s()
-    for it in items:
-        # 跨多个事故共用的图打标（实测 8 组覆盖 ≥3 个事故，疑似图床占位图）。
-        # 只是标记，**不隐藏**——数据里就是这样，藏起来反而误导。
-        it["shared"] = bool(it.get("sha1") and it["sha1"] in suspicious)
-    return jsonify({
-        "ok": True,
-        "data": {
-            "accident_id": accident_id,
-            "count": len(items),
-            "available": images.available(),
-            "items": items,
-        },
-    })
+# `/accidents/<id>/images` 曾在此。删于 2026-10-01：详情接口一次就返回
+# `images`，蓝图为它写的定位是「画廊单独刷新或分页」，而前端从未调用（42 条
+# 路由里唯一的孤儿），单事故实测最多 7 张、≥10 张的 0 个——分页也不成立。
+# 它带来的实际成本是那段打标逻辑与 detail.py 逐字重复两份。取数已收敛到
+# `images.for_accident_marked()`。
 
 
 @api_bp.get("/images/stats")
 def api_images_stats():
-    """图片覆盖统计。蓝图 06 §4。覆盖率只有 7.4%，这个数字要显式呈现。"""
+    """图片覆盖统计。蓝图 06 §4。
+
+    覆盖率按三版合并口径算（559/2,623 ≈ 21.3%），并给出
+    `accidents_with_images_legacy_only`：只有历史版本目录里有图、一张最终版
+    都没有的事故数。截到 `imageV3` 时那批事故在界面上呈现为「无图片」，这个
+    字段就是截断代价的直接度量。
+    """
     return jsonify({"ok": True, "data": images.stats()})
 
 

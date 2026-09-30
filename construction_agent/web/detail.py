@@ -227,13 +227,10 @@ def build(
 
     meta = {k: row.get(k) for k in META_FIELDS}
 
-    # 图片来自**工作库**的 image_manifest（蓝图 06），不是最终库的
-    # image_files——后者的 local_path 三版混存，按它拼 URL 会大面积 404。
-    # 工作库不可用时给空清单 + 标志位，前端据此区分「没有图」与「索引没重建」。
-    image_items = images.for_accident(accident_id)
-    suspicious = images.suspicious_sha1s()
-    for it in image_items:
-        it["shared"] = bool(it.get("sha1") and it["sha1"] in suspicious)
+    # 图片来自**工作库**的 image_manifest（蓝图 06），不是最终库的 image_files：
+    # 后者的 local_path 是旧登记，与磁盘真源差 123 张 / 83 个事故，展示以工作库
+    # 为准。工作库不可用时给空清单 + 标志位，前端据此区分「没有图」与「索引没重建」。
+    image_items = images.for_accident_marked(accident_id)
 
     return {
         "id": row["id"],

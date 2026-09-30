@@ -801,14 +801,19 @@ class TestImages:
         assert dup_client.get("/media/imageV3/a1/nope.jpg").status_code == 404
 
     def test_图片清单带_url_与分析标记(self, dup_client):
-        d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
-        assert d["count"] == 3
-        assert d["available"] is True
-        first = d["items"][0]
+        """走**详情接口**取图——那是前端真正用的那条路。
+
+        原先走 `/api/accidents/<id>/images`，那条画廊专用端点已删（42 条路由
+        里唯一的孤儿），测试跟着它走，测的就不是真实路径了。
+        """
+        d = dup_client.get("/api/accidents/a1").get_json()["data"]
+        assert len(d["images"]) == 3
+        assert d["images_available"] is True
+        first = d["images"][0]
         assert first["url"] == "/media/imageV3/a1/1.jpg"
         assert first["analyzed"] is True
         assert first["phase2_consistency"] == "一致"
-        assert d["items"][1]["analyzed"] is False
+        assert d["images"][1]["analyzed"] is False
 
     def test_图片按版本排序且带角标(self, dup_client):
         """最终版排最前，历史版本在后，每条带展示用角标。
@@ -816,7 +821,7 @@ class TestImages:
         排序不是小事：同一事故跨版本都有图时（主库 57 个），读者先看到的
         必须是最终采用的那一版。
         """
-        items = dup_client.get("/api/accidents/a1/images").get_json()["data"]["items"]
+        items = dup_client.get("/api/accidents/a1").get_json()["data"]["images"]
         assert [it["version"] for it in items] == ["v3", "v3", "v2"]
         assert [it["version_badge"] for it in items] == ["最终版", "最终版", "历史版本"]
         assert items[2]["url"] == "/media/imageV2/a1/old.jpg"
@@ -827,8 +832,8 @@ class TestImages:
         括号里的补充说明（主库实测有「实为人工拆除作业被误报为坍塌」这种）
         是分析结论的一部分，剥标记时不能连它一起丢。
         """
-        d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
-        assert d["items"][0]["phase1_scene_type"] == "坍塌现场"
+        d = dup_client.get("/api/accidents/a1").get_json()["data"]
+        assert d["images"][0]["phase1_scene_type"] == "坍塌现场"
 
         assert images.clean_vlm_text("**坍塌**") == "坍塌"
         assert images.clean_vlm_text("__一致__") == "一致"
@@ -859,8 +864,8 @@ class TestImages:
             con.close()
 
         def shared():
-            d = dup_client.get("/api/accidents/a1/images").get_json()["data"]
-            return [it["shared"] for it in d["items"]]
+            d = dup_client.get("/api/accidents/a1").get_json()["data"]
+            return [it["shared"] for it in d["images"]]
 
         # 三条：v3 的 1.jpg / 2.jpg，v2 的 old.jpg（哈希独立，不参与判定）
         assert shared() == [False, False, False], "sha-one 一开始只有 a1 一条"
@@ -877,11 +882,9 @@ class TestImages:
         「这条事故没有图片」与「图片索引还没重建」是两件事，前端要能分开
         处理——前者是数据事实，后者要去跑 `build_image_manifest.py`。
         """
-        d = client.get("/api/accidents/a1/images").get_json()["data"]
-        assert d == {"accident_id": "a1", "count": 0, "available": False,
-                     "items": []}
-        assert client.get("/api/accidents/a1").get_json(
-        )["data"]["images_available"] is False
+        d = client.get("/api/accidents/a1").get_json()["data"]
+        assert d["images"] == []
+        assert d["images_available"] is False
 
     def test_图片统计(self, dup_client):
         d = dup_client.get("/api/images/stats").get_json()["data"]

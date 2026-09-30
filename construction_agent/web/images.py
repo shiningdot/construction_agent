@@ -118,6 +118,22 @@ def for_accident(accident_id: str) -> list[dict[str, Any]]:
     return items
 
 
+def for_accident_marked(accident_id: str) -> list[dict]:
+    """`for_accident` 的结果 + 跨事故共用的 `shared` 标记。
+
+    这段原先在详情接口和画廊接口 `/api/accidents/<id>/images` 里各写了一份，
+    **逐字重复**。两份拷贝一旦漂移，同一个事故经两条路拿到的标记就不一样。
+    画廊接口已删除（无人调用；蓝图 06 §4 自己写明它是「详情接口已返回 images」
+    之后的备用通道，而单事故实测最多 7 张，「分页」这个理由也不成立），这段
+    收敛成单一出口。
+    """
+    items = for_accident(accident_id)
+    suspicious = suspicious_sha1s()
+    for it in items:
+        it["shared"] = bool(it.get("sha1") and it["sha1"] in suspicious)
+    return items
+
+
 def suspicious_sha1s(min_accidents: int = 3) -> set[str]:
     """被 ≥N 个事故共用的图片内容哈希。
 

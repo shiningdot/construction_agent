@@ -22,12 +22,13 @@ import re
 import time
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin
+from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -507,6 +508,22 @@ class MemCollector(BaseCollector):
 
         publish_date = self._normalize_date(date_str)
 
+        # ── 正文改取 PDF 全文 ──
+        # 放在二次筛选**之后**是有意的：筛选口径保持与改之前逐字相同
+        # （那时也只拿 HTML 摘要判），否则正文一变长，关键词命中率跟着变，
+        # 同一个源两次采样的取舍会漂移，且无从对账。
+        #
+        # 实测 HTML 页上的正文是摘要或 meta 描述，中位 248 字；而 51 页的
+        # 报告 PDF 提出 37,618 字。抽到的 HTML 内容留着当兜底——解析失败
+        # （扫描件、下载失败）时它至少还是一点东西。命中即停，不多下。
+        pdf_parsed = False
+        for pdf_url in pdf_urls:
+            pdf_text = self._fetch_pdf_text(pdf_url)
+            if pdf_text and len(pdf_text) > len(content):
+                content = pdf_text
+                pdf_parsed = True
+                break
+
         # ── 构建内容文本 ──
         # 如果有 PDF，标题+PDF链接作为主要信息
         if pdf_urls and not content:
@@ -522,11 +539,60 @@ class MemCollector(BaseCollector):
             "publish_date": publish_date,
             "status": "new",
             "pdf_urls": pdf_urls,
-            "needs_ocr": len(pdf_urls) > 0,  # 有 PDF 的需要 OCR
+            # 有 PDF **且没解析出来**才需要 OCR
+            "needs_ocr": bool(pdf_urls) and not pdf_parsed,
         }
 
+    def _fetch_pdf_text(self, pdf_url: str) -> str:
+        """下载 PDF 附件并**就地提出正文**；提不出返回空串。
+
+        2026-10-01 实测：应急部这些调查报告 PDF 都是**文字版**，本地
+        PyMuPDF 一次到位——欣佳酒店 51 页提出 37,618 字、商洛桥梁 39 页
+        提出 28,315 字。不需要 OCR、不需要 token、不需要联网。
+
+        改之前这里两处都写着「等 MinerU」：
+
+            `_crawl_detail_article`  抽到 PDF 链接就记 `needs_ocr=True`，从不下载
+            `_handle_pdf_link`       注释直说「不做正文提取」
+
+        而 MinerU 这个依赖**不存在**——`settings.MINERU_API_TOKEN` 没这个
+        字段，`construction_agent.input.pdf_processor` 那个目录是空的。
+        于是应急部的报告入库时正文只有 HTML 页上的摘要，实测中位 **248 字**
+        （主库 3 条 `mem` 记录的 raw_text 分别是 50 / 134 / 3,572 字），
+        而 PDF 里躺着三万字的全文。
+
+        落盘再提，与 `MohurdCollector._handle_pdf` 同一套路：`extract_pdf_text`
+        收的是文件路径，而且原件留着可查——真要 OCR 时下游拿得到那份 PDF。
+        """
+        try:
+            resp = self._client.get(pdf_url)
+        except Exception as e:  # noqa: BLE001 —— 下载失败只降级，不掀整轮
+            logger.debug(f"    PDF 下载失败: {pdf_url} — {e}")
+            return ""
+
+        if resp.status_code != 200:
+            logger.debug(f"    PDF HTTP {resp.status_code}: {pdf_url}")
+            return ""
+
+        # 文件名从 URL 路径取，去掉 query 与非文件名字符
+        stem = Path(unquote(urlparse(pdf_url).path)).stem or "attachment"
+        path = self.data_dir / (re.sub(r'[^\w\-.]', '_', stem)[:50] + ".pdf")
+        try:
+            path.write_bytes(resp.content)
+        except OSError as e:
+            logger.debug(f"    PDF 落盘失败: {path} — {e}")
+            return ""
+
+        text = extract_pdf_text(path)
+        if not text:
+            logger.info(f"    PDF 提不出正文（扫描件？）: {pdf_url}")
+        return text
+
     def _handle_pdf_link(self, report: dict) -> Optional[dict]:
-        """处理 PDF 直链（不做正文提取，仅记录元数据供后续 MinerU OCR）。
+        """处理 PDF 直链：下载并就地把正文提出来。
+
+        改之前这里只记一条 `[PDF 待 OCR] 标题 + 地址`——正文全靠一个不存在
+        的 MinerU。现在提得出来就直接用，提不出来才留待 OCR 的标记。
 
         Args:
             report: {"title", "url", "link_type", "date_str", "year"}
@@ -535,7 +601,8 @@ class MemCollector(BaseCollector):
         url = report["url"]
         date_str = report["date_str"]
 
-        # 关键词再次筛选（兜底）
+        # 关键词再次筛选（兜底）。**筛在下载之前**——省流量，而且筛的
+        # 口径与改之前逐字相同（那时也是只拿标题判）。
         is_ok, reason = is_construction_accident(title, "")
         if not is_ok:
             url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
@@ -543,6 +610,20 @@ class MemCollector(BaseCollector):
             return None
 
         publish_date = self._normalize_date(date_str)
+
+        pdf_text = self._fetch_pdf_text(url)
+        if pdf_text:
+            logger.info(f"    PDF 正文 {len(pdf_text):,} 字: {title[:50]}")
+            return {
+                "title": title,
+                "content": pdf_text[:50000],
+                "source_url": url,
+                "source_name": "mem",
+                "publish_date": publish_date,
+                "status": "new",
+                "pdf_urls": [url],
+                "needs_ocr": False,
+            }
 
         return {
             "title": title,

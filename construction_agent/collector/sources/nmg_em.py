@@ -26,6 +26,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.pdf_text import extract_pdf_text
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
 from construction_agent.collector.stores import RawAccidentStore
@@ -38,17 +39,7 @@ NMGEM_BASE = "https://yjglt.nmg.gov.cn"
 NMGEM_LIST_URL = "https://yjglt.nmg.gov.cn/zwgk/zdxx/sgxxccpg/"
 
 # ── PDF 文本提取 ──
-def _extract_pdf_text(filepath: Path) -> str:
-    try:
-        import fitz
-        doc = fitz.open(str(filepath))
-        text = "".join(page.get_text() for page in doc)
-        doc.close()
-        if len(text) > 50:
-            return text
-    except Exception:
-        pass
-    return ""
+# 本地那份已收敛到 `construction_agent.collector.pdf_text`（2026-10-01）。
 
 # (classify_v2 已迁移至 construction_agent.collector.classifier)
 
@@ -266,13 +257,13 @@ class NmgEMCollector(BaseCollector):
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50]
         local_path = self.data_dir / f"{pub_date}_{safe_title}_{url_hash}.pdf"
         if local_path.exists():
-            return _extract_pdf_text(local_path), str(local_path)
+            return extract_pdf_text(local_path), str(local_path)
         try:
             resp = self._client.get(pdf_url)
             if resp.status_code == 200 and len(resp.content) >= 100:
                 local_path.write_bytes(resp.content)
                 logger.info(f"    PDF: {local_path.name} ({len(resp.content)} bytes)")
-                return _extract_pdf_text(local_path), str(local_path)
+                return extract_pdf_text(local_path), str(local_path)
         except Exception as e:
             logger.error(f"    PDF异常: {e}")
         return "", ""

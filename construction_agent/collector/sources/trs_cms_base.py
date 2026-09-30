@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -87,17 +88,11 @@ class TrsSiteConfig:
 
 
 # ── PDF 文本提取工具函数 ──
-
-def _extract_pdf_text(filepath: Path) -> str:
-    """使用 PyMuPDF 提取 PDF 全文。失败返回空字符串。"""
-    try:
-        import fitz
-        doc = fitz.open(str(filepath))
-        text = "".join(page.get_text() for page in doc)
-        doc.close()
-        return text if len(text) > 50 else ""
-    except Exception:
-        return ""
+#
+# 原实现在这里，2026-10-01 收敛到 `construction_agent.collector.pdf_text`：
+# 这份函数被复制了三份（本文件 + `nmg_em` + `hebei_em`），而 `beijing_em` /
+# `ln_em` / `henan_em` 三个模块调它却没有定义。收敛成一份，见那个模块的
+# docstring。
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -241,9 +236,18 @@ class TrsCmsCollector(BaseCollector):
                 source_url=url,
                 fetch_time=time.strftime("%Y-%m-%dT%H:%M:%S"),
                 extracted_date=self._parse_date_str(detail_date),
-                classification=classification,
-                classification_reason=class_reason,
-                classification_confidence=class_confidence,
+                # 下面三个不是 `RawAccidentText` 的字段。dataclass 的 `__init__`
+                # 不收未声明的关键字，多给一个就 `TypeError`。原先写成平铺的
+                # 关键字参数，12 个 TRS 源里凡是走到这一步的全部当场崩掉
+                # （2026-10-01 动态试跑：cq/gz/hain/sh/shaanxi/sx/tj 七个报
+                # `unexpected keyword argument 'classification'`）。
+                # 扩展数据本来就该走 `extra`，`stores/__init__.py` 也是按这几个
+                # 键名从 extra 里读的。
+                extra={
+                    "classification": classification,
+                    "classification_reason": class_reason,
+                    "classification_confidence": class_confidence,
+                },
             )
             # 附加信息通过 metadata 传递
             raw.raw_html = ""
@@ -406,13 +410,13 @@ class TrsCmsCollector(BaseCollector):
         local_path = self.data_dir / f"{date}_{safe_title}_{hash_suffix}.pdf"
 
         if local_path.exists():
-            return _extract_pdf_text(local_path), str(local_path)
+            return extract_pdf_text(local_path), str(local_path)
 
         try:
             resp = self._client.get(pdf_url)
             if resp.status_code == 200 and len(resp.content) >= 100:
                 local_path.write_bytes(resp.content)
-                return _extract_pdf_text(local_path), str(local_path)
+                return extract_pdf_text(local_path), str(local_path)
         except Exception:
             pass
         return "", ""

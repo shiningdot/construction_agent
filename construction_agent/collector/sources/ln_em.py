@@ -42,6 +42,7 @@ from urllib.parse import urljoin, unquote
 import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.pdf_text import extract_pdf_text
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
 from construction_agent.collector.stores import RawAccidentStore
@@ -397,7 +398,7 @@ class LnEMCollector(BaseCollector):
         # 如果已缓存，直接读取
         if local_path.exists():
             logger.debug(f"    PDF 已缓存: {local_filename}")
-            text = _extract_pdf_text(local_path)
+            text = extract_pdf_text(local_path)
             return text, str(local_path)
 
         # 下载 PDF
@@ -411,7 +412,7 @@ class LnEMCollector(BaseCollector):
             logger.info(f"    PDF 已下载: {local_filename} ({len(resp.content)} bytes)")
 
             # 提取文本
-            text = _extract_pdf_text(local_path)
+            text = extract_pdf_text(local_path)
             if text:
                 logger.info(f"    文本提取: {len(text)} 字")
             else:

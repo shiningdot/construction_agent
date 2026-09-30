@@ -25,6 +25,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.pdf_text import extract_pdf_text
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
 from construction_agent.collector.stores import RawAccidentStore
@@ -378,7 +379,7 @@ class BeijingEMCollector(BaseCollector):
                 logger.debug(f"    PDF 下载异常: {e}")
                 return ""
 
-        return _extract_pdf_text(cache_path)
+        return extract_pdf_text(cache_path)
 
     def _fetch_detail_date(self, article_url: str) -> str:
         """可选：爬取详情页获取发布日期。"""

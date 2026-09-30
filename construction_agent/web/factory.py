@@ -27,6 +27,7 @@ from ..config import settings
 from .api import api_bp
 from .collect import collect_bp
 from .extract import extract_bp
+from .review import review_bp
 from .views import views_bp
 
 WEB_DIR = Path(__file__).resolve().parent
@@ -57,6 +58,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(api_bp)
     app.register_blueprint(collect_bp)
     app.register_blueprint(extract_bp)
+    app.register_blueprint(review_bp)
     app.register_blueprint(views_bp)
 
     return app

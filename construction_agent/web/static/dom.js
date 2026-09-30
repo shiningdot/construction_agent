@@ -19,10 +19,16 @@
     return node;
   }
 
-  /* el('div', { cls: 'x', text: '…', attrs: { title: '…' } }, [child, …]) */
+  /* el('div', { id: 'x', cls: 'x', text: '…', attrs: { title: '…' } }, [child, …])
+
+     `id` 单独列出来支持，是因为它最容易踩：opts 只认写死的那几个键，多写的
+     键会被**静默丢掉**——不报错、不告警，元素就是没拿到 id，之后 `$('x')`
+     返回 null 再一路 null 下去。审核页的致因树与操作回执就这么丢过一次，
+     而且是"页面看着正常、只是没内容"的那种丢法。 */
   function el(tag, opts, children) {
     const node = document.createElement(tag);
     const o = opts || {};
+    if (o.id) node.id = o.id;
     if (o.cls) node.className = o.cls;
     if (o.text != null) node.textContent = String(o.text);
     if (o.attrs) {

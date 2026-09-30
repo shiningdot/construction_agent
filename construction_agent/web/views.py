@@ -61,6 +61,13 @@ def extract_page():
     return render_template("extract.html")
 
 
+@views_bp.get("/review")
+def review_page():
+    """暂存审核。蓝图 03 的落地页，对应流水线的阶段③。"""
+    _reconcile_once()
+    return render_template("review.html")
+
+
 @views_bp.get("/accident/<accident_id>")
 def accident_page(accident_id: str):
     """单事故详情。蓝图 05 §4.1。id 交给前端拉 API，页面本身只出壳。"""

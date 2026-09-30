@@ -27,6 +27,8 @@
          class="{{ 'is-active' if request.endpoint == 'views.collect_page' else '' }}">在线采集</a>
       <a href="{{ url_for('views.extract_page') }}"
          class="{{ 'is-active' if request.endpoint == 'views.extract_page' else '' }}">在线提取</a>
+      <a href="{{ url_for('views.review_page') }}"
+         class="{{ 'is-active' if request.endpoint == 'views.review_page' else '' }}">暂存审核</a>
       <a href="{{ url_for('views.overview_page') }}"
          class="{{ 'is-active' if request.endpoint in ('views.overview_page', 'views.accident_page') else '' }}">概览与检索</a>
       <a href="{{ url_for('views.causes_page') }}"

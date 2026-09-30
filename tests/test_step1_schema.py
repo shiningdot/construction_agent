@@ -33,14 +33,27 @@ EXPECTED_FIELD_COUNT = 31
 # 旧链路 claude_extractor.py:114 产出它，S1–S4 曾完全缺失，2026-09-30 补回。
 REGRESSION_FIELDS = ("direct_cause",)
 
+# 用量记账字段：既不由 LLM 产出（不进 tool schema），也不进 to_dict()。
+# `to_dict()` 的键数被 `run_batch_pipeline` 拿去数「非空字段数」
+# （processing_log.step1_fields_extracted），多两个键就会改掉那个既有统计，
+# 所以它们是**刻意**站在契约之外的，与下划线字段同类。这里显式列出而不是
+# 让它们混进契约检查——不然「dataclass 多出 schema 没有的字段」这条断言
+# 会把一个设计决定误报成缺陷。
+ACCOUNTING_FIELDS = ("tokens_in", "tokens_out")
+
 
 def _schema_properties() -> dict:
     return STEP1_TOOL["input_schema"]["properties"]
 
 
 def _dataclass_fields() -> set[str]:
-    """Step1Result 的公有字段名（下划线开头的是内部元数据，不进 schema）。"""
-    return {f.name for f in dataclasses.fields(Step1Result) if not f.name.startswith("_")}
+    """Step1Result 里**参与 S3 契约**的公有字段名。
+
+    排除下划线开头的内部元数据，以及上面的用量记账字段。
+    """
+    drop = set(ACCOUNTING_FIELDS)
+    return {f.name for f in dataclasses.fields(Step1Result)
+            if not f.name.startswith("_") and f.name not in drop}
 
 
 class TestSchemaDataclassContract:
@@ -136,6 +149,16 @@ class TestStep1ResultBehavior:
         d = Step1Result().to_dict()
         missing = _dataclass_fields() - set(d)
         assert not missing, f"to_dict() 漏掉字段: {sorted(missing)}"
+
+    def test_记账字段不进_to_dict(self):
+        """`to_dict()` 的键数被拿去数「非空字段数」，多一个键就改掉那个统计。
+
+        同时它们也不该进 tool schema——LLM 不产出用量，是调用方填的。
+        """
+        d = Step1Result().to_dict()
+        for f in ACCOUNTING_FIELDS:
+            assert f not in d, f"{f} 不该出现在 to_dict() 里"
+            assert f not in _schema_properties(), f"{f} 不该出现在 tool schema 里"
 
     def test_to_dict_含_direct_cause(self):
         r = Step1Result(direct_cause="沟槽未按规定放坡致边坡坍塌")

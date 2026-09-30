@@ -13,18 +13,18 @@
 不会再出现 `create_db_v2.py` 那种「脚本 SCHEMA 52 列 / 注释 55 列 / 真实库 48 列」
 的三方差值。
 
-八张表分两组：
+十一张表分三组：
 
 - 阶段①（蓝图 01）：`collect_sources` / `collect_tasks` /
   `raw_accidents` / `raw_accident_assets`
 - 阶段②③（蓝图 02/03）：`extract_tasks` / `staging_accidents` /
-  `staging_causes`
-- 阶段④（蓝图 06）：`image_manifest`
+  `staging_causes` / `promote_plans` / `promote_log`
+- 阶段④（蓝图 06）：`image_manifest` / `staging_metadata`
 """
 
 from __future__ import annotations
 
-SCHEMA_VERSION = "staging_v1.0"
+SCHEMA_VERSION = "staging_v1.1"
 
 # 建表顺序即外键依赖顺序，不可随意调整
 SCHEMA_SQL = """
@@ -215,6 +215,38 @@ CREATE TABLE IF NOT EXISTS staging_causes (
 );
 CREATE INDEX IF NOT EXISTS idx_scause_stage ON staging_causes(stage_id, sort_order);
 
+-- ⑧ 并入确认令牌（蓝图 03 第 5.4 节）
+--
+-- 并入最终库是唯一会改论文数据的操作，所以强制「先 dry_run 再执行」：
+-- dry_run 返回一个 token，执行时必须带上，且 token 与 stage_ids 集合绑定。
+-- 这防的是「用户改了选择却沿用上一次的确认」——那种错误一旦发生就是往
+-- 论文口径里混入未经预览的数据。
+--
+-- token 存工作库而不是进程内存：服务重启后仍在，也不受多 worker 影响。
+CREATE TABLE IF NOT EXISTS promote_plans (
+    token      TEXT PRIMARY KEY,        -- uuid4 hex[:12]
+    stage_ids  TEXT NOT NULL,           -- JSON 数组，与 token 绑定
+    plan       TEXT NOT NULL,           -- JSON：dry_run 结果快照，执行时比对
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL            -- 过期即作废，防止隔天误点
+);
+
+-- ⑨ 并入历史（蓝图 03 第 5.5 节的回滚依据）
+--
+-- 记下每次并入用了哪个备份、写了多少行、是否已回滚。回滚只开放「最近一次」，
+-- 更早的走手工恢复——自动回滚越久远的越危险（其间可能已有别的并入）。
+CREATE TABLE IF NOT EXISTS promote_log (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    token          TEXT NOT NULL,
+    stage_ids      TEXT NOT NULL,       -- JSON 数组
+    promoted       INTEGER NOT NULL,    -- 写入 accidents 的条数
+    causes_written INTEGER NOT NULL,    -- 写入 caics_causes 的行数
+    backup_path    TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    rolled_back_at TEXT                 -- 非 NULL 表示已回滚
+);
+CREATE INDEX IF NOT EXISTS idx_promote_log_time ON promote_log(created_at DESC);
+
 -- ═══════════════════════════════════════════════════════════════════
 -- 阶段④ 图片清单
 -- ═══════════════════════════════════════════════════════════════════
@@ -263,6 +295,8 @@ TABLES: tuple[str, ...] = (
     "extract_tasks",
     "staging_accidents",
     "staging_causes",
+    "promote_plans",
+    "promote_log",
     "image_manifest",
     "staging_metadata",
 )

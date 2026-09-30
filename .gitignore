@@ -24,6 +24,14 @@ data/*.json
 data/*.csv
 !data/.gitkeep
 
+# 数据库（含 WAL 旁文件与备份）——库体积大且属数据而非代码，不入版本库
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db.bak*
+*.sqlite
+*.sqlite3
+
 # OS
 .DS_Store
 Thumbs.db

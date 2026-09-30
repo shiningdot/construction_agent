@@ -27,8 +27,12 @@ class ShEMCollector(TrsCmsCollector):
             base_url="https://yjglj.sh.gov.cn",
             list_url="https://yjglj.sh.gov.cn/xxgk/zfxxgk/zcwj/sgdcbg/",
             list_page_pattern="index_{n}.html",
-            list_page_start=2,
-            list_page_max_probe=20,
+            # `list_page_start` 是「`list_url` 对应的页码」，而上面这个 list_url
+            # 是目录（`…/sgdcbg/`），即第 1 页。原先写 2，`_discover_pages` 从
+            # `start + 1` 起探，于是**第 2 页从未被抓过**。
+            list_page_start=1,
+            # 实测末页在第 7 页（第 8 页 404）。和上面同理，这只是保险上限。
+            list_page_max_probe=30,
             list_link_pattern=r"/sgdcbg/\d{8}/",
             delay=delay,
         )

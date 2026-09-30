@@ -29,6 +29,7 @@ import builtins
 import dataclasses
 import re
 from pathlib import Path
+from urllib.parse import urljoin
 
 import pytest
 from bs4 import BeautifulSoup
@@ -251,6 +252,129 @@ def test_详情页里的PDF附件也要还原成绝对URL(cq_collector, monkeypa
         "https://yjj.cq.gov.cn/zwgk_230/fdzdgknr/yjyayjxx/zhsgdcpg/dcbg/202409/"
         "P020240905567173081196.pdf"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 第六组：分页
+#
+# 2026-10-01 之前，两个配了分页的源**从头到尾只抓了第一页**：
+# `shaanxi_em` 1 页 20 条（真实 20 页 392 条）、`sh_em` 1 页 15 条（真实 7 页 94 条）。
+# 两处叠加的缺陷，每一处单独看都「正常」：
+#
+# 1. `_build_page_url` 对 `index_{n}.html` 返回**裸文件名** `index_2.html`
+#    （既含 `{n}` 又含 `index_`，命中前面那个分支）——没有协议头的相对路径。
+# 2. `_discover_pages` 用 HEAD 判存在性，而 `shaanxi_em` **整站拒 HEAD**：
+#    每页 HEAD 403、GET 200 且内容完整。这是「恒真的判据」——
+#    403 被读成「没有下一页」，与「这个站只有一页」表现完全一致。
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="module")
+def paging_collectors(tmp_path_factory):
+    from construction_agent.collector.sources.sh_em import ShEMCollector
+    from construction_agent.collector.sources.shaanxi_em import ShaanxiEMCollector
+
+    return [
+        cls(data_dir=tmp_path_factory.mktemp(cls.__name__))
+        for cls in (ShEMCollector, ShaanxiEMCollector)
+    ]
+
+
+def test_分页URL必须是带协议的绝对地址(paging_collectors):
+    """缺陷 1 的直接断言：旧写法返回 `index_2.html`，连协议头都没有。
+
+    没协议头时 httpx 抛 `UnsupportedProtocol`，然后被 `_discover_pages` 的
+    `except Exception` 吃掉——**异常被吞掉的那次，看起来和「没有下一页」一样**。
+    """
+    for c in paging_collectors:
+        for n in (2, 3, 20):
+            url = c._build_page_url(n)
+            assert url.startswith(("http://", "https://")), f"{c.source_name()} 第{n}页: {url!r}"
+
+
+def test_分页URL对文件型和目录型list_url都拼得对():
+    """`list_url` 有两种形状，拼接只对其中一种成立，`urljoin` 两种都对。
+
+    这条不绑具体站点：任何一个源把分页 URL 拼成 `…/index_1.html/index_2.html`
+    都会红。
+    """
+    cases = [
+        # 目录型：拼在目录下
+        ("https://yjglj.sh.gov.cn/xxgk/zfxxgk/zcwj/sgdcbg/", "index_{n}.html",
+         "https://yjglj.sh.gov.cn/xxgk/zfxxgk/zcwj/sgdcbg/index_2.html"),
+        # 文件型：替换文件名，不能把 index_1.html 当成目录
+        ("https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/index_1.html", "index_{n}.html",
+         "https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/index_2.html"),
+    ]
+    for list_url, pattern, expected in cases:
+        got = urljoin(list_url, pattern.format(n=2))
+        assert got == expected
+        assert "index_1.html/" not in got
+
+
+def test_所有配了分页模式的源_拼出来都是绝对URL():
+    """扫全部源文件，不绑站点。分页模式写在 `TrsSiteConfig(...)` 的关键字里，静态可读。"""
+    problems = []
+    for path in _source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "TrsSiteConfig"):
+                continue
+            kw = {k.arg: k.value for k in node.keywords if k.arg}
+            pattern = getattr(kw.get("list_page_pattern"), "value", "")
+            list_url = getattr(kw.get("list_url"), "value", "")
+            if not pattern or not list_url:
+                continue
+            built = urljoin(list_url, pattern.format(n=2))
+            if not built.startswith(("http://", "https://")):
+                problems.append(f"{path.name}: list_url={list_url!r} pattern={pattern!r} → {built!r}")
+    assert not problems, "分页 URL 不是绝对地址：\n" + "\n".join(problems)
+
+
+def test_分页探测不许用HEAD():
+    """缺陷 2 的静态护栏：`shaanxi_em` 每页 HEAD 都 403，GET 都 200。
+
+    403 不是「页面不存在」的证据，只是「不给你 HEAD」。拿 HEAD 判存在性，
+    这个源永远只有 1 页。这条测试盯住 `_discover_pages` 里不许出现 `.head(`。
+    """
+    tree = ast.parse((SOURCES_DIR / "trs_cms_base.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_discover_pages":
+            heads = [n for n in ast.walk(node)
+                     if isinstance(n, ast.Attribute) and n.attr == "head"]
+            assert not heads, "`_discover_pages` 用了 HEAD 判分页存在性，遇拒 HEAD 的站会静默只剩一页"
+            break
+    else:
+        pytest.fail("找不到 `_discover_pages`——测试失效了")
+
+
+def test_探测过的列表页不再重复请求(paging_collectors):
+    """`_discover_pages` 已经 GET 到正文，`collect()` 里的 `_fetch` 该直接取用。
+
+    否则每个列表页发两遍请求——不算错，但没有理由。
+    """
+    c = paging_collectors[0]
+    requested = []
+
+    class _Resp:
+        status_code = 200
+        text = "<ul></ul>"
+
+    class _Client:
+        def get(self, url, timeout=None):
+            requested.append(url)
+            return _Resp()
+
+    c._client = _Client()
+    c.cfg = dataclasses.replace(c.cfg, list_page_max_probe=3)  # 只探 2 页，别等 20 次
+    c._page_cache.clear()
+
+    pages = c._discover_pages()
+    assert len(pages) == 3
+    before = len(requested)
+
+    assert c._fetch(pages[1]) == "<ul></ul>"   # 第 2 页：走缓存
+    assert len(requested) == before, "探测过的列表页又发了一次请求"
+    assert c._fetch("https://example.com/never.json") is None or len(requested) > before
 
 
 # ═══════════════════════════════════════════════════════════════════

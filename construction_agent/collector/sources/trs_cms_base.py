@@ -221,6 +221,9 @@ class TrsCmsCollector(BaseCollector):
             headers={"User-Agent": self.cfg.user_agent},
         )
         self.raw_store = RawAccidentStore()
+        # `_discover_pages` 探测分页时已经 GET 到正文，存这里供 `_fetch` 复用，
+        # 免得列表页各请求两遍（见 `_fetch`）。
+        self._page_cache: dict[str, str] = {}
 
         # 统计计数器
         self._total_listed = 0
@@ -380,7 +383,19 @@ class TrsCmsCollector(BaseCollector):
     # ── 内部方法 ──
 
     def _discover_pages(self) -> list[str]:
-        """发现所有分页 URL。"""
+        """发现所有分页 URL。
+
+        **判据是 GET 的状态码，不是 HEAD 的。** `shaanxi_em` 整站拒 HEAD：
+        第 2、3、4 页 HEAD 全 403，而 GET 全 200、每页 38,000 字符内容完整。
+        用 HEAD 判「还有没有下一页」，这个源的结论是「只有一页」——
+        **而且是静默的，看上去与「这个站确实只有一页」没有任何区别**。
+
+        `list_page_start` 的语义是「`list_url` 对应的页码」，默认 1，
+        所以从 `start + 1` 开始往后探。
+
+        探测时把响应正文收进 `_page_cache`，`collect()` 随后对同一页
+        `_fetch` 时直接取用，不重复发请求。
+        """
         if not self.cfg.list_page_pattern:
             return [self.cfg.list_url]
 
@@ -388,24 +403,46 @@ class TrsCmsCollector(BaseCollector):
         for n in range(self.cfg.list_page_start + 1, self.cfg.list_page_max_probe + 1):
             page_url = self._build_page_url(n)
             try:
-                resp = self._client.head(page_url, timeout=5)
-                if resp.status_code == 200:
-                    pages.append(page_url)
-                else:
-                    break
-            except Exception:
+                resp = self._client.get(page_url, timeout=15)
+            except Exception as e:
+                logger.warning(f"[{self.cfg.source_name}] 第 {n} 页探测失败，停止分页: {e}")
                 break
+            if resp.status_code != 200:
+                logger.info(
+                    f"[{self.cfg.source_name}] 第 {n} 页 HTTP {resp.status_code}，"
+                    f"判定分页结束（共 {len(pages)} 页）"
+                )
+                break
+            self._page_cache[page_url] = resp.text
+            pages.append(page_url)
         return pages
 
     def _build_page_url(self, page_num: int) -> str:
-        """根据分页模式构建 URL。子类可覆盖以定制分页逻辑。"""
-        pattern = self.cfg.list_page_pattern
+        """根据分页模式构建第 `page_num` 页的 URL。子类可覆盖以定制分页逻辑。
+
+        **一律 `urljoin`，不许字符串拼接。** 站点给的 `list_page_pattern` 有两种形状，
+        而 `list_url` 本身也有两种形状，组合起来四种，拼接只对其中一种成立：
+
+        | `list_page_pattern` | `list_url` | 拼接结果 | `urljoin` |
+        |---|---|---|---|
+        | `index_{n}.html` | `…/sgdc/index_1.html`（**文件**） | `…/index_1.html/index_2.html` ✗ | `…/sgdc/index_2.html` ✓ |
+        | `index_{n}.html` | `…/sgdcbg/`（**目录**） | `…/sgdcbg/index_2.html` ✓ | 同上 ✓ |
+        | `https://…/index_{n}.html` | 任意 | 取决于拼接 | 原样返回 ✓ |
+
+        **曾经的写法的害处不在拼错，在于错得看不出来**：
+        ```python
         if "{n}" in pattern:
-            return pattern.format(n=page_num)
-        if "index_" in pattern:
-            # 常见模式: list_url + "index_{n}.html"
+            return pattern.format(n=page_num)   # ← `index_{n}.html` 命中这里
+        if "index_" in pattern:                 # ← 这个分支从没执行过
             return f"{self.cfg.list_url.rstrip('/')}/{pattern.format(n=page_num)}"
-        return pattern
+        ```
+        `index_{n}.html` **同时**含 `{n}` 和 `index_`，而第一个分支在前面，
+        于是返回的是裸文件名 `index_2.html`——**没有协议头的相对路径**。
+        `_discover_pages` 对它发 HEAD 必然抛 `UnsupportedProtocol`，
+        落进那里的 `except Exception: break`，**静默只剩第一页**，
+        返回「1 页」看起来与「这个站只有一页」完全一样。
+        """
+        return urljoin(self.cfg.list_url, self.cfg.list_page_pattern.format(n=page_num))
 
     def _parse_list(self, html: str, page_url: str = "") -> list[dict]:
         """解析列表页 HTML，提取文章链接。
@@ -520,7 +557,15 @@ class TrsCmsCollector(BaseCollector):
         return "", ""
 
     def _fetch(self, url: str) -> Optional[str]:
-        """HTTP GET 带重试。"""
+        """HTTP GET 带重试。
+
+        先查 `_page_cache`：`_discover_pages` 探测分页时已经 GET 过列表页，
+        这里直接取用（`pop` 掉，同一 URL 至多缓存一次）。
+        """
+        cached = self._page_cache.pop(url, None)
+        if cached is not None:
+            return cached
+
         for attempt in range(self.cfg.max_retries):
             try:
                 resp = self._client.get(url)

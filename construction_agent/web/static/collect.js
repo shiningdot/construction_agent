@@ -242,6 +242,7 @@
       });
     }).then(function () {
       notice('已提交，任务在后台跑。采集时长取决于站点，可以随时回来看进度。');
+      awaitingResult = true;   // 结果取回来之前，轮询别停
       return loadTasks();
     }).catch(function (e) {
       notice('提交失败：' + e.message);
@@ -259,10 +260,31 @@
 
   /* ── ③ 任务队列 ─────────────────────────────────────────── */
 
+  /* 提交出去的任务，结果还没取回来。
+
+     不刷新会怎样：用户点完「开始采集」，任务卡写着「入库 8」，而下方的原始
+     数据表还是空的——以为白跑了。这是第三层验证（headless 真点击）才抓得到
+     的那类问题：接口全对、数据也真进了库，只是**没人去取**。
+
+     为什么不用「活动任务清零」当判据：任务可能在一次轮询间隔内就跑完
+     （假采集器下就是这样），从头到尾没出现过 running，那个事件根本不会发生。
+
+     为什么不用「任务快照变了」：轮询到没有活动任务就停了（见 schedulePoll），
+     快照要变也得有第二次 loadTasks 才看得见——恰恰没有第二次。所以得让
+     「等结果」这件事本身去续命：只要这个标志还在，轮询就不停，直到某一拍
+     看见任务已经不是活动状态，才去把结果取回来。 */
+  var awaitingResult = false;
+
   function loadTasks() {
     return fetchJson('/api/collect/tasks?limit=30').then(function (body) {
       tasks = body.data || [];
       renderTasks();
+      if (awaitingResult && tasks.length && !hasActive()) {
+        awaitingResult = false;
+        loadFunnel();
+        loadSources();
+        loadRaw(rawPage);
+      }
       schedulePoll();
     }).catch(function (e) {
       $('taskCount').textContent = '加载失败：' + e.message;
@@ -276,11 +298,14 @@
     });
   }
 
-  /* 只在有活动任务时轮询，且用 setTimeout 递归而不是 setInterval ——
-     后者在网络慢的时候会把请求堆起来，越堆越多。 */
+  /* 有活动任务、或者还在等一次结果回填时轮询；用 setTimeout 递归而不是
+     setInterval——后者在网络慢的时候会把请求堆起来，越堆越多。
+
+     awaitingResult 是必需的：没有它，任务快到第一拍就已完成的场合（假采集器、
+     或者真源碰巧很快），轮询在第一拍就退出，原始数据区永远等不到刷新。 */
   function schedulePoll() {
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
-    if (!hasActive()) return;
+    if (!hasActive() && !awaitingResult) return;
     pollTimer = setTimeout(function () { loadTasks(); }, POLL_MS);
   }
 

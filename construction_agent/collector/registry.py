@@ -45,6 +45,25 @@ GROUP_LABELS = {
 # 在采集器里跑一遍等于同一批文本被分类两次，多花一次模型调用。
 _NO_CLASSIFY: tuple[tuple[str, Any], ...] = (("enable_classify", False),)
 
+# `MohurdCollector` 的构造器默认 `collect_mem=True`——那是它早期兼管两个部委
+# 时留下的：`run_collect.py` 里这条源的描述至今写着「mohurd.gov.cn + mem.gov.cn」。
+# 后来应急部独立成 `mem` 这个 source_key（`MemCollector`），两件事就重了：
+#
+# 1. **筛选标准两套，宽的那套会放煤矿进来。** `_collect_mem` 的关键词表只有
+#    建筑词（「坍塌」之类）、**没有任何排除词**；而 `MemCollector` 的
+#    `EXCLUDE_KW` 里有「煤矿」「煤业公司」等。实测 `_collect_mem` 收进来的
+#    两条都是「内蒙古阿拉善新井煤业有限公司露天煤矿“2·22”特别重大坍塌事故」，
+#    正是 `MemCollector` 会排除的。
+# 2. **去重挡不住。** 两条路的 `source_url` 口径不同——`_collect_mem` 记的是
+#    PDF 直链（`.../W020240204579335303864.pdf`），`MemCollector` 记的是详情页
+#    （`.shtml`）。`raw_accidents` 的 `UNIQUE(url_hash)` 因此命中不了同一个报告，
+#    两个源都跑就会各存一份。
+#
+# 关掉不丢数据：`MemCollector` 遍历 2005–2025 全部年份目录，覆盖面是
+# `_collect_mem`（只抓入口页一层）的超集，实测它抓到的报告也在同一个
+# `fdzdgknr/` 目录下。
+_MOHURD_ONLY: tuple[tuple[str, Any], ...] = (("collect_mem", False),)
+
 
 @dataclass(frozen=True)
 class SourceSpec:
@@ -138,7 +157,9 @@ SOURCES: dict[str, SourceSpec] = dict([
     _s("mohurd", "住房和城乡建设部事故通报", "national", "住房和城乡建设部",
        "https://www.mohurd.gov.cn", 1.0,
        "mohurd", "MohurdCollector",
-       note="不挂 raw_store，产出靠 collect() 返回值传出来"),
+       kwargs=_MOHURD_ONLY,
+       note="不挂 raw_store，产出靠 collect() 返回值传出来；"
+            "collect_mem 已关，应急部归 mem 源，见 _MOHURD_ONLY 的注释"),
     _s("news_aggregator", "新闻搜索聚合（百度 / Bing）", "media", "—",
        "", 1.0,
        "news_aggregator", "NewsAggregator",

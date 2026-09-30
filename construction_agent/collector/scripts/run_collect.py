@@ -75,7 +75,11 @@ def _register():
             lambda: _import_collector("safehoo", "SafehooCollector"),
         ),
         "mohurd": (
-            "住建部事故通报 (mohurd.gov.cn + mem.gov.cn)",
+            # 这里原先写着「mohurd.gov.cn + mem.gov.cn」——`MohurdCollector`
+            # 早期兼管两个部委。应急部现已独立成 `mem` 这个源（`MemCollector`
+            # 覆盖 2005–2025 全部年份，是它的超集），registry 已把
+            # `collect_mem` 关掉，理由见 `_MOHURD_ONLY` 的注释。
+            "住建部事故通报 (mohurd.gov.cn)",
             lambda: _import_collector("mohurd", "MohurdCollector"),
         ),
         "mem": (

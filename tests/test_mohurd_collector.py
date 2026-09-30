@@ -352,3 +352,32 @@ def test_列表页入口是调查报告而不是跳转页():
     httpx 不跑 JS，抓到的就是那 484 字节空壳。主库里 3 条 mem 记录的
     URL 全在 `tbzdsgdcbg/` 下。"""
     assert MEM_SGCC_URL.endswith("/gk/sgcc/tbzdsgdcbg/")
+
+
+# --------------------------------------------------------------------------
+# 职责边界：应急部归 mem 源，mohurd 只管住建部
+# --------------------------------------------------------------------------
+
+
+def test_registry里mohurd不再兼采应急部():
+    """回归钉子。`MohurdCollector.__init__` 的 `collect_mem` 默认是 **True**
+    ——早期兼管两个部委留下的，`run_collect.py` 里那条描述至今写着
+    「mohurd.gov.cn + mem.gov.cn」。
+
+    两套筛选标准并存时，**宽的那套会放煤矿进来**：`_collect_mem` 的关键词表
+    只有建筑词、没有任何排除词，实测收进来的两条都是「内蒙古阿拉善新井
+    煤业有限公司露天煤矿“2·22”特别重大坍塌事故」——正是 `MemCollector`
+    的 `EXCLUDE_KW`（含「煤矿」「煤业公司」）会排除的。
+
+    去重也挡不住：两条路的 `source_url` 口径不同（PDF 直链 vs 详情页
+    `.shtml`），`UNIQUE(url_hash)` 命中不了同一个报告。
+
+    这个断言盯的是 registry 里的 build_kwargs，不是构造器的默认值——
+    默认值留着不动（`run_collect.py` 那条老路径还在用），关在登记表这一层。
+    """
+    from construction_agent.collector import registry
+
+    assert dict(registry.get("mohurd").build_kwargs).get("collect_mem") is False
+    # 应急部由 mem 源独家负责；两个 key 指向同一个栏目才是这件事的前提
+    assert registry.get("mem").cls == "MemCollector"
+    assert registry.get("mohurd").cls == "MohurdCollector"

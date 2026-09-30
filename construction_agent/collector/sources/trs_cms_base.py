@@ -99,6 +99,72 @@ class TrsSiteConfig:
 # TRS CMS 通用采集器
 # ═══════════════════════════════════════════════════════════════════
 
+def _unwrap_data_islands(html: str) -> str:
+    """把 `<script type="text/xml">` 数据岛里的列表条目提出来，让 BeautifulSoup 看得见。
+
+    **这是 `js_em` 一条都抓不到的原因**（2026-10-01 动态试跑查出）。
+    那个站的列表页长这样：
+
+        <div id="397082"><script type="text/xml"><datastore>
+        <recordset><record><![CDATA[
+        <li class="cf"><a title="…" href="/art/2026/4/22/art_81395_11761062.html">…</a>…
+        ]]> </record> … </recordset></script></div>
+
+    两道坎叠在一起，缺一不可：
+    1. `html.parser` 对 `<script>` 的内容**一律当文本**（script 是 CDATA 元素），
+       里面的 `<a>` 不会成为标签；
+    2. 那条 `CDATA` 声明也不被识别，整段仍是文本。
+
+    于是那一页的 45 条链接一条都进不了 DOM，`find_all("a")` 只能看见 16 个导航
+    链接——而链接正则只在 `<a href>` 上匹配，结果恒为 0。**正则、URL、状态码
+    全是好的**，问题在解析之前。
+
+    只对真含这种数据岛的页面动手：正则匹配不上时原样返回，其余 11 个 TRS 源
+    的页面结构不受影响。
+
+    正则放宽了三处（`js_em` 实测用的是双引号、无 charset 后缀，另外两处属于
+    **防御性**，没有实测样本）：引号单双皆可、`type` 值允许带参数后缀、
+    `type` 关键字大小写不限。放宽的理由是这三处一旦不匹配，表现与「这个源
+    没数据」完全一样——又是沉默失效，宁可多认几种写法。
+    """
+    def _one(m: "re.Match[str]") -> str:
+        return re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", m.group(1), flags=re.S)
+
+    return re.sub(r"""<script[^>]*type=["']text/xml[^"']*["'][^>]*>(.*?)</script>""",
+                  _one, html, flags=re.S | re.I)
+
+
+def _date_from_url(href: str) -> str:
+    """从详情页 URL 的路径里抠出日期，返回 `YYYY-MM-DD`；抠不到返回空串。
+
+    两种写法都要认：
+
+    - 斜杠分段、**月/日不补零**——`/art/2019/4/18/…`（TRS 常见）、
+      `/scyjt/dcbg/2023/8/14/…`
+    - 连续八位——`/20230101/`
+
+    原先写的是 `(\\d{4})[/-](\\d{2})[/-](\\d{2})`，`\\d{2}` 要求月日补零，
+    于是上面两种主流写法**一条都匹配不上**，列表页日期字段恒为空串。
+    空值本身不报错，看起来就像「这个站列表页不写日期」——**又一个恒空的判据**。
+    2026-10-01 补数据岛测试时撞出来的：URL 里明摆着 `2019/4/18`，`date` 却是空串。
+
+    连续八位那种额外加 `(?<!\\d)` / `(?!\\d)`，免得从 `art_81395_8732508`
+    这类长数字串中间切出一段假的八位数。抠出来的三组数还做范围校验，
+    `1234/56/78` 这种不返回。
+    """
+    for pattern in (
+        r"(?<!\d)(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?!\d)",
+        r"(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)",
+    ):
+        m = re.search(pattern, href)
+        if not m:
+            continue
+        year, month, day = (int(g) for g in m.groups())
+        if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+    return ""
+
+
 class TrsCmsCollector(BaseCollector):
     """TRS CMS 通用采集器基类。
 
@@ -317,6 +383,7 @@ class TrsCmsCollector(BaseCollector):
         Returns:
             [{"title": str, "url": str, "date": str}, ...]
         """
+        html = _unwrap_data_islands(html)
         soup = BeautifulSoup(html, "html.parser")
         records: list[dict] = []
 
@@ -332,10 +399,7 @@ class TrsCmsCollector(BaseCollector):
                     full_url = href if href.startswith("http") else (
                         self.cfg.base_url.rstrip("/") + "/" + href.lstrip("/")
                     )
-                    date = ""
-                    m = re.search(r"(\d{4})[/-](\d{2})[/-](\d{2})", href)
-                    if m:
-                        date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+                    date = _date_from_url(href)
                     if title:
                         records.append({"title": title, "url": full_url, "date": date})
             return records
@@ -351,10 +415,7 @@ class TrsCmsCollector(BaseCollector):
                 full_url = href if href.startswith("http") else (
                     self.cfg.base_url.rstrip("/") + "/" + href.lstrip("/")
                 )
-                date = ""
-                m = re.search(r"(\d{4})(\d{2})(\d{2})", href)
-                if m:
-                    date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+                date = _date_from_url(href)
                 if title:
                     records.append({"title": title, "url": full_url, "date": date})
 

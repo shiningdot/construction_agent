@@ -25,7 +25,12 @@ class ScEMCollector(TrsCmsCollector):
             base_url="https://yjt.sc.gov.cn",
             list_url="https://yjt.sc.gov.cn/scyjt/dcbg/GovInfoPublic.shtml",
             list_page_pattern="",
-            list_link_pattern=r"/\d{6}/t\d{8}_\d+\.html",
+            # 原值 r"/\d{6}/t\d{8}_\d+\.html" 是另一种 CMS 的格式，本页一条都不匹配
+            # ——列表页 HTTP 200、54 KB、79 个 <a>，正则命中 0，于是整个源恒返回空。
+            # 实测该站详情页形如 /scyjt/dcbg/2023/8/14/<32 位 hex>.shtml。
+            # 同构的 PDF 直链（…/<hex>/files/xxx.pdf）本正则不收：它没有配套的
+            # 详情解析，收进来只会多出一条有标题、无正文的记录。
+            list_link_pattern=r"/scyjt/dcbg/\d{4}/\d{1,2}/\d{1,2}/[0-9a-f]{16,}\.shtml",
             delay=delay,
             timeout=30,
         )

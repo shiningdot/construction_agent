@@ -219,6 +219,37 @@ class CaicsPipeline:
         self.enable_search_enhance = enable_search_enhance
 
     # ══════════════════════════════════════════════════
+    # 前置检查
+    # ══════════════════════════════════════════════════
+
+    def preflight(self) -> list[str]:
+        """检查三个 LLM 组件是否具备执行条件，返回问题列表。
+
+        **不做网络探测**，只看客户端是否已初始化，因此零成本、可反复调用。
+
+        为什么需要它：未配置 API key 时，各组件并不会抛异常，而是**静默降级**——
+        `classify_text_type()` 返回 `other`、`extract()` 返回 None。于是整批数据
+        会被"正常地"过滤掉，看起来像完成了工作，实际什么都没做。本项目的失败
+        模式反复出现在这里（hfacs.py 的 load() 静默 False、search_enhancer 的
+        direct_cause 恒为空串），故提前把这类配置缺失显式化。
+
+        判定方式用 `hasattr + is None`：组件若根本不暴露 `client` 属性（例如测试
+        用的假件），视为不适用，不报问题。
+        """
+        problems = []
+        for label, comp in (
+            ("S1/S2 分类器", self.classifier),
+            ("S3 字段提取器", self.extractor),
+            ("S4 致因编码器", self.encoder),
+        ):
+            if hasattr(comp, "client") and getattr(comp, "client") is None:
+                problems.append(
+                    f"{label}（{type(comp).__name__}）的 LLM 客户端未初始化，"
+                    f"通常是未配置 ANTHROPIC_API_KEY"
+                )
+        return problems
+
+    # ══════════════════════════════════════════════════
     # 单条
     # ══════════════════════════════════════════════════
 
@@ -239,6 +270,20 @@ class CaicsPipeline:
             title=title, publish_date=publish_date,
         )
         t_start = time.time()
+
+        # ── 前置检查：组件没配好就别跑 ────────────────
+        # 不比运行时才发现好——不检查的话，缺 key 时 S1 会把每条都判为 other，
+        # 整批"正常地"过滤光，看不出是配置问题。
+        problems = self.preflight()
+        if problems:
+            out.records.append(StageRecord(
+                "PREFLIGHT", False, 0, error="；".join(problems)))
+            out.status = STATUS_FAILED
+            out.purge_reason = "前置检查未通过：" + "；".join(problems)
+            out.total_ms = self._elapsed(t_start)
+            logger.error("前置检查未通过，未进入 S1：%s", "；".join(problems))
+            return out
+
         metadata = {"publish_date": publish_date, "source_name": source_name}
 
         # ── S1 类型闸门 ──────────────────────────────

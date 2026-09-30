@@ -18,7 +18,7 @@ from construction_agent.config import settings
 
 console = Console()
 
-AGENT_LOGO = """
+AGENT_LOGO = r"""
 [bold cyan]
   ___ __ _ _ __   ___ _   _ _ __   ___  __ _ _ __   ___ _ __
  / __/ _` | '_ \ / __| | | | '_ \ / _ \/ _` | '_ \ / _ \ '__|
@@ -166,6 +166,128 @@ def cmd_interactive(args: argparse.Namespace):
             _show_accident_table(accident)
         else:
             console.print("[bold red]❌ 提取失败，请重试[/]")
+
+
+def cmd_extract(args: argparse.Namespace):
+    """用 S1–S4 主管道处理单条事故信息（CAICS 链路）。
+
+    与 `process` 的分工：
+      `process`  走旧链路 `ExtractionPipeline`（V1 四维度 + HFACS 编码），
+                 服务于已封存的旧理论
+      `extract`  走 S1–S4 `CaicsPipeline`（CAICS 5 层 19 类），**与主库
+                 2,623 条数据同构**，是生产链路
+
+    默认不落库——单条文本没有对应的 `raw_accidents` 记录，而工作库对
+    raw_id 有外键约束。落库属于在线采集管道的场景（蓝图 02 阶段②）。
+    """
+    from construction_agent.extraction.caics_pipeline import CaicsPipeline
+
+    title = args.title or args.text[:50]
+    console.print(Panel(f"[bold]{title}[/]\n[dim]{args.text}[/]", title="📥 输入"))
+
+    try:
+        pipe = CaicsPipeline(enable_search_enhance=not args.no_search)
+    except Exception as exc:
+        console.print(f"[bold red]❌ 主管道初始化失败: {exc}[/]")
+        sys.exit(1)
+
+    # 提前把配置缺失摆到台面上。不检查的话，缺 key 时 S1 会把文本判为
+    # other、整条被"正常地"过滤，看不出是环境问题。
+    problems = pipe.preflight()
+    if problems:
+        console.print("[bold red]❌ 主管道无法执行：[/]")
+        for p in problems:
+            console.print(f"  [red]·[/] {p}")
+        console.print("\n[dim]请在 construction_agent/.env 配置 ANTHROPIC_API_KEY 后重试[/]")
+        sys.exit(1)
+
+    with console.status("[bold cyan]🔄 执行 S1→S2→S3→S4..."):
+        outcome = pipe.run_once(
+            title=title, text=args.text,
+            publish_date=args.publish_date or "",
+            source_name=args.source or "",
+        )
+
+    _show_stage_table(outcome)
+
+    # 终态分派
+    if outcome.status == "purged":
+        reason = {
+            "text_type": f"文本类型为 {outcome.text_type_value}，非事故报道",
+            "non_construction": "判定为非建筑施工事故",
+        }.get(outcome.purge_reason, outcome.purge_reason)
+        console.print(f"\n[yellow]⛔ 被闸门拦下: {reason}[/]")
+        console.print(f"[dim]S1 理由: {outcome.text_type.reason if outcome.text_type else '-'}[/]")
+        if outcome.classification:
+            console.print(f"[dim]S2 理由: {outcome.classification.reason}[/]")
+        return
+
+    if outcome.status != "completed":
+        console.print(f"\n[bold red]❌ 失败: {outcome.purge_reason}[/]")
+        sys.exit(1)
+
+    # 成功：展示提取结果与编码
+    console.print("\n[bold green]✅ 提取与编码完成[/]")
+    console.print(Panel(_json_dumps(outcome.basic.to_dict()),
+                        title="📋 基础字段 (S3)", border_style="green"))
+
+    if outcome.causes:
+        _show_causes_table(outcome.causes)
+    else:
+        console.print("[yellow]⚠ S4 未产出致因编码（该条仍视为完成，编码为空）[/]")
+
+    console.print(
+        f"[dim]文本类型 {outcome.text_type_value} | "
+        f"判定 {outcome.classification.verdict.value if outcome.classification else '-'} | "
+        f"编码 {len(outcome.caics_codes)} 条 | 总耗时 {outcome.total_ms} ms[/]"
+    )
+
+    if args.json:
+        Path(args.json).write_text(
+            _json_dumps(outcome.to_dict()), encoding="utf-8")
+        console.print(f"[green]✓ JSON 已导出: {args.json}[/]")
+
+
+def _json_dumps(data) -> str:
+    import json
+    return json.dumps(data, ensure_ascii=False, indent=2, default=str)
+
+
+def _show_stage_table(outcome):
+    """显示 S1–S4 的分段轨迹。"""
+    table = Table(title="主管道轨迹")
+    table.add_column("阶段", style="cyan", no_wrap=True)
+    table.add_column("结果", no_wrap=True)
+    table.add_column("耗时", justify="right", no_wrap=True)
+    table.add_column("说明")
+
+    labels = {
+        "S1": "S1 类型闸门", "S2": "S2 相关性闸门", "S3": "S3 字段提取",
+        "SEARCH": "搜索增强", "S4": "S4 致因编码",
+    }
+    for r in outcome.records:
+        mark = "[green]✓[/]" if r.ok else "[red]✗[/]"
+        note = r.error if r.error else r.detail
+        table.add_row(labels.get(r.stage, r.stage), mark, f"{r.ms} ms", note or "-")
+
+    console.print(table)
+
+
+def _show_causes_table(causes):
+    """显示 CAICS 致因编码。"""
+    table = Table(title=f"CAICS 致因编码 ({causes.cause_count} 条)")
+    table.add_column("编码", style="cyan", no_wrap=True)
+    table.add_column("类名")
+    table.add_column("证据")
+
+    for c in causes.causes:
+        table.add_row(c.code, c.name, (c.evidence or "-")[:60])
+
+    console.print(table)
+    if causes.primary_cause:
+        console.print(f"[dim]主因: {causes.primary_cause}[/]")
+    if causes.cause_chain:
+        console.print(f"[dim]致因链: {causes.cause_chain}[/]")
 
 
 def cmd_web(args: argparse.Namespace):
@@ -436,6 +558,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
+  python -m construction_agent.main extract "某工地发生坍塌事故，造成3人死亡"
+  python -m construction_agent.main extract "…" --publish-date 2024-03-16 --json out.json
   python -m construction_agent.main process "某工地发生坍塌事故，造成3人死亡"
   python -m construction_agent.main batch accidents.txt --json output.json --csv output.csv
   python -m construction_agent.main interactive
@@ -461,6 +585,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_batch.add_argument("file", help="事故信息文件路径（每行一条）")
     p_batch.add_argument("--json", help="输出 JSON 文件路径")
     p_batch.add_argument("--csv", help="输出 CSV 文件路径")
+
+    # extract: S1–S4 主管道处理单条（CAICS 链路）
+    p_extract = subparsers.add_parser(
+        "extract", help="S1–S4 主管道处理单条事故信息（CAICS 链路，与主库同构）")
+    p_extract.add_argument("text", help="事故描述文本")
+    p_extract.add_argument("--title", help="事故标题（默认取正文前 50 字）")
+    p_extract.add_argument("--publish-date", dest="publish_date",
+                           help="原文发布日期 YYYY-MM-DD（用于 S3 的日期推断）")
+    p_extract.add_argument("--source", help="来源名称（写入 S3 的 metadata）")
+    p_extract.add_argument("--no-search", action="store_true",
+                           help="跳过 S3 后的搜索增强（省一次网络往返，产出与新采集数据一致）")
+    p_extract.add_argument("--json", help="输出 JSON 文件路径")
 
     # interactive: 交互模式
     subparsers.add_parser("interactive", help="交互式命令行模式")
@@ -507,6 +643,7 @@ def main(argv: list[str] | None = None):
 
     commands = {
         "process": cmd_process,
+        "extract": cmd_extract,
         "batch": cmd_batch,
         "interactive": cmd_interactive,
         "web": cmd_web,

@@ -315,6 +315,69 @@ class TestFailurePaths:
 # 搜索增强
 # ══════════════════════════════════════════════════════════════
 
+class TestPreflight:
+    """组件未初始化时应当显式失败，而不是静默产出垃圾。"""
+
+    def test_假组件没有_client_属性则视为适用(self):
+        pipe, _ = make_pipeline()
+        assert pipe.preflight() == []
+
+    def test_组件有_client_且为_None_则报问题(self):
+        class NoKeyClassifier(FakeClassifier):
+            client = None
+
+        pipe, _ = make_pipeline(classifier=NoKeyClassifier())
+        problems = pipe.preflight()
+        assert len(problems) == 1
+        assert "S1/S2" in problems[0] and "ANTHROPIC_API_KEY" in problems[0]
+
+    def test_三个组件都缺则报三条(self):
+        class NoKeyClassifier(FakeClassifier):
+            client = None
+
+        class NoKeyExtractor(FakeExtractor):
+            client = None
+
+        class NoKeyEncoder(FakeEncoder):
+            client = None
+
+        pipe, _ = make_pipeline(classifier=NoKeyClassifier(),
+                                extractor=NoKeyExtractor(), encoder=NoKeyEncoder())
+        assert len(pipe.preflight()) == 3
+
+    def test_前置检查不过时不进_S1(self):
+        class NoKeyClassifier(FakeClassifier):
+            client = None
+
+        cls = NoKeyClassifier()
+        pipe, parts = make_pipeline(classifier=cls)
+        out = pipe.run_once("标题", "正文")
+
+        assert out.status == STATUS_FAILED
+        assert "前置检查未通过" in out.purge_reason
+        assert cls.s1_calls == 0, "S1 不该被调用"
+        assert out.records[0].stage == "PREFLIGHT"
+        assert out.records[0].ok is False
+
+    def test_前置检查不过时批量全失败(self):
+        class NoKeyClassifier(FakeClassifier):
+            client = None
+
+        pipe, _ = make_pipeline(classifier=NoKeyClassifier())
+        outs = pipe.run_batch([{"title": "甲", "content": "x"},
+                               {"title": "乙", "content": "y"}])
+        assert all(o.status == STATUS_FAILED for o in outs)
+
+    def test_前置检查的与运行时_schema_一致_不误判(self):
+        """真实组件在未配 key 时确实暴露 client=None，配了则不是。"""
+        from construction_agent.collector.llm_classifier import AccidentClassifier
+        from construction_agent.extraction.step1_basic_extractor import Step1BasicExtractor
+        from construction_agent.extraction.step2_caics_encoder import Step2CaicsEncoder
+
+        for comp in (AccidentClassifier(), Step1BasicExtractor(), Step2CaicsEncoder()):
+            assert hasattr(comp, "client"), f"{type(comp).__name__} 应暴露 client 属性"
+
+
 class TestSearchEnhance:
 
     def test_不需要增强时_S3_只跑一次(self):

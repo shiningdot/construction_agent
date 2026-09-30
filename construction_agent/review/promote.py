@@ -575,20 +575,42 @@ def rollback(db_path: Path | None = None) -> dict[str, Any]:
 
 
 def history(limit: int = 10) -> list[dict[str, Any]]:
-    return staging_db.query(
-        "SELECT id, token, stage_ids, promoted, causes_written, backup_path, "
-        "created_at, rolled_back_at FROM promote_log "
-        "ORDER BY id DESC LIMIT ?", (limit,))
+    """并入历史，最近的在前。
+
+    与 `promoted_accident_ids()` 同理：早期版本建的工作库没有 `promote_log`，
+    缺表就是「还没有任何并入记录」，返回空列表。漏斗统计
+    （`/api/review/stats` 的 `funnel_payload`）直接调它，返回空集比整页 500 合理。
+    """
+    try:
+        return staging_db.query(
+            "SELECT id, token, stage_ids, promoted, causes_written, backup_path, "
+            "created_at, rolled_back_at FROM promote_log "
+            "ORDER BY id DESC LIMIT ?", (limit,))
+    except sqlite3.OperationalError:
+        return []
 
 
 def promoted_accident_ids() -> set[str]:
-    """所有已并入最终库的 accident_id（= raw_id）。用于统计漏斗。"""
+    """所有已并入最终库的 accident_id（= raw_id）。用于统计漏斗。
+
+    早期版本建的工作库没有 `promote_log` 表（`staging_schema.py` 后来才加，
+    DDL 是 `CREATE TABLE IF NOT EXISTS`，重跑一次建表即可补上）。缺表等价于
+    「从没并入过任何东西」，返回空集——调用它的是审核队列与漏斗统计，都在
+    页面主路径上，不该为一张空表把整页打成 500。
+    """
     out: set[str] = set()
-    for row in staging_db.query(
-            "SELECT stage_ids FROM promote_log WHERE rolled_back_at IS NULL"):
+    try:
+        rows = staging_db.query(
+            "SELECT stage_ids FROM promote_log WHERE rolled_back_at IS NULL")
+    except sqlite3.OperationalError:
+        return out
+    for row in rows:
         try:
             ids = json.loads(row["stage_ids"])
         except (TypeError, ValueError):
+            continue
+        if not ids:
+            # 空列表会让下面的 `IN ()` 变成语法错误——SQLite 不接受空集合
             continue
         rows = staging_db.query(
             f"SELECT raw_id FROM staging_accidents WHERE stage_id IN "

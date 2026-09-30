@@ -970,6 +970,23 @@ class TestApi:
             con.execute("INSERT INTO accidents (id) VALUES ('x')")
         con.close()
 
+    def test_工作库缺_promote_log_时审核端点不崩(self, dup_client):
+        """早期版本建的工作库没有 `promote_log`（实测：schema 停在 v1.0）。
+
+        审核队列与漏斗统计都要读它，缺表等价于「从没并入过任何东西」，应当
+        返回空集。这两条都在页面主路径上，不该为一张空表把整页打成 500 ——
+        2026-10-01 实测确实崩过：`/api/review/queue` 与 `/api/review/stats`
+        双双 `OperationalError: no such table: promote_log`。
+        """
+        con = sqlite3.connect(sdb.resolve_staging_path())
+        con.execute("DROP TABLE IF EXISTS promote_log")
+        con.commit()
+        con.close()
+
+        for path in ("/api/review/queue", "/api/review/stats",
+                     "/api/review/history"):
+            assert dup_client.get(path).status_code == 200, path
+
 
 # ══════════════════════════════════════════════════════════════
 # 致因分析页（蓝图 05 §4.2）

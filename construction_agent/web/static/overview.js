@@ -380,8 +380,39 @@
     $('f_sort').value = state.sort;
   }
 
+  /* 丢掉 filters 里没有的筛选值。
+
+     场景是分享链接过期：数据更新后省份改名，链接里的旧值就不认了。后端对
+     未识别的省份键是**静默忽略**的（`province.filter_clause` 的 docstring 写着
+     理由：过期的键不该让页面崩），列表会照常返回全部 2,623 条。于是页面停在
+     自相矛盾的状态——URL 说筛了某个省，列表却是全部，而且没有任何提示。
+
+     这里把 state 收敛到「筛选器真有的值」，然后重写 hash、重载列表，让它自洽。
+     判据与后端一致（都以 /api/filters 为准）：后端 meta 回显的也是生效键，
+     两边说的是同一件事。 */
+  function pruneUnknown(opts) {
+    if (!MULTI_KEYS.some((k) => opts[k])) return;   // 响应结构不对，别乱清
+    let changed = false;
+    MULTI_KEYS.forEach((key) => {
+      const allowed = new Set((opts[key] || []).map((v) => v.value));
+      const kept = state[key].filter((v) => allowed.has(v));
+      if (kept.length !== state[key].length) {
+        state[key] = kept;
+        changed = true;
+      }
+    });
+    if (changed) {
+      state.page = 1;
+      writeHash();
+      loadList();
+    }
+  }
+
   function loadFilters() {
-    return jsonGet('/api/filters').then(renderFilters).catch(() => {});
+    return jsonGet('/api/filters').then((opts) => {
+      pruneUnknown(opts);
+      renderFilters(opts);
+    }).catch(() => {});
   }
 
   // ══════════════════════════════════════════════════════════

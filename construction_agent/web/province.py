@@ -347,6 +347,36 @@ def filter_clause(
     return "(" + " OR ".join(parts) + ")", params
 
 
+def effective_keys(
+    keys: Sequence[str], db_path: str | Path | None = None
+) -> list[str]:
+    """这批筛选键里，哪些**真的**进了 WHERE。
+
+    与 `filter_clause` 是同一份判断的两半：那个把键翻成 SQL 并静默忽略未知键，
+    这个回答「最后到底筛了什么」，供响应把生效条件回显给前端。两边的规则必须
+    逐条一致，所以放在同一个文件里、共用 `raw_values`——分头实现迟早会漂。
+
+    规则：
+
+    - 空值桶 `__empty__` **总生效**——它筛的是 `province IS NULL OR TRIM = ''`，
+      与库里有几条无关（`raw_values` 对它返回空列表，不能拿它当判据）
+    - 其余键要有对应的原始值才算数：未知键、或本库没有记录的省，`raw_values` 为空
+
+    Why it matters：`?province=不存在的省` 在 SQL 侧被忽略，列表返回全部条数。
+    若 meta 照抄传入值，响应就在说「我按这个省筛了」——前端拿到的是假话，也无从
+    知道筛选没生效。2026-10-01 用 `/api/accidents?province=北京`（库里只有
+    「北京市」）实测到：total 2,623（未筛）而 meta 写着 `["北京"]`。
+    """
+    if not keys:
+        return []
+    idx = get_index(db_path)
+    out: list[str] = []
+    for key in keys:
+        if key == SENTINEL_EMPTY or idx.raw_values(key):
+            out.append(key)
+    return out
+
+
 def options(db_path: str | Path | None = None) -> list[dict[str, Any]]:
     """筛选器下拉框的数据源：内地省份 + 三个桶，均带计数。"""
     idx = get_index(db_path)

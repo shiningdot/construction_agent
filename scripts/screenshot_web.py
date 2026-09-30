@@ -24,10 +24,8 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sqlite3
 import sys
-import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))      # scripts/_common
 
 from _common import main_db_path, main_repo_root              # noqa: E402
+from _serve import point_at, serve                            # noqa: E402
 
 
 def pick_sample(main_db: str, staging_db: Path) -> tuple[str | None, str]:
@@ -105,15 +104,10 @@ def main() -> int:
     staging_db = (Path(args.staging_db) if args.staging_db
                   else main_repo / "data" / "caiems_staging.db")
 
-    # 三个路径都得显式指过去：app 的默认值跟着**被导入的包**走，worktree 下会
-    # 指向 worktree 自己的 data/（那里没有库也没有图片目录）。
-    os.environ["CAIEMS_DB"] = main_db
-    os.environ["CAIEMS_STAGING_DB"] = str(staging_db)
-    os.environ["CAIEMS_DATA_DIR"] = str(main_repo / "data")
+    point_at(main_db, staging_db)
 
     out = Path(args.out).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
-    base = f"http://127.0.0.1:{args.port}"
 
     accident_id, info = pick_sample(main_db, staging_db)
     print(f"最终库   : {main_db}")
@@ -121,12 +115,7 @@ def main() -> int:
     print(f"图片根   : {main_repo / 'data'}")
     print(f"样本事故 : {accident_id or '—'}  {info}\n")
 
-    from construction_agent.web.factory import create_app
-    from werkzeug.serving import make_server
-
-    app = create_app()
-    server = make_server("127.0.0.1", args.port, app, threaded=True)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    server, base = serve(args.port)
 
     pages = [
         ("/", "01_概览"),

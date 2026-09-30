@@ -270,6 +270,36 @@ class TestProvinceIndex:
         assert "TRIM(province) = ''" in sql
         assert params == ["四川省"]
 
+    def test_生效键剔除库外的省份(self, tiny_db):
+        """回显给前端的条件必须是**真进了 WHERE** 的那批。
+
+        `filter_clause` 对未知键静默忽略（列表照常返回全部），若 meta 照抄传入值，
+        响应就在说「我按这个省筛了」——2026-10-01 实测到这一幕。
+        """
+        assert province.effective_keys([]) == []
+        assert province.effective_keys(["不存在的省"]) == []
+        assert province.effective_keys(["四川省", "不存在的省"]) == ["四川省"]
+
+    def test_空值桶总生效(self, tiny_db):
+        """`__empty__` 筛的是 IS NULL OR TRIM=''，与库里有几条无关——
+        `raw_values` 对它返回空列表，不能拿它当判据。"""
+        assert province.effective_keys([province.SENTINEL_EMPTY, "不存在的省"]) == [
+            province.SENTINEL_EMPTY
+        ]
+
+    def test_生效键与过滤条件不漂(self, tiny_db):
+        """`effective_keys` 是与 `filter_clause` 配套的另一半，两边判断必须一致：
+        说了生效的键就得真产出 SQL 片段，没产出的就不该被回显。"""
+        for keys in (
+            [],
+            ["四川省"],
+            ["不存在的省"],
+            [province.SENTINEL_EMPTY],
+            ["四川省", "不存在的省", province.SENTINEL_EMPTY],
+        ):
+            sql, _ = province.filter_clause(keys)
+            assert bool(sql) == bool(province.effective_keys(keys)), keys
+
 
 # ══════════════════════════════════════════════════════════════
 # 概览

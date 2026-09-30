@@ -239,10 +239,19 @@ class ListParams:
         )
 
     def normalized(self, db_path: str | Path | None = None) -> dict[str, Any]:
-        """回显给前端的实际生效条件（未知省份键已被剔除）。"""
+        """回显给前端的实际生效条件（未知省份键已被剔除）。
+
+        省份这一项要走 `province.effective_keys`：`build_where` 对未识别的省份键
+        是**静默忽略**的（见 `province.filter_clause`），列表会照常返回全部条数。
+        照抄传入值的话，meta 就成了假话——`?province=北京`（库里只有「北京市」）
+        会返回 2,623 条而 meta 写着 `["北京"]`。
+
+        其余多值字段不需要这一步：它们是直接进 `IN (...)` 的，未知值筛出 0 条，
+        条件确实生效了，回显原值是对的。
+        """
         return {
             "q": self.q,
-            "province": self.province,
+            "province": province.effective_keys(self.province, db_path),
             "severity": self.severity,
             "accident_type": self.accident_type,
             "project_type": self.project_type,

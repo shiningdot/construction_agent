@@ -1,5 +1,11 @@
 """详情页「内容图」的抽取——判据与实现，各源共用一份。
 
+两层判据，缺一不可：
+
+- **URL 层**（`is_page_image`）：「这张图属于这一页吗」——按目录/前缀/图名。
+- **DOM 层**（`is_attachment_icon`）：「这张图在页面上是什么角色」——附件行里
+  的图标也属于这一页，但它不是内容（第二十六轮，`sc_em` 逼出来的）。
+
 原先这段逻辑只写在 `sources/trs_cms_base.py` 里（第十八/十九轮）。`nmg_em`
 与 `gd_em` 不是 TRS 系、拿不到那个基类，但它们同样有图片型报告——`nmg_em`
 实测一个源就有 **121 张内容图**，是全项目最多的一块；`gd_em` 有 152 张，
@@ -16,9 +22,15 @@ from __future__ import annotations
 import re
 from urllib.parse import urljoin, urlsplit
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 IMG_EXT = re.compile(r"\.(png|jpe?g|gif|bmp|webp|tiff?)$", re.I)
+
+# 附件扩展名。用于 `is_attachment_icon`——**不是**用来决定下载什么，只是用来
+# 认出「附件行」这个结构。所以白名单宽一点没关系：认错一个只影响那张图是否
+# 被当图标，不会引发下载。
+ATTACH_EXT = re.compile(
+    r"\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|wps|et|ofd|csv|txt)$", re.I)
 
 
 def page_article_id(page_url: str) -> str:
@@ -134,6 +146,82 @@ def is_page_image(page_url: str, img_url: str) -> bool:
     return i.path.rsplit("/", 1)[-1].rsplit(".", 1)[0] == page_article_id(page_url)
 
 
+def is_attachment_icon(tag) -> bool:
+    """这张图是不是**「附件行里的图标」**——不是内容，是装饰。
+
+    形态（`sc_em` 实测，2026-10-01 第二十六轮）：
+
+        <p>附件：<img border="0" src="…/<hex>/images/pdf.gif">
+                <a href="…/<hex>/files/…报告.pdf" target="_blank">报告名称</a></p>
+
+    为什么「同目录 / 以页面路径为前缀」那条判据接不住它：这个站的附件图标
+    **就放在文章自己的资源目录里**——和它 24 张扫描页同一个 `images/` 目录。
+    对判据来说两者没有任何区别。而这张图标会被一路带下去：`image_urls` →
+    `raw_accident_assets` 一行 `asset_type='image'` → 阶段②的 OCR 队列。
+    **图片通路的目的就是「让阶段②知道哪些图要 OCR」，塞个图标进去就是塞噪音。**
+
+    ### 判据为什么用「紧邻」而不是「父容器内」
+
+    先试过「图片的直接父元素里有附件链接」——**它会误伤**。`nmg_em` 的详情页
+    把内容图直接放在 `<body>` 下（外面没有 `<p>` 包着），于是 `<body>` 成了它们的
+    直接父元素；那一页只要有一行附件链接，全页的图就都被判成图标了。父容器越
+    往上冒，越容易把「页面上有附件」错读成「这张图是附件图标」。
+
+    收紧成两条**结构上贴在一起**的形态，任一命中即算：
+
+        ① 图片的下一个**紧邻**节点是指向附件的 `<a>` —— 上面那个 `<p>` 就是这形态
+        ② 图片被指向附件的 `<a>` 包着              —— `<a href="…pdf"><img …></a>`
+
+    **只看下一个，不看上一个。** 左邻是附件链接、右邻是内容图的排布排除不掉，
+    而实测形态里图标总是在链接**之前**（先图标后文字）。这是这个模块一贯的方向：
+    宁可漏一张图标，不误伤一张内容图——漏一张图标只是多 OCR 一个 200 字节的
+    GIF，误伤一张内容图是**丢掉一整页报告**。
+
+    ### 「紧邻」不能用 `find_next_sibling()`
+
+    这一条是**被既有测试当场抓住的**，不是想出来的。最初的写法是
+    `tag.find_next_sibling()`——它只找 Tag、自动跳过文本节点，看起来正合适。
+    跑全量测试时 `gd_em` 的两条挂了：
+
+        <div class="article_con">
+          <img class="nfw-cms-img" src="/img/0/1/2/1.jpg">   ← 内容图
+          ……正文正文正文（几千字）……
+          <a href="/attachment/0/1/2/3.pdf">附件：评估报告</a>
+        </div>
+
+    `find_next_sibling()` **跨过整段正文**找到了文件末尾那个附件链接，于是这张
+    内容图被判成图标。教训是：在一个 `<div>` 里，「下一个标签是附件链接」和
+    「紧挨着附件链接」完全是两回事。
+
+    所以改成只看 `next_sibling`（下一个**任意**节点），且只允许中间隔**纯空白**
+    文本——正因为 `sc_em` 的原文是两个标签之间**一个字都没有**：
+
+        <img border="0" src="…/images/pdf.gif"><a href="…/files/…报告.pdf">
+
+    留纯空白的中断，是因为站点换个格式写成 `<img …> <a …>`（一个空格）就会漏，
+    而这是同一段排版，不该因为一个空格就换结论。
+
+    ### 边界
+
+    - 中间隔了 `<br>`、`<span>` 或**任何非空白文本**就认不出（结构上已不「紧邻」）
+    - 图标与附件链接分别包在各自的 `<span>` 里也认不出
+    - **实测只有 `sc_em` 命中**：8 个 TRS 源 × 3 个详情页里，判据放行的 14 张图
+      中，只有它那 1 张（`pdf.gif`，同页出现两次）符合；`sh_em` / `sx_em` 各有
+      附件链接却 0 张放行图，`gz_em` 9 张、`hain_em` 3 张放行图全部不命中。
+    """
+    nxt = tag.next_sibling
+    while isinstance(nxt, NavigableString) and not nxt.strip():
+        nxt = nxt.next_sibling
+    if nxt is not None and getattr(nxt, "name", None) == "a" and \
+            ATTACH_EXT.search(urlsplit(nxt.get("href") or "").path):
+        return True
+    par = tag.parent
+    if par is not None and par.name == "a" and \
+            ATTACH_EXT.search(urlsplit(par.get("href") or "").path):
+        return True
+    return False
+
+
 def extract_page_images(page_url: str, soup: BeautifulSoup,
                         max_n: int = 200) -> list[str]:
     """从详情页 DOM 里抽出内容图 URL（去重、保序、按 `max_n` 截断）。
@@ -164,11 +252,17 @@ def extract_page_images(page_url: str, soup: BeautifulSoup,
     的才要；一个标签最多产出一个 URL。
 
     `data:` 开头的内联 base64 跳过（不是 URL，登记了也没法取）。
+
+    **附件行里的图标跳过**（`is_attachment_icon`，第二十六轮）。判据是结构和
+    位置的，不看文件名——所以站点换成 `doc.gif` 或干脆换个名字也照样认得。
+    放在 `is_page_image` **之前**判：图标连判据都不该进，省得它去挤 `max_n`。
     """
     out: list[str] = []
     if max_n <= 0:
         return out
     for tag in soup.find_all(["img", "source"]):
+        if is_attachment_icon(tag):
+            continue
         for attr in ("src", "data-src"):
             src = (tag.get(attr) or "").strip()
             if not src or src.startswith("data:"):

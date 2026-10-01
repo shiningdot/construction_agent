@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 from bs4 import BeautifulSoup  # noqa: E402
 
 from construction_agent.collector.images import (  # noqa: E402
-    extract_page_images, is_page_image, page_article_id)
+    extract_page_images, is_attachment_icon, is_page_image, page_article_id)
 from construction_agent.collector.sources.nmg_em import (  # noqa: E402
     NMGEM_LIST_URL, NmgEMCollector)
 from construction_agent.collector.stores import RawAccidentStore  # noqa: E402
@@ -118,13 +118,151 @@ def test_图名带后缀时的已知漏判():
     assert not is_page_image(_GD_PAGE, "https://yjgl.gd.gov.cn/img/0/1/2/3554784_ORIGIN.jpg")
 
 
+def _soup(html: str) -> BeautifulSoup:
+    return BeautifulSoup(html, "html.parser")
+
+
+# ── A3 组：DOM 层判据「附件行里的图标」（第二十六轮，sc_em 逼出来的）──
+#
+# `sc_em` 的附件图标**就放在文章自己的资源目录里**——和它 24 张扫描页同一个
+# `images/` 目录。URL 层判据对两者一视同仁，接不住。实测原文（2026-10-01）：
+#
+#     <p>附件：<img border="0" src="999dab…/images/pdf.gif">
+#             <a href="999dab…/files/…报告.pdf" target="_blank">报告名称</a></p>
+#
+# 这张图标会一路带下去：`image_urls` → asset 表一行 → 阶段②的 OCR 队列。
+
+_SC_PAGE = ("https://yjt.sc.gov.cn/scyjt/dcbg/2022/4/8/"
+            "999dab979c9746c48c7f9a4d087cb906.shtml")
+_SC_ICON = ("https://yjt.sc.gov.cn/scyjt/dcbg/2022/4/8/"
+            "999dab979c9746c48c7f9a4d087cb906/images/pdf.gif")
+
+
+def test_附件行的图标不算内容图():
+    """**正例。** 图标本身完全满足 URL 层判据（以页面路径为前缀），
+    所以先钉住这一点——否则这条测试可能只是「URL 判据碰巧没放行」。"""
+    assert is_page_image(_SC_PAGE, _SC_ICON)
+    s = _soup('<p>附件：<img border="0" src="./999dab979c9746c48c7f9a4d087cb906/'
+              'images/pdf.gif"><a href="./999dab979c9746c48c7f9a4d087cb906/'
+              'files/报告.pdf" target="_blank">报告名称</a></p>')
+    assert extract_page_images(_SC_PAGE, s) == []
+
+
+def test_判据自检_拿掉那个兄弟链接图标就回来了():
+    """**这条测试比正例更要紧。**
+
+    正例单独看有歧义：图标没被抽出来，可能是新判据挡的，也可能是 URL 判据
+    本来就没放行。把兄弟 `<a>` 一拿掉，同一张图立刻回来——这才是
+    「是 `is_attachment_icon` 在起作用」的证明。"""
+    ico = './999dab979c9746c48c7f9a4d087cb906/images/pdf.gif'
+    assert extract_page_images(_SC_PAGE, _soup(f'<p>附件：<img src="{ico}"></p>')) \
+        == [_SC_ICON]
+
+
+def test_内容图与附件链接同页但不同段落不误伤():
+    """**反例，比正例更要紧。** 页面上有附件链接不代表内容图是图标——
+    两者得结构上挨着才算。"""
+    s = _soup('<p><img src="./999dab979c9746c48c7f9a4d087cb906/images/0001.jpg"></p>'
+              '<p><a href="./999dab979c9746c48c7f9a4d087cb906/files/a.pdf">'
+              '报告</a></p>')
+    assert extract_page_images(_SC_PAGE, s) == [_SC_ICON.replace("pdf.gif", "0001.jpg")]
+
+
+def test_被附件链接包着的图也算图标():
+    """第二种形态：`<a href="…pdf"><img …></a>`。"""
+    s = _soup('<a href="./files/a.pdf"><img src="./999dab979c9746c48c7f9a4d087cb906/'
+              'images/pdf.gif"></a>')
+    assert extract_page_images(_SC_PAGE, s) == []
+
+
+def test_紧挨着的是普通链接就不算图标():
+    """判据认的是**附件**链接，不是「图片旁边有个 `<a>`」。"""
+    s = _soup('<p><img src="./999dab979c9746c48c7f9a4d087cb906/images/0001.jpg">'
+              '<a href="./other.html">相关新闻</a></p>')
+    assert extract_page_images(_SC_PAGE, s) == [_SC_ICON.replace("pdf.gif", "0001.jpg")]
+
+
+def test_判据本身对图标与内容图分得开():
+    """直接调 `is_attachment_icon`——上面几条测的是 `extract_page_images`
+    的行为，这条把判据函数本身也钉一下。"""
+    icon = _soup('<p><img src="./a/pdf.gif"><a href="./b/a.pdf">报告</a></p>'
+                 ).find("img")
+    plain = _soup('<p><img src="./a/0001.jpg"></p>').find("img")
+    assert is_attachment_icon(icon) is True
+    assert is_attachment_icon(plain) is False
+
+
+def test_已知代价_内容图紧挨着附件链接会被一起跳过():
+    """**这条钉的是一个代价，不是一条特性。**
+
+    `sc_em` 的图标与附件链接就是紧挨着排的，判据只能靠「紧邻」来认它，
+    于是「内容图恰好也紧挨着附件链接」这种排布会被一并跳过。
+
+    没有更好的办法：图标与内容图在 URL 上**完全同类**（同在文章资源目录），
+    只能看结构；而任何比「紧邻」更松的口径都会误伤——试过「直接父元素内有
+    附件链接」，`nmg_em` 把内容图直接放在 `<body>` 下，于是全页的图都被
+    判成图标了。
+
+    方向仍是**宁可漏**：漏一张图标只是多 OCR 一个 200 字节的 GIF，
+    误伤一张内容图是丢掉一整页报告。实测 8 个 TRS 源 × 3 个详情页，
+    判据放行的 14 张图里只有 `sc_em` 那 1 张命中，真实样本里没有出现过
+    「内容图紧挨附件链接」。留着这条是为了将来真遇到时，改这里，别改方向。
+    """
+    s = _soup('<p><img src="./999dab979c9746c48c7f9a4d087cb906/images/0001.jpg">'
+              '<a href="./999dab979c9746c48c7f9a4d087cb906/files/a.pdf">报告</a></p>')
+    assert extract_page_images(_SC_PAGE, s) == []
+
+
+def test_图标不占上限额度():
+    """判据放在 `is_page_image` **之前**，图标连判据都不进——所以它不挤
+    `max_n`。挡 3 张图标时，`max_n=2` 仍该拿到 2 张内容图。"""
+    s = _soup("".join('<p><img src="./a/pdf.gif"><a href="./b/x.pdf">x</a></p>'
+                      for _ in range(3))
+              + '<img src="./999dab979c9746c48c7f9a4d087cb906/images/0001.jpg">'
+              + '<img src="./999dab979c9746c48c7f9a4d087cb906/images/0002.jpg">')
+    got = extract_page_images(_SC_PAGE, s, max_n=2)
+    assert got == [_SC_ICON.replace("pdf.gif", "0001.jpg"),
+                   _SC_ICON.replace("pdf.gif", "0002.jpg")]
+
+
+def test_图片与附件链接隔着大段正文时不算图标():
+    """**这条钉的是判据实现里踩过的坑，比上面所有正例都值钱。**
+
+    最初的实现用 `tag.find_next_sibling()`——它只找 Tag、自动跳过文本节点，
+    看起来正合适。跑全量测试时 `gd_em` 的两条挂了，才发现它会**跨过整段正文**
+    找到文末的附件链接：
+
+        <div class="article_con">
+          <img class="nfw-cms-img" src="…/1.jpg">   ← 内容图
+          ……正文正文正文（几千字）……
+          <a href="…/3.pdf">附件：评估报告</a>
+        </div>
+
+    于是整页的内容图被判成图标。改成只看 `next_sibling` 且只允许中间隔**纯空白**。
+    将来谁想把这里「简化」回 `find_next_sibling()`，这条会拦住。
+    """
+    body = "正文正文正文。" * 400
+    s = _soup('<div class="article_con">'
+              '<img class="nfw-cms-img" '
+              'src="./999dab979c9746c48c7f9a4d087cb906/images/0001.jpg">'
+              f'{body}'
+              '<a href="./999dab979c9746c48c7f9a4d087cb906/files/a.pdf">'
+              '附件：评估报告</a></div>')
+    assert extract_page_images(_SC_PAGE, s) == [
+        _SC_ICON.replace("pdf.gif", "0001.jpg")]
+
+
+def test_中间只有一个空格仍算紧邻():
+    """留纯空白的中断：站点把 `<img …><a …>` 写成 `<img …> <a …>` 只是排版
+    差异，不该因此换结论。"""
+    s = _soup('<p>附件：<img src="./999dab979c9746c48c7f9a4d087cb906/images/pdf.gif">'
+              ' <a href="./999dab979c9746c48c7f9a4d087cb906/files/a.pdf">报告</a></p>')
+    assert extract_page_images(_SC_PAGE, s) == []
+
+
 # --------------------------------------------------------------------------
 # B 组：从 DOM 里抽
 # --------------------------------------------------------------------------
-
-
-def _soup(html: str) -> BeautifulSoup:
-    return BeautifulSoup(html, "html.parser")
 
 
 def test_抽出同目录图并还原成绝对URL():

@@ -62,7 +62,7 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
-from construction_agent.collector.attachments import kind_of_suffix
+from construction_agent.collector.attachments import kind_of_suffix, sort_into
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
@@ -261,17 +261,22 @@ class HebeiEMCollector(BaseCollector):
             #
             # **类型只能在下载之后判**（URL 没有扩展名，见 `_process_pdf`）。
             # 认不出的不入产出——`_process_pdf` 已经记了警告，这里不重复。
-            # 与 `beijing_em` 同一处置，理由也一样：宁可漏登记一条，也不要把
-            # 一个 PNG 塞进 `pdf_urls` 让阶段② 拿 PyMuPDF 去解。
             pdf_urls: list[str] = []
             office_urls: list[str] = []
+            # 图片附件（2026-10-01 第三十三轮补）。实测全站 110 页里唯一一张
+            # `.png` 是「鼎睿石化"5·31"火灾事故调查报告」的**罐区总平面布置图**
+            # ——内容是图，不是装饰。改前它走「认不出」分支被丢掉，而
+            # `executor._ASSET_KEYS` 里 `("image_urls", "image")` 这一项
+            # 早就等着被填。
+            image_urls: list[str] = []
             attach_texts: list[str] = []
             for attach_url in attach_urls:
                 a_text, _local, kind = self._process_pdf(
                     attach_url, title, detail_date)
-                if not kind:
-                    continue
-                (pdf_urls if kind == "pdf" else office_urls).append(attach_url)
+                # 分拣不在这儿写三元表达式——加一种类型要改 n 处的教训见
+                # `attachments.sort_into`。
+                sort_into(kind, attach_url,
+                          pdf=pdf_urls, office=office_urls, image=image_urls)
                 if a_text:
                     attach_texts.append(a_text)
             if attach_texts:
@@ -304,6 +309,8 @@ class HebeiEMCollector(BaseCollector):
                 parts.append("PDF: " + " / ".join(pdf_urls))
             if office_urls:
                 parts.append("Office 文档: " + " / ".join(office_urls))
+            if image_urls:
+                parts.append("图片附件: " + " / ".join(image_urls))
             if detail_text:
                 preview = detail_text[:3000]
                 if len(detail_text) > 3000:
@@ -316,6 +323,7 @@ class HebeiEMCollector(BaseCollector):
                 "publish_date": detail_date, "status": status,
                 "pdf_urls": pdf_urls,
                 "office_urls": office_urls,
+                "image_urls": image_urls,
                 # 全项目约定（§2.5.13）：有附件 且 正文没提出来。
                 # 「有附件」取的是**页面上的链接**，不是「下载成功的附件」——
                 # 实测有 404 的死链（`downloadFile?id=` 返回 404 空响应），
@@ -451,12 +459,21 @@ class HebeiEMCollector(BaseCollector):
         后缀是 ASCII 没坏）。所以判据在**下载之后**，这不是绕远，是这里只有
         下载之后才有信号。
 
-        认不出的（实测有 `.png`，612×374 一张图）**照旧落盘、但不报类型**——
-        落盘是为了文件名诚实、便于人工去看它到底是什么；类型给空字符串，
-        由调用方决定不收。
+        认不出的**照旧落盘、但不报类型**——落盘是为了文件名诚实、便于人工去看
+        它到底是什么；类型给空字符串，由调用方决定不收。
+
+        **图片不试文本提取**（2026-10-01 第三十三轮）：改前那张 `.png` 走的是
+        「认不出」分支，本轮判据认了图片之后它会带着 `kind="image"` 一路走到
+        `extract_pdf_text`——而 `fitz` 打不开 PNG，白跑一次还得把异常吞掉。
+        图片的正文在阶段②的 OCR 里，不在采集层。
 
         函数名里的 `pdf` 是历史包袱：它从 2026-10-01 第三十轮起处理的是「附件」。
         """
+
+        def _text_of(path: Path, kind: str) -> str:
+            """PDF / Office 提出正文；图片返回空串（见上面那段）。"""
+            return "" if kind == "image" else extract_pdf_text(path)
+
         url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50]
         stem = f"{pub_date}_{safe_title}_{url_hash}"
@@ -465,8 +482,8 @@ class HebeiEMCollector(BaseCollector):
         # 用 `iterdir` 不用 `glob`——标题里可能有 `[`，那在 glob 里是字符集语法。
         for cached in self.data_dir.iterdir():
             if cached.name.startswith(stem + "."):
-                return (extract_pdf_text(cached), str(cached),
-                        kind_of_suffix(cached.suffix))
+                k = kind_of_suffix(cached.suffix)
+                return _text_of(cached, k), str(cached), k
 
         try:
             resp = self._session.get(url)
@@ -483,7 +500,7 @@ class HebeiEMCollector(BaseCollector):
             if not kind:
                 logger.warning(f"    附件类型认不出，不入产出: {url}（后缀 "
                                f"{suffix or '无'}）")
-            return extract_pdf_text(local_path), str(local_path), kind
+            return _text_of(local_path, kind), str(local_path), kind
         except Exception as e:
             logger.error(f"    附件异常: {e}")
         return "", "", ""

@@ -28,7 +28,7 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.attachments import attachment_kind
+from construction_agent.collector.attachments import attachment_kind, sort_into
 from construction_agent.collector.base import (BaseCollector, CollectResult,
                                                RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
@@ -51,6 +51,8 @@ def _placeholder(kind: str, title: str, unit: str, url: str) -> str:
         return f"[Office 报告] {title}\n发布单位: {unit}\n文档: {url}"
     if kind == "pdf":
         return f"[PDF 报告] {title}\n发布单位: {unit}\nPDF: {url}"
+    if kind == "image":
+        return f"[图片附件] {title}\n发布单位: {unit}\n图片: {url}"
     # 认不出、或压根没附件：只写标题与单位，不假装有附件
     return f"{title}\n发布单位: {unit}"
 
@@ -228,7 +230,11 @@ class BeijingEMCollector(BaseCollector):
             # beijing_em 记录的 raw_text 全是 106–206 字的占位，最长那条
             # （206 字）也只是把一长串承包单位名字塞进了标题。
             pdf_text = ""
-            if self._enable_pdf_classify and asset_url:
+            # 图片**不试文本提取**（2026-10-01 第三十三轮）：`fitz` 打不开
+            # PNG，白下载一次还得把异常吞掉。与 `hebei_em._process_pdf` 里
+            # 那个 `_text_of` 短路是同一处判断（`gd_em` 那边靠 `text_kinds`
+            # 过滤，见它 `collect()` 里那行）。
+            if self._enable_pdf_classify and asset_url and kind != "image":
                 # 下载附件（PDF 与 Word 都交给它，`fitz` 按内容嗅探）
                 pdf_text = self._download_and_extract(asset_url)
                 if pdf_text:
@@ -264,6 +270,19 @@ class BeijingEMCollector(BaseCollector):
                 pass
 
             # 构建记录
+            #
+            # 附件按类型分家（`executor._ASSET_KEYS` 按键名认类型）。**分拣走
+            # 共享函数**（2026-10-01 第三十三轮）：改前这里是
+            # `[asset_url] if kind == "pdf" else []` / `... == "office" ...`
+            # 两条三元表达式——判据加上 `"image"` 之后**两个键都会是空列表、
+            # 静默丢掉**，而且连 warning 都不会有（warning 挂在 `not kind`
+            # 上，而 `"image"` 是真值）。理由详见 `attachments.sort_into`。
+            pdf_urls: list[str] = []
+            office_urls: list[str] = []
+            image_urls: list[str] = []
+            sort_into(kind, asset_url, pdf=pdf_urls, office=office_urls,
+                      image=image_urls)
+
             item = {
                 "title": title,
                 # 正文已在 PDF 里提出 → 直接当正文用；提不出（扫描件、404、
@@ -275,11 +294,9 @@ class BeijingEMCollector(BaseCollector):
                 "source_name": "beijing_em",
                 "publish_date": "",
                 "status": item_status,
-                # 按判出来的类型分家：`executor._ASSET_KEYS` 按键名认类型，
-                # Word 放进 `pdf_urls` 就登记成 `asset_type='pdf'`。
-                # 认不出/为空时两个键都是空列表——不写空串进去。
-                "pdf_urls": [asset_url] if kind == "pdf" else [],
-                "office_urls": [asset_url] if kind == "office" else [],
+                "pdf_urls": pdf_urls,
+                "office_urls": office_urls,
+                "image_urls": image_urls,
                 # 「有附件 且 正文没提出来」——全项目约定（§2.5.13）。加
                 # `bool(kind)` 这一项：`xkrq` 数组比 `urls` 短时 `pdf_path`
                 # 为空，那是**压根没有附件**，标成「要去 OCR」是虚报。

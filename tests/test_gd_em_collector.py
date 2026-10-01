@@ -97,6 +97,10 @@ def _close(c: GdEMCollector) -> None:
     ("/attachment/0/1/2/3.PDF", "pdf"),
     ("/attachment/0/1/2/3.docx?download=1", "office"),
     (f"{GDEM_BASE}/attachment/0/1/2/3.pdf", "pdf"),
+    # 图片（2026-10-01 第三十三轮）。本源实测没出现过图片附件，但判据是
+    # 三个源共用的——`hebei_em` 那张被丢掉的就是 `.png`。
+    ("/attachment/0/1/2/3.png", "image"),
+    ("/attachment/0/1/2/3.jpg", "image"),
     # 认不出的不收
     ("/gk/zdlyxxgk/sgdcbg/index.html", ""),
     ("/gk/zdlyxxgk/sgdcbg/index_2.html", ""),
@@ -112,6 +116,76 @@ def test_附件后缀分拣(href, expected):
     # 当时一份都没有，Word 附件全被当 PDF 交给下游）。这条用例跟着改测共享模块
     # ——它钉的是判据本身，不是哪个源。
     assert attachment_kind(href) == expected
+
+
+# --------------------------------------------------------------------------
+# 图片附件（2026-10-01 第三十三轮）
+# --------------------------------------------------------------------------
+
+
+def test_图片附件进image_urls不进office(tmp_path):
+    """改前这里是 `(pdf_urls if kind == "pdf" else office_urls).append(...)`。
+
+    判据肯认 `"image"` 之后，同一行会把一张 PNG 塞进 `office_urls`——经
+    `executor._ASSET_KEYS` 登记成 `asset_type='office'`，阶段② 拿 `antiword`
+    去解图片。**这不是「漏」，是「错」**，与本源那个 `.doc` ⊆ `.docx` 的
+    老 bug 同族：键名说了谎。
+
+    顺带钉住：图片附件**不该被下载去提正文**——`collect()` 里那行已经用
+    `text_kinds` 把 image 滤掉了。
+    """
+    png = "/attachment/0/1/2/3.png"
+    calls: list[str] = []
+    c = _collector(tmp_path, _detail_page(png))
+    c._download_and_extract = lambda u: (calls.append(u), "")[1]
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["image_urls"] == [f"{GDEM_BASE}/attachment/0/1/2/3.png"]
+    assert item["pdf_urls"] == []
+    assert item["office_urls"] == []
+    # 有附件、正文没提出来 → 仍标 needs_ocr（§2.5.13 的口径）
+    assert item["needs_ocr"] is True
+    assert calls == [], f"图片不该被拿去提文本，实际下载了 {calls}"
+
+
+def test_只有图片附件时不走全页回退(tmp_path):
+    """**判据自检**：把 `if not sorted_kinds:` 改回
+    `if not pdf_urls and not office_urls:`（改前那一行），这条就红。
+
+    那个条件的形状是「每加一种类型都得回来改一次」，加图片时正好撞上：
+    `article_con` 里**只有一张 PNG 附件**，两个旧列表都是空的 → 判断成
+    「这个页面没有附件」→ 去全页扫带「附件」字样的链接。
+
+    下面把那个「全页扫到的链接」也摆出来（页脚一条 PDF，同样带「附件」
+    二字）。走回退，它就会被收进 `pdf_urls`；不走，`pdf_urls` 是空的。
+    """
+    png = "/attachment/0/1/2/3.png"
+    stray = f"{GDEM_BASE}/attachment/0/9/9/9.pdf"
+    html = f"""<html><body>
+<h1 class="article_t">{_TITLE}</h1>
+<div class="bor_bot"><div class="article_item fl">信息来源：广东省应急管理厅</div>
+<div class="article_item fl">时间：2022-08-01 10:00</div></div>
+<div class="article_con">点击链接查看报告详情：
+<a href="{png}">附件：平面布置图</a></div>
+<div class="footer"><a href="{stray}">附件：全文下载</a></div>
+</body></html>"""
+
+    c = _collector(tmp_path, html)
+    c._download_and_extract = lambda u: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["image_urls"] == [f"{GDEM_BASE}{png}"]
+    assert item["pdf_urls"] == [], \
+        "只有一个图片附件时误判成「没有附件」，把页脚那条 PDF 也扫了进来"
+    assert item["needs_ocr"] is True
 
 
 # --------------------------------------------------------------------------

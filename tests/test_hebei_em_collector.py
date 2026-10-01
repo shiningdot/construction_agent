@@ -128,8 +128,10 @@ def _run(c: HebeiEMCollector, n: int = 1) -> list[dict]:
     ("报告.doc", "office", ".doc"),
     ("报告.docx", "office", ".docx"),
     ("报告.PDF", "pdf", ".pdf"),
-    # 实测那一张：612×374、19,830 字节。**认不出**——不收，但后缀要留住
-    ("]GSZE$FOVYWCF59K6T9UD24.png", "", ".png"),
+    # 实测那一张：612×374、19,830 字节。第三十三轮起判成 image——下载下来
+    # 看过，它是「鼎睿石化"5·31"火灾事故调查报告」的罐区总平面布置图，
+    # 是内容不是装饰（改前它走「认不出」分支被丢掉）。
+    ("]GSZE$FOVYWCF59K6T9UD24.png", "image", ".png"),
     # 汉字坏掉的那一段是 GBK 被当 latin-1 读的结果，判据只用 ASCII 后缀
     ("¡°3?13¡±½Ï´óÈ¼Æø±¬È¼ÊÂ¹Êµ÷²é±¨¸æ.pdf", "pdf", ".pdf"),
     ("没有后缀", "", ""),
@@ -189,11 +191,19 @@ def test_通路A把office_urls登记成office(tmp_path):
     assert [a["asset_type"] for a in row["_assets"]] == ["office"]
 
 
-def test_PNG附件两个键都不收但留warning(tmp_path, caplog):
-    """实测那张 612×374 的 PNG。**宁可漏登记一条，也不要把图片当 PDF 交下去。**
+def test_PNG附件进image_urls(tmp_path):
+    """实测那张 612×374 的 PNG。**这条断言在第三十三轮被推翻过，理由如下。**
 
-    与 `beijing_em` 对 `.xlsx` 的处置同一档：认不出 → 不收 → 但记一条 warning，
-    站点哪天多出一种附件类型，得有人知道。
+    第三十轮写这条时它叫 `test_PNG附件两个键都不收但留warning`，断言的是
+    「不收」——当时的理由是「宁可漏登记一条，也不要把图片当 PDF 交下去」。
+    那个理由**对**（不能登记成 PDF），但结论**过头了**：它把「类型判不出来」
+    和「类型不是文档」当成了同一件事。第三十三轮把那张图下载下来看了，
+    它是「鼎睿石化"5·31"火灾事故调查报告」的**罐区总平面布置图**（标着锅炉房
+    明火源、1#~5# 储罐、消防道路与防火间距尺寸）——是内容，不是装饰。
+    `executor._ASSET_KEYS` 里 `("image_urls", "image")` 早就等着被填。
+
+    所以正确处置是**按图片登记**：进 `image_urls`（→ `asset_type='image'`），
+    既不进 `pdf_urls`（阶段② 会拿 PyMuPDF 去解），也不丢。
     """
     url = f"{HBEM_BASE}/portal/upload/downloadFile?id=png1"
     c = _collector(tmp_path, {
@@ -203,12 +213,13 @@ def test_PNG附件两个键都不收但留warning(tmp_path, caplog):
         "title": _TITLE, "date": "2025-07-10", "source": "河北省应急管理厅",
         "text": "页面正文", "attach_urls": [url]}
 
-    with caplog.at_level("WARNING"):
-        item = _run(c)[0]
+    item = _run(c)[0]
 
+    assert item["image_urls"] == [url]
     assert item["pdf_urls"] == []
     assert item["office_urls"] == []
-    assert "附件类型认不出" in caplog.text
+    # 摘要里也不许把图片写成「PDF:」（改前那条占位行就是错的）
+    assert "图片附件" in item["content"]
 
 
 def test_一页多附件全部收下(tmp_path):
@@ -297,3 +308,42 @@ def test_落盘后缀跟着真实类型(tmp_path):
     item = _run(c2)[0]
     assert len(downloads) == 1, "缓存没命中，又下载了一次"
     assert item["office_urls"] == [url]
+
+
+@pytest.mark.parametrize("filename,expect_called", [
+    ("报告.pdf", True),
+    ("事故调查报告.docx", True),
+    # 实测那张。第三十三轮判据肯认图片之后，它会带着 `kind="image"` 一路
+    # 走到 `extract_pdf_text`——`fitz` 打不开 PNG，白跑一次还要吞异常。
+    ("]GSZE$FOVYWCF59K6T9UD24.png", False),
+])
+def test_只对文档附件试文本提取(tmp_path, monkeypatch, filename,
+                                expect_called):
+    """**判据自检**：把 `_text_of` 那行短路摘掉，`.png` 这条就红。
+
+    注意断言的是「`extract_pdf_text` 有没有被调用」，不是「正文空不空」——
+    图片即便不短路，`extract_pdf_text` 也会因为打不开文件而返回空串（它内部
+    吞异常），只看正文的话这条测试对两种写法都是绿的。
+
+    图片仍然**照旧落盘**：文件名诚实（`.png`），人工还能去看它是什么。
+    """
+    calls: list[Path] = []
+    monkeypatch.setattr(
+        "construction_agent.collector.sources.hebei_em.extract_pdf_text",
+        lambda p: (calls.append(p), "【提出来的正文】")[1])
+
+    url = f"{HBEM_BASE}/portal/upload/downloadFile?id=a1"
+    c = _collector(tmp_path, {"downloadFile?id=a1": _attach(filename)},
+                   enable_classify=False)
+    c._crawl_detail = lambda _u: {
+        "title": _TITLE, "date": "2025-07-10", "source": "河北省应急管理厅",
+        "text": "页面正文", "attach_urls": [url]}
+
+    item = _run(c)[0]
+
+    assert bool(calls) is expect_called, \
+        f"{filename}：期望提取文本={expect_called}，实际调用了 {len(calls)} 次"
+    # 附件落盘这一条两条路一样——短路的是提取，不是下载
+    files = sorted(p.name for p in (tmp_path / "src").iterdir())
+    assert len(files) == 1, f"该只落一个文件，实际 {files}"
+    assert files[0].endswith(Path(filename).suffix)

@@ -260,6 +260,65 @@ def test_认不出的附件类型不入产出但留warning(tmp_path, caplog):
     assert "附件类型认不出" in caplog.text
 
 
+def test_图片附件进image_urls(tmp_path):
+    """**这一条是本轮第二个缺陷的直接证据。**
+
+    改前这里是对称的两条三元表达式：
+
+        "pdf_urls":    [asset_url] if kind == "pdf" else [],
+        "office_urls": [asset_url] if kind == "office" else [],
+
+    判据只认 pdf / office 时它们都对。第三十三轮判据肯认 `"image"` 之后，
+    同一段代码**两个键都会是空列表**——而且**一个字都不说**：本源的 warning
+    挂在 `if asset_url and not kind:` 上，`"image"` 是真值，那条分支进不去。
+
+    实测撞上它的机会有多大：这个源的附件是列表页 JS 数组 `xkrq[i]` 的值，
+    2026-10-01 抽样的 84 条里没有图片——**所以这不是「已经丢了图」，是
+    「再有一次站点改版就会静默丢图」**。`hebei_em` 那张被丢掉的罐区平面图
+    是同一个坑的既遂版本。
+
+    顺带钉住：图片附件**不该被下载去提正文**（`fitz` 打不开 PNG）。
+    """
+    url = f"{BJEM_BASE}/attach/0/W020240101.png"
+    calls: list[str] = []
+    c = _collector(tmp_path, list_page=_list_page("/attach/0/W020240101.png"))
+    c._download_and_extract = lambda u: (calls.append(u), "")[1]
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["image_urls"] == [url]
+    assert item["pdf_urls"] == []
+    assert item["office_urls"] == []
+    # 占位行按实际类型写，别再说「PDF 报告」
+    assert item["content"].startswith("[图片附件] ")
+    assert "图片: " in item["content"]
+    # 有附件、正文没提出来 → 仍标 needs_ocr（全项目约定，§2.5.13）
+    assert item["needs_ocr"] is True
+    assert calls == [], f"图片不该被拿去提文本，实际下载了 {calls}"
+
+
+def test_图片附件不触发认不出的warning(tmp_path, caplog):
+    """`"image"` 会从 `if asset_url and not kind:` 那条分支**穿过去**。
+
+    这是好事（它认得出），但也意味着：假如分拣那边漏收，本源连一句提示都
+    不会有。所以上一条断言必须落在 `image_urls` 的内容上——**warning 的有无
+    在这里不是安全信号**。
+    """
+    c = _collector(tmp_path, list_page=_list_page("/attach/0/a.png"))
+    try:
+        with caplog.at_level("WARNING"):
+            c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["image_urls"], "判据认了 image，分拣却没地方放——这条会红"
+    assert "附件类型认不出" not in caplog.text
+
+
 def test_没有附件时不假装有附件(tmp_path):
     """`xkrq` 数组比 `urls` 短时 `pdf_path` 为空——那是**压根没有附件**。
 

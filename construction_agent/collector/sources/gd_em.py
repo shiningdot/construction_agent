@@ -37,7 +37,7 @@ import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
-from construction_agent.collector.attachments import attachment_kind
+from construction_agent.collector.attachments import attachment_kind, sort_into
 from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
                                                CollectResult, RawAccidentText)
 from construction_agent.collector.images import extract_page_images
@@ -267,13 +267,18 @@ class GdEMCollector(BaseCollector):
             office_urls = detail.get("office_urls") or []
             image_urls = detail.get("image_urls") or []
             has_images = detail.get("has_images", False)
+            # 收下的附件类型，三种都在里面（第三十三轮）。
+            # **图片附件不去取正文**：`_extract_first_attachment` 走的是
+            # PyMuPDF，解不了 PNG，试也只是白跑一次再把异常吞掉。
+            attach_kinds = detail.get("attach_kinds") or []
+            text_kinds = [k for k in attach_kinds if k != "image"]
 
             # 正文短而页面挂了附件 → 真正文多半在附件里，去取一次。
             # 改之前这里到「标个 needs_ocr」就结束了：附件 URL 抽出来只写进
             # 摘要当提示，没有任何一步去下载它。实测那两条 Word 附件的正文
             # （`.docx` 一条 8,170 字）一直躺在 URL 后面没人取。
             attach_text = ""
-            if len(detail_text) < _BODY_MIN and (pdf_urls or office_urls):
+            if len(detail_text) < _BODY_MIN and text_kinds:
                 attach_text = self._extract_first_attachment(pdf_urls + office_urls)
                 if attach_text:
                     logger.info(f"    附件正文 {len(attach_text)} 字")
@@ -337,7 +342,7 @@ class GdEMCollector(BaseCollector):
                 # 判据看的是 `body_text`（含附件正文），所以提到了正文的条目
                 # 不再标 OCR——2026-10-01 之前这里看的是页面正文，`.docx`
                 # 附件提得到正文也照样标 True。
-                "needs_ocr": ((has_images or bool(pdf_urls) or bool(office_urls))
+                "needs_ocr": ((has_images or bool(attach_kinds))
                               and len(body_text) < _BODY_MIN),
                 "issuing_authority": source,
                 "classification": classification,
@@ -520,14 +525,32 @@ class GdEMCollector(BaseCollector):
         image_urls: list[str] = []
         pdf_urls: list[str] = []
         office_urls: list[str] = []
+        # 收下的附件**类型**（不是 URL），两处要用：下面那条回退分支判断
+        # 「有没有找到附件」，以及 `needs_ocr` 判断「附件里有没有图片」。
+        # 存类型不存 URL，是因为 `image_urls` 里混着内容图（`extract_page_
+        # images` 数的）与附件图，只看列表本身分不出是哪种。
+        sorted_kinds: list[str] = []
 
         def _sort_attachment(href: str) -> None:
-            """按后缀把附件收进对应的列表。认不出就不收。"""
+            """按后缀把附件收进对应的列表；认不出就不收。
+
+            **分拣走共享函数**（2026-10-01 第三十三轮）。改前这里是
+            `(pdf_urls if kind == "pdf" else office_urls).append(full)`——判据
+            加上 `"image"` 之后它会把一张 PNG 塞进 `office_urls`，阶段② 会拿
+            `antiword` 去解图片。理由与那三处的通病详见
+            `attachments.sort_into`。
+
+            收下的类型记进 `sorted_kinds`：回退分支原先用
+            `if not pdf_urls and not office_urls` 判断「没找到附件」，那个条件
+            在有图片附件时会把「只有图片」的页面误判成「没有附件」。
+            """
             kind = attachment_kind(href)
             if not kind:
                 return
             full = href if href.startswith("http") else urljoin(GDEM_BASE, href)
-            (pdf_urls if kind == "pdf" else office_urls).append(full)
+            if sort_into(kind, full, pdf=pdf_urls, office=office_urls,
+                         image=image_urls):
+                sorted_kinds.append(kind)
 
         if article_div:
             # 检测图片（只看这个 class，见 Returns 里的说明）
@@ -546,12 +569,16 @@ class GdEMCollector(BaseCollector):
             # 清理多余空行
             content_text = re.sub(r"\n{3,}", "\n\n", content_text)
 
-            # 提取附件链接（PDF 与 Word 分开收，判据见 `collector/attachments.py`）
+            # 提取附件链接（PDF / Word / 图片分开收，判据见
+            # `collector/attachments.py`）
             for a in article_div.find_all("a", href=True):
                 _sort_attachment(a["href"])
 
-        # 如果 article_con 没找到附件，在整个页面范围内搜索附件
-        if not pdf_urls and not office_urls:
+        # 如果 article_con 没找到附件，在整个页面范围内搜索附件。
+        # **判据是「收下了几个」，不是「哪两个列表非空」**：写成
+        # `not pdf_urls and not office_urls` 的话，每加一种类型都得回来改一次
+        # 这个条件（第三十三轮加图片时正是撞在这里）。
+        if not sorted_kinds:
             for a in soup.find_all("a", href=True):
                 if "附件" in a.get_text(strip=True):
                     _sort_attachment(a["href"])
@@ -565,6 +592,9 @@ class GdEMCollector(BaseCollector):
             "office_urls": office_urls,
             "image_urls": image_urls,
             "has_images": has_images,
+            # 收下的附件类型（2026-10-01 第三十三轮）。此前 `collect()` 判断
+            # 「有附件」用的是 `pdf_urls or office_urls`，加图片后那一对会漏。
+            "attach_kinds": sorted_kinds,
         }
 
     def _handle_pdf_direct(self, record: dict) -> Optional[dict]:

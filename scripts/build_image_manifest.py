@@ -28,11 +28,38 @@
 
 最终库的 `image_files` 保持原样，作为历史审计留痕。
 
+4. 顺带把 `data/images/` **顶层**的平铺文件（不属于任何事故子目录）纳入
+   清单，版本短名 `flat`
+
+平铺池（2026-10-01 补）
+-----------------------
+`data/images/` 顶层还躺着 3,701 个文件（273 MB），不在任何事故子目录里——
+初版管线「按件落盘」的产物，从未进过清单，网页上一张都不显示。文件名形态
+是 `<事故标识>_<序号>.<ext>`，标识分三类：
+
+- **8 位 hex**（旧库 `accident_id` 的形态）1,838 种。两道桥接回主库：
+  旧库 `accidents.title` 归一化后与主库标题唯一对上（**语义证据**），
+  或主库 12 位 id 的前 8 位与它相同（**结构证据**，实测 2,623 个 id
+  前 8 位零碰撞，两桥重叠部分结论零冲突）。两桥互补——标题桥救得了
+  「旧库与主库 id 不同源但标题相同」的，前缀桥救得了「标题被改写或
+  为空」的。
+- **中文事故名** 3 种。主库标题与它既不相等、也不构成子串（「齐齐哈尔
+  体育馆」对「齐齐哈尔市第三十四中学体育馆屋顶坍塌事故」），只能人工
+  判定，依据逐条写在 `FLAT_MANUAL_OWNER`。
+- **第三套 8 位 hex** 668 种。既不在旧库 `accidents` 表，也不在主库 id
+  前缀里，归属线索为零。
+
+归属不上的**留空不猜**。`7_22广州塔吊倒塌事故` 两组共 6 张属明确排除，
+理由写在 `FLAT_DENIED`（主库含「广州」的 28 条、含「塔吊」的 10 条里，
+没有一条是它描述的事故）。同一事故内按 `sha1` 去重——平铺池 3,701 个
+文件只有 1,323 个唯一 sha1，不去重会让详情页出现十张一样的图。
+
 用法
 ----
     python3 scripts/build_image_manifest.py --dry-run     # 只扫描与报告，不写库
-    python3 scripts/build_image_manifest.py               # 三版重建 + 写工作库
+    python3 scripts/build_image_manifest.py               # 三版 + 平铺池重建，写工作库
     python3 scripts/build_image_manifest.py --version-dir imageV3   # 只重建最终版
+    python3 scripts/build_image_manifest.py --no-flat-pool          # 不要平铺池
     python3 scripts/build_image_manifest.py --report r.json
     python3 scripts/build_image_manifest.py --data-dir /path/to/data \\
         --final-db /path/to/caiems_v2.db
@@ -55,6 +82,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from collections import Counter, defaultdict
@@ -88,6 +116,43 @@ SUSPECT_GENERIC_MIN = 3
 # 得到 `v2`/`v3`，但对 `images` 得到的是 `s`（"images" 去掉 "image"），
 # 一个既不在 `VERSION_BADGES` 里、也没人认识的短名。
 VERSION_DIRS: dict[str, str] = {"images": "v1", "imageV2": "v2", "imageV3": "v3"}
+
+# 平铺池的版本短名。`data/images/` 顶层还躺着 3,701 个**不在任何事故子目录
+# 里**的文件（273 MB）——它们是初版管线「按件落盘」的产物，从未进过清单，
+# 于是网页上一张都不显示（2026-10-01 查证，详见报告里的 flat_pool 段）。
+# 给它们一个独立短名，既不冒充 v1，也让前端能区分来源。
+FLAT_VERSION = "flat"
+
+# 平铺文件名的形态是 `<事故标识>_<序号>.<ext>`，标识本身才是归属线索。
+_FLAT_TAIL = re.compile(r"^(.*)_\d+$")
+# 旧库事故 id 是 8 位 hex；主库是 12 位。
+_HEX8 = re.compile(r"^[0-9a-f]{8}$")
+# 标题归一化：只去标点、空白与全半角引号，**不做同义替换**——换成"市"、
+# 补全"事故"这类动作会制造本不存在的匹配。
+_TITLE_NOISE = re.compile(r"[\s_·、,，。.（）()「」【】\-—\"'“”]")
+
+# 平铺池里只有 5 个标识不是 8 位 hex，其中 3 个只能人工判定：主库标题与它
+# 既不相等、也不构成子串（「齐齐哈尔体育馆」对「齐齐哈尔市第三十四中学
+# 体育馆屋顶坍塌事故」，中间隔着"市第三十四中学"）。**逐条写明依据**，
+# 不做批量模糊匹配——模糊匹配在这批数据上会静默错配。
+FLAT_MANUAL_OWNER: dict[str, str] = {
+    "齐齐哈尔体育馆": "ae16d12d2c7f",
+    "齐齐哈尔体育馆坍塌事故": "ae16d12d2c7f",
+    "湖南邵东一水库隧洞施工事故_致3死": "56086afa9706",
+}
+
+# 不归属的标识与原因，写进报告备查。
+FLAT_DENIED: dict[str, str] = {
+    "7_22广州塔吊倒塌事故":
+        "主库无对应：2,623 条里含「广州」的 28 条、含「塔吊」的 10 条，"
+        "没有一条是 7·22 广州塔吊倒塌事故",
+    "广州7_22塔吊倒塌事故":
+        "同上，与上一组是同一事故的两种命名",
+}
+
+# 默认旧库。它是 8 位 accident_id 能接回主库的唯一桥梁：平铺文件的 hex 前缀
+# 是旧库 id，旧库 accidents.title 归一化后与主库 title 对得上，才谈得上归属。
+DEFAULT_LEGACY_DB = "db_backups/caiems.db.bak.20260803"
 
 
 # --------------------------------------------------------------------------
@@ -159,6 +224,193 @@ def scan_version_dir(images_dir: Path, data_dir: Path) -> dict:
 
     return {"records": records, "empty_dirs": empty_dirs, "weird": weird,
             "bad_magic": bad_magic}
+
+
+# --------------------------------------------------------------------------
+# 平铺池（data/images/ 顶层，不属于任何事故目录）
+# --------------------------------------------------------------------------
+
+
+def flat_ident(stem: str) -> str:
+    """`<标识>_<序号>` → 标识。没有序号后缀时原样返回。
+
+    「湖南邵东一水库隧洞施工事故_致3死」的 `_致3死` 不会被剥掉——正则要求
+    下划线之后**全是数字**，`致3死` 不满足。
+    """
+    m = _FLAT_TAIL.match(stem)
+    return m.group(1) if m else stem
+
+
+def norm_title(t: str | None) -> str:
+    return _TITLE_NOISE.sub("", t or "")
+
+
+def build_owner_map(final_db: Path, legacy_db: Path | None,
+                    idents: set[str]) -> tuple[dict, dict]:
+    """平铺标识 → 主库 `accident_id`，外加一份诊断。
+
+    三条来源，优先级从高到低：手工表 → 旧库 title 桥（8 位 hex）→ 主库
+    title 直接匹配（中文式标识）。
+
+    **唯一命中才收**。主库有 4 组归一化后重名的 title（杭州地铁塌陷、
+    黔西南义龙一中、云南澄江宽澄鼎元、甘肃甘州 7·2 升降机，各 ×2～×3），
+    它们对应的是不同事故——把图随便挂给其中一条就是伪造归属，宁可留空。
+    """
+    main = sqlite3.connect(f"file:{final_db.as_posix()}?mode=ro", uri=True)
+    try:
+        titles = [(r[0], r[1]) for r in main.execute(
+            "SELECT id, title FROM accidents")]
+    finally:
+        main.close()
+
+    by_norm: dict[str, list[str]] = defaultdict(list)
+    by_prefix: dict[str, list[str]] = defaultdict(list)
+    for aid, t in titles:
+        by_norm[norm_title(t)].append(aid)
+        by_prefix[aid[:8]].append(aid)
+    known_ids = {aid for aid, _ in titles}
+
+    # 手工表先做存在性校验：指向一个不存在的事故 id 是脚本 bug，不是数据
+    # 问题，不能悄悄咽下去——它会让「这几张图有归属」变成一句空话。
+    # 只校验**本次真的要判定**的标识：手工表是项目级常量，而调用方可能只是
+    # 拿一个小库试跑，库里没有那些事故并不代表映射写错了。
+    bad = {i: a for i, a in FLAT_MANUAL_OWNER.items()
+           if i in idents and a not in known_ids}
+    if bad:
+        raise SystemExit(f"手工映射指向不存在的事故 id：{bad}")
+
+    old_title: dict[str, str] = {}
+    legacy_ok = legacy_db is not None and legacy_db.exists()
+    if legacy_ok:
+        con = sqlite3.connect(f"file:{legacy_db.as_posix()}?mode=ro", uri=True)
+        try:
+            old_title = {r[0]: r[1] for r in con.execute(
+                "SELECT id, title FROM accidents")}
+        finally:
+            con.close()
+
+    # 平铺池里出现过的标识，交给本函数逐条判定
+    owner: dict[str, str] = {}
+    diag: dict[str, object] = {
+        "legacy_db": str(legacy_db) if legacy_ok else None,
+        "legacy_db_readable": legacy_ok,
+        "manual": {}, "bridged": {}, "by_prefix": {}, "by_title": {},
+        "ambiguous": {}, "prefix_ambiguous": {}, "no_main_match": [],
+        "unresolved_hex": [], "no_legacy_title": [],
+    }
+
+    for ident in sorted(idents):
+        if ident in FLAT_DENIED:
+            continue
+        if ident in FLAT_MANUAL_OWNER:
+            owner[ident] = FLAT_MANUAL_OWNER[ident]
+            diag["manual"][ident] = FLAT_MANUAL_OWNER[ident]
+            continue
+
+        if _HEX8.match(ident):
+            t = old_title.get(ident) if legacy_ok else None
+
+            # ① 语义证据：旧库 title → 主库 title 归一化后唯一命中。
+            #    这条最强，优先用。
+            if t and norm_title(t):
+                cands = by_norm.get(norm_title(t), [])
+                if len(cands) == 1:
+                    owner[ident] = cands[0]
+                    diag["bridged"][ident] = cands[0]
+                    continue
+                if len(cands) > 1:
+                    diag["ambiguous"][ident] = cands
+                    continue
+
+            # ② 结构证据：主库 12 位 id 的前 8 位就是旧库那个 8 位 id。
+            #    实测主库 2,623 个 id 前 8 位**零碰撞**，所以前缀唯一命中
+            #    不会挂错；与 ① 有 51 种重叠且**结论零冲突**，互为旁证。
+            #    它救回的正是 ① 够不着的那批——旧库重建时标题被改写
+            #    （「武汉在建长江大桥引桥发生坍塌事故」→「武汉天兴洲大桥
+            #    引桥钢梁断裂坍塌事故」）或干脆为空的记录。
+            pfx = by_prefix.get(ident, [])
+            if len(pfx) == 1:
+                owner[ident] = pfx[0]
+                diag["by_prefix"][ident] = pfx[0]
+                continue
+            if len(pfx) > 1:
+                diag["prefix_ambiguous"][ident] = pfx
+                continue
+
+            # ③ 两桥都不通：记下原因，不归属。
+            if t is None:
+                # 第三套 id 体系（711 种 / 1,422 张）——旧库 accidents 表里
+                # 根本没有它，主库前缀里也没有
+                diag["unresolved_hex"].append(ident)
+            elif not norm_title(t):
+                diag["no_legacy_title"].append(ident)
+            else:
+                diag["no_main_match"].append(ident)
+        else:
+            cands = by_norm.get(norm_title(ident), [])
+            if len(cands) == 1:
+                owner[ident] = cands[0]
+                diag["by_title"][ident] = cands[0]
+            elif len(cands) > 1:
+                diag["ambiguous"][ident] = cands
+            else:
+                diag["no_main_match"].append(ident)
+
+    return owner, diag
+
+
+def scan_flat_pool(images_dir: Path, data_dir: Path,
+                   owner_map: dict) -> dict:
+    """扫 `data/images/` 顶层的平铺文件，返回结构与 `scan_version_dir` 同构。
+
+    与版本目录扫描的两点不同：
+
+    1. `accident_id` **不是目录名**，而是文件名前缀经 `owner_map` 归属到的
+       主库 id。归属不上的文件直接丢弃——留空比挂错强。
+    2. 同一事故内按 `sha1` 去重。平铺池实测 3,701 个文件只有 1,323 个唯一
+       sha1，重复率极高（初版管线一张图按多个来源页各存一份），不去重的
+       话详情页会出现十张一模一样的图。
+
+    跨事故的重复**保留**——那是 `cross_accident_duplicates` 要统计的，前端
+    会打 `shared` 标记。
+    """
+    records: list[dict] = []
+    weird: list[str] = []
+    bad_magic: list[str] = []
+    denied_hits: Counter = Counter()
+
+    seen: dict[tuple[str, str], dict] = {}
+    for p in sorted(q for q in images_dir.iterdir() if q.is_file()):
+        ident = flat_ident(p.stem)
+        if ident in FLAT_DENIED:
+            denied_hits[ident] += 1
+            continue
+        aid = owner_map.get(ident)
+        if aid is None:
+            continue
+        if p.suffix.lower() not in IMAGE_EXTS:
+            weird.append(p.relative_to(data_dir).as_posix())
+            continue
+        sha1, head = probe(p)
+        if not head.startswith(MAGIC_PREFIXES):
+            bad_magic.append(p.relative_to(data_dir).as_posix())
+            continue
+        key = (aid, sha1)
+        if key in seen:
+            continue
+        rec = {
+            "accident_id": aid,
+            "rel_path": p.relative_to(data_dir).as_posix(),
+            "filename": p.name,
+            "ext": p.suffix.lower().lstrip("."),
+            "bytes": p.stat().st_size,
+            "sha1": sha1,
+        }
+        seen[key] = rec
+        records.append(rec)
+
+    return {"records": records, "empty_dirs": [], "weird": weird,
+            "bad_magic": bad_magic, "denied_hits": dict(denied_hits)}
 
 
 # --------------------------------------------------------------------------
@@ -287,6 +539,12 @@ def main() -> int:
                          f"传 --version-dir imageV3")
     ap.add_argument("--final-db", default=None,
                     help="最终库路径（只读，用于回填与归属校验）")
+    ap.add_argument("--legacy-db", default=None,
+                    help="旧库路径（只读）。平铺文件的 8 位 hex 前缀要靠它"
+                         "的 accidents.title 才接得回主库。默认 "
+                         f"<data-dir>/{DEFAULT_LEGACY_DB}")
+    ap.add_argument("--no-flat-pool", action="store_true",
+                    help="跳过 data/images/ 顶层的平铺文件（默认纳入）")
     ap.add_argument("--staging-db", default=None, help="工作库路径")
     ap.add_argument("--report", default=None, help="报告 JSON 的输出路径")
     ap.add_argument("--dry-run", action="store_true",
@@ -345,6 +603,48 @@ def main() -> int:
     if not scans:
         print("三版图片目录都不存在，无从扫描。", file=sys.stderr)
         return 2
+
+    # 平铺池：与版本目录各自独立，但在清单里同样是「一批记录 + 一个短名」，
+    # 所以塞进同一个 scans 字典，清空与写库都走同一套逻辑。
+    flat_scan: dict | None = None
+    if not args.no_flat_pool:
+        flat_dir = data_dir / "images"
+        if flat_dir.is_dir():
+            idents = {flat_ident(q.stem) for q in flat_dir.iterdir() if q.is_file()}
+            legacy_db = (Path(args.legacy_db).expanduser().resolve()
+                         if args.legacy_db else data_dir / DEFAULT_LEGACY_DB)
+            owner_map, owner_diag = build_owner_map(final_db, legacy_db, idents)
+            flat_scan = scan_flat_pool(flat_dir, data_dir, owner_map)
+            flat_scan["ident_total"] = len(idents)
+            flat_scan["owner_total"] = len(owner_map)
+            flat_scan["owner_diag"] = owner_diag
+            scans[FLAT_VERSION] = flat_scan
+            records += flat_scan["records"]
+            weird += flat_scan["weird"]
+            bad_magic += flat_scan["bad_magic"]
+            by_version[FLAT_VERSION] = len(flat_scan["records"])
+
+            print("\n── 平铺池（data/images/ 顶层，不属于任何事故目录）─────")
+            print(f"  平铺文件 : {sum(1 for q in flat_dir.iterdir() if q.is_file())} 个"
+                  f" / {len(idents)} 种标识")
+            print(f"  可归属   : {len(owner_map)} 种标识"
+                  f" → 收录 {len(flat_scan['records'])} 张"
+                  f"（同事故同内容已去重）")
+            d = owner_diag
+            print(f"  归属明细 : 手工表 {len(d['manual'])}"
+                  f" · 旧库标题桥 {len(d['bridged'])}"
+                  f" · id 前缀桥 {len(d['by_prefix'])}"
+                  f" · 主库标题直配 {len(d['by_title'])}")
+            print(f"  未归属   : 旧库无此 id {len(d['unresolved_hex'])} 种"
+                  f" · 旧库标题为空 {len(d['no_legacy_title'])} 种"
+                  f" · 两桥都不通 {len(d['no_main_match'])} 种")
+            if d["ambiguous"] or d["prefix_ambiguous"]:
+                print(f"  ⚠ 歧义（已跳过）: 标题 {len(d['ambiguous'])} 种"
+                      f" · 前缀 {len(d['prefix_ambiguous'])} 种")
+            if flat_scan["denied_hits"]:
+                for k, v in flat_scan["denied_hits"].items():
+                    print(f"  明确排除 : {k} {v} 张 —— {FLAT_DENIED[k]}")
+
     if not records:
         # 「目录在、里面一张图都没有」和「目录不存在」是同一件事的两副面孔，
         # 原先只有后者退非 0，前者会安静地走完全程、把一份空清单写进工作库。
@@ -435,6 +735,17 @@ def main() -> int:
         "by_ext": dict(Counter(r["ext"] for r in records)),
         "total_bytes": sum(r["bytes"] for r in records),
         "backfill": fill,
+        "flat_pool": ({
+            "version": FLAT_VERSION,
+            "idents": flat_scan["ident_total"],
+            "owned_idents": flat_scan["owner_total"],
+            "records": len(flat_scan["records"]),
+            "covered_accidents": len({r["accident_id"]
+                                      for r in flat_scan["records"]}),
+            "denied": FLAT_DENIED,
+            "denied_hits": flat_scan["denied_hits"],
+            "owner_diag": flat_scan["owner_diag"],
+        } if flat_scan else None),
         "unknown_accident_dirs": unknown_dirs,
         "skipped_non_image": weird,
         "non_image_content": bad_magic,

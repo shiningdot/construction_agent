@@ -165,10 +165,20 @@ class RawAccidentStore:
         return rid
 
     def add_batch(self, items: list[dict]) -> int:
-        """批量添加，返回新增数量。
+        """批量添加，返回新增数量；**成功即落盘**。
 
         每项标准字段: title, content, source_url, source_name, publish_date, status
         额外字段（如 pdf_urls, needs_ocr）会自动保留。
+
+        **落盘只经这里。** 采集器写完最后一批后**不要自己调 `_save()`**：
+        `_save()` 只把内存里的 `_data` 写盘，而记录是 `add_batch` → `add()`
+        才 append 进去的（挂了 sink 时 `add()` 还要把记录交给 sink）。
+        单独调 `_save()` **一条都写不进去**，却会让人以为「末尾已经落盘了」
+        ——`trs_cms_base.py` 就这么错过一次：周期批写是
+        `if len(results) % 5 == 0`，末尾的「最后一批写入」却只写了
+        `self.raw_store._save()`。实测（§2.5.32）产出 3 条时 store 与 sink
+        **都收到 0 条**，产出 7 条时只到 5 条。**余数那一批也必须走
+        `add_batch`。**
         """
         # 标准字段名
         standard_fields = {

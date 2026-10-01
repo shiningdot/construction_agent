@@ -502,10 +502,28 @@ class TrsCmsCollector(BaseCollector):
             if len(results) % 5 == 0:
                 self.raw_store.add_batch(
                     [self._to_store_item(r) for r in results[-5:]])
-                self.raw_store._save()
 
-        # 最后一批写入
-        self.raw_store._save()
+        # 最后一批写入。**必须是 `add_batch`，不能只 `_save()`**——
+        # 这行原先是孤零零一句 `self.raw_store._save()`，于是不足 5 的余数
+        # **从未进过 `_data`**（只有 `add_batch` → `add()` 才会 append 并
+        # 落盘）。更要命的是在线采集：`sink` 也是在 `add()` 里被调的，所以
+        # 那些条目**根本交不出去**——executor 收不到，库里就没有。
+        #
+        # 实测（2026-10-01，同一份 HTML，`collect()` 返回值当真值）：
+        #
+        #     产出 3 条 → store 0 条 / sink 0 条     （全丢）
+        #     产出 5 条 → store 5 条 / sink 5 条     （5 的倍数才全到）
+        #     产出 6 条 → store 5 条 / sink 5 条     （丢 1）
+        #     产出 7 条 → store 5 条 / sink 5 条     （丢 2）
+        #
+        # 其余 9 个 store-backed 源用的是另一套写法（`batch_items` 累积 +
+        # 末尾 `if batch_items: add_batch(...)`），**没有这个缺陷**。同族的
+        # 「同一件事各源各写一遍、只有一处写错」还有 `pdf_text.py` 被抄三份
+        # 与 `attachments.py` 判据不统一——本源此处是这一族的又一例。
+        remainder = len(results) % 5
+        if remainder:
+            self.raw_store.add_batch(
+                [self._to_store_item(r) for r in results[-remainder:]])
 
         elapsed = time.time() - t_start
         logger.info(

@@ -256,7 +256,6 @@ class NmgEMCollector(BaseCollector):
 
         if batch_items:
             self.raw_store.add_batch(batch_items)
-        self.raw_store._save()
 
         logger.info(f"完成: {self._collected}条入库, {self._review_count}条待审, {self._filtered_out}条过滤")
         return self._make_stats(time.time() - t_start)

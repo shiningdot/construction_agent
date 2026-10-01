@@ -303,7 +303,6 @@ class BeijingEMCollector(BaseCollector):
             self.raw_store.add_batch(batch_items)
             logger.info(f"原始缓存: 新增 {len(batch_items)} 条建筑事故候选")
 
-        self.raw_store._save()
         return self._make_stats(time.time() - t_start)
 
     def _fetch(self, url: str) -> Optional[str]:

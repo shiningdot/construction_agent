@@ -279,7 +279,6 @@ class MemCollector(BaseCollector):
         # 保存剩余
         if batch_items:
             self.raw_store.add_batch(batch_items)
-        self.raw_store._save()
 
         return self._make_stats(time.time() - t_start)
 

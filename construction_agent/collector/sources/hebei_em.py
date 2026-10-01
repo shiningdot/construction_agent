@@ -341,7 +341,6 @@ class HebeiEMCollector(BaseCollector):
 
         if batch_items:
             self.raw_store.add_batch(batch_items)
-        self.raw_store._save()
 
         logger.info(f"完成: {self._collected}入库, {self._review_count}待审, {self._filtered_out}过滤")
         return self._make_stats(time.time() - t_start)

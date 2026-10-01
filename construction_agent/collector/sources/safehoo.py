@@ -306,7 +306,6 @@ class SafehooCollector(BaseCollector):
         # 保存剩余
         if batch_items:
             self.raw_store.add_batch(batch_items)
-        self.raw_store._save()
 
         elapsed = time.time() - t_start
         logger.info(

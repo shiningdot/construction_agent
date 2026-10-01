@@ -303,7 +303,6 @@ class HenanEMCollector(BaseCollector):
 
         if batch_items:
             self.raw_store.add_batch(batch_items)
-        self.raw_store._save()
 
         logger.info(
             f"采集完成: {self._collected} 条入库, "

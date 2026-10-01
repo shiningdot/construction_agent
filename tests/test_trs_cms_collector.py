@@ -46,12 +46,18 @@ _LIST_URL = "https://tsrc.gov.cn/list/"
 _LIST_DIR = "https://tsrc.gov.cn/list/202607/"
 
 # (标题, URL 里的日期段, URL 里的序号段) —— 标题含「事故」以过一级筛选
+#
+# **七条，默认只用前五条。** 第七、八两组是第三十二轮加的：本轮那个缺陷
+# （末批只 `_save()` 不 `add_batch()`）**只在产出条数不是 5 的倍数时现形**，
+# 而此前全部 21 条测试都用 5 条——恰好落在那条分支的正中间，一条都测不到。
 _LINKS = [
     ("甲地隧道坍塌事故调查报告", "20260713", "90611300"),
     ("乙地脚手架坠落事故调查报告", "20260714", "90611400"),
     ("丙地物体打击事故调查报告", "20260715", "90611500"),
     ("丁地机械伤害事故调查报告", "20260716", "90611600"),
     ("戊地触电事故调查报告", "20260717", "90611700"),
+    ("己地高处坠落事故调查报告", "20260718", "90611800"),
+    ("庚地基坑坍塌事故调查报告", "20260719", "90611900"),
 ]
 
 _PDF_HREF = "./P020260713387609310237.pdf"
@@ -65,10 +71,10 @@ def _detail_url(date: str, seq: str) -> str:
     return f"{_LIST_DIR}t{date}_{seq}.html"
 
 
-def _list_html() -> str:
+def _list_html(n: int = 5) -> str:
     items = "".join(
         f'<li><a href="./202607/t{d}_{s}.html">{t}</a></li>'
-        for t, d, s in _LINKS)
+        for t, d, s in _LINKS[:n])
     return f"<html><body><ul>{items}</ul></body></html>"
 
 
@@ -85,17 +91,20 @@ def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。
             f"{footer}</body></html>")
 
 
-def _collector(tmp_path: Path, *, with_pdf: bool = True,
+def _collector(tmp_path: Path, *, n: int = 5, with_pdf: bool = True,
                body: str = "页面正文。" * 60,
                pdf_hrefs: list[str] | None = None,
                pdf_max: int = 5,
                img_hrefs: list[str] | None = None,
                image_max: int = 50,
                footer: str = "") -> TrsCmsCollector:
-    """五条条目的不联网采集器。
+    """`n` 条条目的不联网采集器，默认五条。
 
-    五条是刻意的：`collect()` 在 `len(results) % 5 == 0` 时才批量写库，
-    不足五条根本不走那条分支——串批的缺陷只有攒够一批才现形。
+    **默认五条是历史的**：`collect()` 在 `len(results) % 5 == 0` 时才批量
+    写库，串批那个缺陷（§2.5.26）只有攒够一批才现形。但五条**恰好避开**了
+    另一条分支——末批余数。第三十二轮那个缺陷（产出不是 5 的倍数时余数
+    彻底丢失）正是被「全部测试都用五条」掩盖到今天的，所以要用 `n=` 显式
+    指定别的条数。
     """
     cfg = TrsSiteConfig(
         source_name="tsrc",
@@ -120,8 +129,8 @@ def _collector(tmp_path: Path, *, with_pdf: bool = True,
                                                pdf_hrefs=pdf_hrefs,
                                                img_hrefs=img_hrefs,
                                                footer=footer)
-               for i, (t, d, s) in enumerate(_LINKS)}
-    c._fetch = lambda url: _list_html() if url == _LIST_URL else details.get(url, "")
+               for i, (t, d, s) in enumerate(_LINKS[:n])}
+    c._fetch = lambda url: _list_html(n) if url == _LIST_URL else details.get(url, "")
     return c
 
 
@@ -270,7 +279,7 @@ def test_每条的日期各归各的不串批(tmp_path):
         c.collect()
         items = c.raw_store.get_all()
         got = [it["publish_date"] for it in items]
-        want = [f"{d[:4]}-{d[4:6]}-{d[6:]}" for _, d, _ in _LINKS]
+        want = [f"{d[:4]}-{d[4:6]}-{d[6:]}" for _, d, _ in _LINKS[:5]]
         assert got == want, f"日期串批: {got} != {want}"
         # 五条各不相同 —— 「全部等于第 5 条」的写法在这里必挂
         assert len(set(got)) == 5
@@ -851,5 +860,101 @@ def test_附件已提出正文时图片支仍独立成立(tmp_path):
         assert item["pdf_urls"] == [_PDF_URL]
         assert item["image_urls"] == [_IMG_URL]
         assert item["needs_ocr"] is True
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# I 组：末批余数（2026-10-01 第三十二轮，缺陷 H）
+# --------------------------------------------------------------------------
+#
+# 改前 `collect()` 的末尾是孤零零一句 `self.raw_store._save()`。周期批写是
+# `if len(results) % 5 == 0`，所以**产出条数不是 5 的倍数时，余数那一批从来
+# 没进过 `_data`**——`_save()` 只把内存里的 `_data` 写盘，而记录是
+# `add_batch` → `add()` 才 append 进去的（挂了 sink 时还要在 `add()` 里
+# 把记录交给 sink）。
+#
+# 实测（同一份 HTML，`collect()` 返回值当真值）：
+#
+#     产出 3 条 → store 0 条 / sink 0 条     （全丢）
+#     产出 5 条 → store 5 条 / sink 5 条     （5 的倍数才全到）
+#     产出 6 条 → store 5 条 / sink 5 条     （丢 1）
+#     产出 7 条 → store 5 条 / sink 5 条     （丢 2）
+#
+# 线上代价是**采集链路上的静默数据丢失**：sink 是在 `add()` 里被调的，没进
+# `add()` 就交不出去，executor 收不到、工作库里就没有——而采集日志照写
+# 「收录 N 条」。TRS 系 12 个源全部继承这个基类，全都中招。
+#
+# 这条缺陷**从来没被测到**，因为本文件此前 21 条测试**全部用 5 条**，恰好
+# 落在那条分支的正中间（见 `_collector` 的 docstring 与 `_LINKS` 的注释）。
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 7])
+def test_产出条数不是五的倍数时一条不丢(tmp_path, n):
+    """缺陷 H 的回归测试：`collect()` 返回几条，store 里就该有几条。
+
+    `n=5` 也在参数表里。它是唯一本来就正确的条数，留着当**反向对照**——
+    免得哪天有人把余数分支写成「无条件再补一遍最后五条」，让 5 的倍数反而
+    翻倍。这一条同时钉住「既不丢、也不重」。
+
+    断言标题集合而不只是条数：重复写同一批也能凑够条数，集合能拆穿它。
+    """
+    c = _collector(tmp_path, n=n)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        ret = c.collect()
+        items = c.raw_store.get_all()
+        assert len(ret) == n
+        assert len(items) == n
+        assert {i["title"] for i in items} == {r.title for r in ret}
+    finally:
+        _close(c)
+
+
+@pytest.mark.parametrize("n", [3, 7])
+def test_余数也交给sink(tmp_path, n):
+    """在线采集走的是 sink，不是文件——余数丢的正是这一条通路。
+
+    `sink` 在 `RawAccidentStore.add()` 里被调（`stores/__init__.py:163`），
+    所以「余数没进 `add()`」等于「执行器一条都收不到、工作库里没有」，而
+    采集日志照写「收录 3 条」。这条盯的就是那段缺口。
+
+    顺序一并断言：`add_batch` 先写前 5 条、再写余数，与 `collect()` 的返回
+    顺序一致。若哪天有人调换了两个批次的先后，这里会红。
+    """
+    c = _collector(tmp_path, n=n)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    received: list[dict] = []
+    c.raw_store.attach(lambda rec: received.append(rec))
+    try:
+        ret = c.collect()
+        assert len(ret) == n
+        assert len(received) == n
+        assert [r["source_url"] for r in received] == [r.source_url for r in ret]
+    finally:
+        _close(c)
+
+
+def test_判据抓得住旧写法(tmp_path):
+    """反改验证：把末批换回旧写法（只 `_save()`），证明上面两条真的会红。
+
+    这里把 `add_batch` 换成「只调 `_save()`」——那正是改前末尾那一句的净
+    效果。于是 `test_产出条数不是五的倍数时一条不丢` 里
+    `len(items) == n` 会拿到 0，`test_余数也交给sink` 里 `len(received)`
+    同样是 0。两条判据都对写法敏感，不是写什么都会绿的摆设。
+    """
+    c = _collector(tmp_path, n=3)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+
+    def _old_style_add_batch(items):
+        c.raw_store._save()          # 改前末尾那一句就是这个
+        return 0
+
+    c.raw_store.add_batch = _old_style_add_batch
+    try:
+        ret = c.collect()
+        assert len(ret) == 3                   # 采集本身照样产出三条
+        assert c.raw_store.get_all() == []     # 旧写法下 store 是空的
+        assert c.raw_store.get_new() == []     # 待处理队列里也没有
     finally:
         _close(c)

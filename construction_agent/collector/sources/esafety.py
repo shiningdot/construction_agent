@@ -161,7 +161,13 @@ class EsafetyCollector(BaseCollector):
                 detail = self._fetch_detail(report_id)
                 if detail and "data" in detail:
                     pages = detail["data"].get("regulationPageInfos") or []
-                    image_urls = [p.get("imageUrl", "") for p in pages]
+                    # 去掉空串（2026-10-01 第二十八轮）：接口里某一页没有
+                    # `imageUrl` 时会交出 `''`，留着会让下面每一个判据都失真
+                    # ——`needs_ocr` 因为一个空串标成「要 OCR」、`content` 里
+                    # 写「[图片报告 1页]」却列不出地址、登记时还得靠 asset 层
+                    # 再滤一次（`_assets_from` 确实滤了，但那是别人的防御）。
+                    image_urls = [(p.get("imageUrl") or "").strip() for p in pages]
+                    image_urls = [u for u in image_urls if u]
 
             # 构建记录
             content_text = title
@@ -181,7 +187,17 @@ class EsafetyCollector(BaseCollector):
                 "publish_date": exec_date,
                 "status": "new",
                 "needs_ocr": len(image_urls) > 0,
-                "pdf_urls": image_urls if image_urls else [],
+                # ── 图片 URL **不能放在 `pdf_urls` 里**（2026-10-01 第二十八轮改）
+                #
+                # `executor._ASSET_KEYS` 是**按键名**认类型的——放在 `pdf_urls`
+                # 里就登记成 `asset_type='pdf'`，阶段② 会拿这批「PDF」去下载并
+                # 解析，一份也解不出来。§2.5.15 第十四轮把这条登记为「潜在缺陷」
+                # （该源当时无 token、0 条产出，路上没人），到这里才轮上。
+                #
+                # `pdf_urls` 现在是**真的空**，不是漏了：本源走 API，没有任何
+                # 附件文件，正文就是 `content` 里那几行标题与图片地址。
+                "pdf_urls": [],
+                "image_urls": image_urls,
                 "report_id": report_id,
                 "accident_type_id": item.get("accidentTypeId", ""),
                 "accident_level_id": item.get("accidentLevelId", ""),

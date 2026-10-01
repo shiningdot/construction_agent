@@ -81,13 +81,22 @@ def _list_html(n: int = 5) -> str:
 def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 60,
                  pdf_hrefs: list[str] | None = None,
                  img_hrefs: list[str] | None = None,
+                 office_hrefs: list[str] | None = None,
                  footer: str = "") -> str:
     hrefs = (pdf_hrefs if pdf_hrefs is not None
              else ([_PDF_HREF] if with_pdf else []))
+    # Word 附件与 PDF 附件在**页面结构上完全一样**——都是 `<a href="…">`，
+    # 区别只在后缀。旧代码分不开它们，正是因为它比的是硬编码的 `.pdf`。
+    hrefs = hrefs + list(office_hrefs or [])
     tags = "".join(f'<a href="{h}">附件：调查报告</a>' for h in hrefs)
     imgs = "".join(f'<img src="{h}">' for h in (img_hrefs or []))
+    # 非附件链接（导航 / 返回列表 / 相关信息）。第三十五轮把选择器从
+    # `a[href$='.pdf']` 放宽到 `a[href]` 之后，**全页的每一个 `<a>` 都会过
+    # 一遍判据**，所以页面上必须有这类链接，否则测不到「放宽 ≠ 误收」。
+    nav = ('<a href="./202607/t20260713_90611999.html">上一页</a>'
+           '<a href="/index.html">首页</a>')
     return (f"<html><head><title>{title}</title></head>"
-            f"<body><div class='con'>{body}</div>{tags}{imgs}"
+            f"<body><div class='con'>{body}</div>{tags}{imgs}{nav}"
             f"{footer}</body></html>")
 
 
@@ -97,6 +106,7 @@ def _collector(tmp_path: Path, *, n: int = 5, with_pdf: bool = True,
                pdf_max: int = 5,
                img_hrefs: list[str] | None = None,
                image_max: int = 50,
+               office_hrefs: list[str] | None = None,
                footer: str = "") -> TrsCmsCollector:
     """`n` 条条目的不联网采集器，默认五条。
 
@@ -128,6 +138,7 @@ def _collector(tmp_path: Path, *, n: int = 5, with_pdf: bool = True,
                                                body=f"{body}（第 {i} 条）",
                                                pdf_hrefs=pdf_hrefs,
                                                img_hrefs=img_hrefs,
+                                               office_hrefs=office_hrefs,
                                                footer=footer)
                for i, (t, d, s) in enumerate(_LINKS[:n])}
     c._fetch = lambda url: _list_html(n) if url == _LIST_URL else details.get(url, "")
@@ -956,5 +967,207 @@ def test_判据抓得住旧写法(tmp_path):
         assert len(ret) == 3                   # 采集本身照样产出三条
         assert c.raw_store.get_all() == []     # 旧写法下 store 是空的
         assert c.raw_store.get_new() == []     # 待处理队列里也没有
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# J 组：附件判据被写死成「PDF 附件」（2026-10-01 第三十五轮）
+# --------------------------------------------------------------------------
+#
+# 改前这条通路有两层，**两层都只认 PDF**：
+#
+#     detail_pdf_selector = "a[href$='.pdf']"      # 选择器层
+#     if href.endswith(".pdf"): …                   # 循环体层
+#
+# 于是 `.docx` / `.doc` 从选择器那一层就进不来，**连一条 warning 都没有**——
+# 12 个 TRS 子类**无一覆写** `detail_pdf_selector`，12 个源一起中招。
+#
+# 实测 `shaanxi_em`（该假设的最强反例）：
+#
+#     全站 473 条详情页，`a[href$='.pdf']` 选中的是**空集**——一条 PDF
+#     附件都没有；而其中 5 条挂着 Word 附件共 17 个文件，一个都没登记。
+#
+# 其中两条的**报告本体就在 `.doc` 里**：西安「9·10」重大建筑施工坍塌事故
+# （与之一并挂出的还有「11·14」液化石油气泄漏爆炸重大事故），页面正文是
+# 一份 7,971 字的通报，第 114 行「附：」之后紧跟着两行锚文本「西安"9·10"…
+# 调查报告」「西安"11·14"…调查报告」——**两份完整报告各自一个 `.doc`**。
+# **正中论文主题的那起事故，报告本体从来没被采集链路看见过。**
+#
+# 这是「同一件事各源各写一遍、只有一处写对、而没有地方写着正确答案」那族
+# 问题的第五次（前四次见 §2.5.29 / §2.5.32 / §2.5.33 / §2.5.34）。
+
+_DOCX_HREF = "./P020250219344648336403.docx"
+_DOCX_URL = _LIST_DIR + "P020250219344648336403.docx"
+_DOC_HREF = "./P02014073115562396101714.doc"
+_DOC_URL = _LIST_DIR + "P02014073115562396101714.doc"
+
+
+def test_Word附件进office_urls(tmp_path):
+    """`.docx` / `.doc` 都要进 `office_urls`，且**不进** `pdf_urls`。
+
+    改前这两条断言各错一边：前者的期望值是空集（收不到），后者的期望值是
+    `[_DOCX_URL]`（Word 被按调用的列表名硬塞进 PDF 那一列）。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[_DOCX_HREF, _DOC_HREF])
+    calls: list[str] = []
+    c._download_and_extract_pdf = lambda u, t, d: (calls.append(u), ("", ""))[1]
+    try:
+        c.collect()
+        items = c.raw_store.get_all()
+        assert len(items) == 5
+        for item in items:
+            assert item["office_urls"] == [_DOCX_URL, _DOC_URL]
+            assert item["pdf_urls"] == []
+        # **Word 只登记、不下载**：`_download_and_extract_pdf` 走的是 PyMuPDF，
+        # 拿它去解 Word 只会白跑一趟。转换器是另一个量级的工程，见 `extra`
+        # 里 `office_urls` 那段注释。
+        assert calls == []
+    finally:
+        _close(c)
+
+
+def test_PDF附件仍然进pdf_urls(tmp_path):
+    """放宽选择器的回归对照：PDF 那条路一点没变。"""
+    c = _collector(tmp_path, office_hrefs=[_DOCX_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("PDF 正文。" * 40, "/x/a.pdf")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["pdf_urls"] == [_PDF_URL]
+        assert item["office_urls"] == [_DOCX_URL]
+        # 正文仍只由 PDF 那份构成 —— Word 没混进 `pdf_text`
+        assert "PDF 正文" in item["content"]
+    finally:
+        _close(c)
+
+
+@pytest.mark.parametrize("href,key", [
+    ("./A.DOCX", "office_urls"),          # 大写后缀（站点大小写不统一是常态）
+    ("./B.docx?v=2", "office_urls"),      # 带查询串
+    ("./C.doc#top", "office_urls"),       # 带锚点
+    ("./D.PDF", "pdf_urls"),
+    ("./E.pdf?download=1", "pdf_urls"),
+])
+def test_后缀的大小写查询串锚点都不影响归类(tmp_path, href, key):
+    """判据统一在 `attachments.attachment_kind` 里，这里钉住它对 TRS 的表层。
+
+    旧写法 `href.endswith(".pdf")` 对 `./D.PDF` 判否、对 `./E.pdf?download=1`
+    也判否——**同一个 PDF 换个写法就收不到**。而 `a[href$='.pdf']` 选择器
+    同样匹配不到带查询串的那条，两层错法还不一样。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[href])
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item[key] == [_LIST_DIR + href.removeprefix("./")]
+    finally:
+        _close(c)
+
+
+def test_导航链接不会被误收成附件(tmp_path):
+    """选择器放宽到 `a[href]` 之后，**全页每一个 `<a>` 都会过一遍判据**。
+
+    fixture 里固定挂着两条非附件链接（`./202607/t20260713_90611999.html`、
+    `/index.html`），它们在 `a[href$='.pdf']` 下本就被挡住，靠的是选择器；
+    现在选择器不管了，得靠判据挡住。**收进来等于每个页面白登记几条附件。**
+    """
+    c = _collector(tmp_path, with_pdf=False)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["pdf_urls"] == []
+        assert item["office_urls"] == []
+        assert item["image_urls"] == []
+    finally:
+        _close(c)
+
+
+def test_同一个Word附件挂两个链接只登记一次(tmp_path):
+    """去重仍在这一层做——`sort_into` 只分拣、不去重。
+
+    `sc_em` 那条实测（正文里链一次、附件区再列一次）本来只覆盖 PDF；加了
+    `office_urls` 之后，原先那句 `if full not in pdf_urls` **只查 PDF 那一列**，
+    一篇挂两次的 Word 会重复登记。这条钉的是改法，不是改前的行为。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[],
+                   office_hrefs=[_DOCX_HREF, _DOCX_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        assert c.raw_store.get_all()[0]["office_urls"] == [_DOCX_URL]
+    finally:
+        _close(c)
+
+
+def test_Word附件的条目通路B登记office类型asset(tmp_path):
+    """一路走到 `raw_accident_assets`：`executor._ASSET_KEYS` 里**早就**有
+    `("office_urls", "office")` 这一项，只是此前没有任何采集器往外传过这个键，
+    所以 `asset_type='office'` 一直是 0 行。
+    """
+    from construction_agent.collector.executor import _row_from_raw_item
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[_DOCX_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        ret = c.collect()
+        row = _row_from_raw_item(ret[0], "tsrc", "task1")
+        assert row is not None
+        assert row["_assets"] == [{"asset_type": "office", "url": _DOCX_URL}]
+    finally:
+        _close(c)
+
+
+def test_Word附件不并进needs_ocr(tmp_path):
+    """`needs_ocr` 指的是**光学字符识别**，Word 里的字本来就是字符。
+
+    这一条钉住「有意不并」这个决定本身：页面只挂 Word、正文区短，也不该
+    标 OCR——它缺的是格式转换。代价照实记在 `needs_ocr` 上方的注释里：
+    **Word 附件的正文，采集层没有任何人负责**。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[_DOCX_HREF],
+                   body="短正文。" * 20)          # 100 字，在 200 之下
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["office_urls"] == [_DOCX_URL]
+        assert item["needs_ocr"] is False
+        # 旁证：正文确实短到进了审核队列 —— 排除「因为正文够长才没标」
+        assert item["classification_reason"] == "无有效正文"
+    finally:
+        _close(c)
+
+
+def test_判据自检_选择器改回以pdf结尾就收不到Word(tmp_path):
+    """反改验证（一）：把 `detail_pdf_selector` 改回 `a[href$='.pdf']`。
+
+    这正是改前的原值。若这一条不红，说明上面几条断言其实什么也没测到。
+    """
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[_DOCX_HREF])
+    c.cfg.detail_pdf_selector = "a[href$='.pdf']"
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        assert c.raw_store.get_all()[0]["office_urls"] == []
+    finally:
+        _close(c)
+
+
+def test_判据自检_判据改回endswith就收不到Word(tmp_path, monkeypatch):
+    """反改验证（二）：选择器保持放宽，把**循环体的判据**换回 `endswith(".pdf")`。
+
+    旧代码是两层叠加，只还原一层（上一条）不够——这一条还原第二层。判据函数
+    在 `trs_cms_base` 的模块命名空间里，改这里等价于换回旧写法。
+    """
+    monkeypatch.setattr(
+        trs_cms_base, "attachment_kind",
+        lambda u: "pdf" if str(u).lower().endswith(".pdf") else "")
+    c = _collector(tmp_path, pdf_hrefs=[], office_hrefs=[_DOCX_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        assert c.raw_store.get_all()[0]["office_urls"] == []
     finally:
         _close(c)

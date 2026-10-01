@@ -28,6 +28,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from construction_agent.collector.attachments import attachment_kind, sort_into
 from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
                                                RawAccidentText)
 from construction_agent.collector.boilerplate import (
@@ -77,7 +78,13 @@ class TrsSiteConfig:
     # ── 详情页配置 ──
     detail_title_selector: str = "title"  # 详情标题提取: "title"(<title>标签) / "h1" / CSS选择器
     detail_text_selector: str = "body"    # 详情正文容器: "body" / "article" / CSS选择器
-    detail_pdf_selector: str = "a[href$='.pdf']"  # PDF 附件链接选择器
+    # 从哪里找附件链接。**它只负责「在哪儿找」，不负责「什么算附件」**
+    # （2026-10-01 第三十五轮改）。原值是 `a[href$='.pdf']`——一个把
+    # 「附件」这个概念直接写死成「PDF」的选择器，于是 Word 附件**一个都
+    # 不进视野**。实测 `shaanxi_em`：全站 473 条详情页**没有一条挂 PDF**
+    # （该选择器选中的是空集），而其中 5 条挂着 Word 附件共 17 个文件，
+    # 一个都没登记。类型判断交给 `attachments.attachment_kind`。
+    detail_pdf_selector: str = "a[href]"  # 附件链接候选选择器
     detail_pdf_max: int = 5               # 一条详情页最多下载几个 PDF 附件
     # 一条详情页最多登记几张内容图（0 = 不抽取）。**200 不是随手定的**：
     # 原为 50，而 `gd_em` 实测有一条 59 张的扫描件报告被截掉 9 张，理由见
@@ -343,6 +350,9 @@ class TrsCmsCollector(BaseCollector):
             if detail and tpl:
                 detail_text = strip_template(detail.get("text_lines") or [], tpl)
             pdf_urls = (detail or {}).get("pdf_urls") or []
+            # Word 附件（2026-10-01 第三十五轮）。**只登记、不下载**——见下面
+            # `extra` 里 `office_urls` 那段注释：转换器还没接。
+            office_urls = (detail or {}).get("office_urls") or []
             image_urls = (detail or {}).get("image_urls") or []
 
             # 下载全部 PDF 并提取全文，**合并**成一份正文。
@@ -453,6 +463,29 @@ class TrsCmsCollector(BaseCollector):
                     # 正文只有 631 / 717 字，而 PDF 里有 8,635 / 7,523 字——
                     # 正文的主体在附件里，附着的是正文本身而不是什么补充材料。
                     "pdf_urls": pdf_urls,
+                    # ── Word 附件通路（2026-10-01 第三十五轮补）────────────
+                    #
+                    # 判据修好之后（`detail_pdf_selector` 由 `a[href$='.pdf']`
+                    # 改为 `a[href]`，类型交给 `attachments.attachment_kind`），
+                    # 这一类附件才第一次被看见。`executor._ASSET_KEYS` 里**早
+                    # 就**有 `("office_urls", "office")` 这一项——和
+                    # `image_urls` 一样，声明了很久却没有采集器往外传，
+                    # `raw_accident_assets.asset_type='office'` 至今 0 行。
+                    #
+                    # **本轮只登记 URL，不做正文提取**：`_download_and_extract_pdf`
+                    # 那条路走的是 PyMuPDF（`pdf_text.py`），Word 需要完全不同的
+                    # 解析器（docx→python-docx / doc→LibreOffice 或无解），
+                    # 是另一个量级的工程，塞进这一轮会把「判据修好」这件事
+                    # 淹掉。所以代价是明确的：`shaanxi_em` 那 5 条挂 Word 的页面
+                    # （共 17 个文件，其中西安「9·10」重大建筑施工坍塌事故、
+                    # 西安「11·14」液化石油气泄漏爆炸重大事故的**报告本体就在
+                    # `.doc` 里**）正文仍然只有页面那一段通报。**URL 先落下**，
+                    # 阶段② 至少知道去哪儿取。
+                    #
+                    # 不并进 `pdf_parts` 的循环：那个循环的每一步都假设手上有
+                    # 一个能出文本的 PDF，混进 Word 只会让 `pdf_text` 这个变量
+                    # 名字和内容对不上。
+                    "office_urls": office_urls,
                     # 判据有**两条并列**，因为「文字还没拿到」在这两处形态不同
                     # （2026-10-01 第二十七轮补第二条）。
                     #
@@ -480,6 +513,18 @@ class TrsCmsCollector(BaseCollector):
                     #    稀释掉**：`gz_em` 有一条挂 30 张图却有 16,670 字正文的
                     #    记录，标 OCR 没有意义。方向与 `nmg_em`（第二十二轮）
                     #    一致。
+                    #
+                    # ③ **Word 附件有意不并进来**（2026-10-01 第三十五轮）。
+                    #    `needs_ocr` 这个名字指的是**光学字符识别**，而 Word
+                    #    文件里的文字本来就是字符——它缺的是格式转换，不是识别。
+                    #    西安「9·10」那条挂两份 `.doc`、正文只有 6,973 字通报，
+                    #    确实「报告主体还没拿到」，但那不是 OCR 能解决的事。
+                    #    把 Word 折进 `needs_ocr` 会让这个字段名开始撒谎，而
+                    #    下游真要处理时得到的是一批需要装 LibreOffice 的任务。
+                    #    代价照实记在这里：**Word 附件的正文，采集层没有任何人
+                    #    负责**——`pdf_parts` 只收 PDF，`combined_text` 因此可能
+                    #    只是页面上那段通报。**留到下一轮裁决**（要么起一个
+                    #    `needs_convert` 之类的新字段，要么在阶段② 做）。
                     "needs_ocr": (
                         (bool(pdf_urls) and not pdf_text)
                         or (bool(image_urls)
@@ -729,14 +774,52 @@ class TrsCmsCollector(BaseCollector):
         #
         # 去重是必需的：`sc_em` 实测存在**同一个 PDF 挂两个链接**的页面
         # （正文里链接一次、附件区再列一次），不去重会重复下载同一份。
+        # **判据是「附件」，不是「PDF 附件」**（2026-10-01 第三十五轮改）。
+        # 原先这里是 `a[href$='.pdf']` + `href.endswith(".pdf")`——两处都只认
+        # PDF，`.docx` / `.doc` 从选择器那一层就进不来，连 warning 都没有。
+        #
+        # 实测 `shaanxi_em`（该源全 PDF 型假设的最强反例）：
+        #   全站 473 条详情页，`a[href$='.pdf']` 选中的是**空集**——一条 PDF
+        #   附件都没有；而其中 5 条挂着 Word 附件共 17 个文件。其中两条的
+        #   **报告本体就在 `.doc` 里**：西安「9·10」重大建筑施工坍塌事故与
+        #   西安「11·14」液化石油气泄漏爆炸重大事故，页面正文是一份 6,973 字
+        #   的**通报**，第 114 行「附：」之后紧跟着两行锚文本「西安“9·10”…
+        #   调查报告」「西安“11·14”…调查报告」——**报告本体各自一个 `.doc`**。
+        #
+        # 类型判据走 `collector.attachments`（`pdf_text.py` 被抄三份、附件判据
+        # 各写一套的教训）：加一种类型只改那个文件。
         pdf_urls: list[str] = []
-        if self.cfg.detail_pdf_selector:
-            for a_tag in soup.select(self.cfg.detail_pdf_selector):
-                href = a_tag.get("href", "")
-                if href.endswith(".pdf"):
-                    full = _absolute(url, href)
-                    if full not in pdf_urls:
-                        pdf_urls.append(full)
+        office_urls: list[str] = []
+        # 图片附件**本轮有意不往产出传**，见下方注释；这里仍然接住，
+        # 为的是让「这个源上有几个图片附件」在源码里可见、可计数，而不是
+        # 静默丢弃——丢弃和「没有」在日志里长得一样。
+        image_attachments: list[str] = []
+        # **去重仍在这一层做**（2026-10-01 第三十五轮）。`sort_into` 只分拣、
+        # 不去重——它是 `gd_em` / `beijing_em` / 这里三处共用的，而那两处的
+        # 输入各自已去重，把去重塞进共享函数等于顺手替它们改了行为。上面
+        # `sc_em` 那条「同一个 PDF 挂两个链接」的理由，落点就是这几行。
+        #
+        # 改用集合而不是原先的 `if full not in pdf_urls`：旧写法只查得到
+        # PDF 那一列，加进 office / image 两列之后，只查 pdf 列表会让一篇
+        # 挂两次的 Word 附件重复登记。
+        _seen: set[str] = set()
+        for a_tag in soup.select(self.cfg.detail_pdf_selector):
+            full = _absolute(url, a_tag.get("href", ""))
+            if full in _seen:
+                continue
+            if sort_into(attachment_kind(full), full,
+                         pdf=pdf_urls, office=office_urls,
+                         image=image_attachments):
+                _seen.add(full)
+        if image_attachments:
+            # 与下面那个 `image_urls` 的语义冲突：那个键装的是
+            # `extract_page_images` 抽的**页面内容图**（正文就是那些扫描页），
+            # 而这里是**图片附件**（页面挂了一个 `.png` 文件）。两者在
+            # `executor._ASSET_KEYS` 里会同归 `asset_type='image'`，混在一个键
+            # 里就再也分不开。要么给图片附件单开一个键，要么在 images 那侧
+            # 加来源标注——**留到下一轮裁决**，本轮只保证它不再无声无息。
+            logger.debug(f"[{self.cfg.source_name}] {len(image_attachments)} 个"
+                         f"图片附件本轮未登记: {url}")
 
         # 内容图（2026-10-01 第十八轮补）。在此之前 `_crawl_detail` **对图一个字
         # 都不读**——这是缺陷 C 的直接成因：图片型报告（正文是扫描件）整条记录
@@ -769,7 +852,8 @@ class TrsCmsCollector(BaseCollector):
 
         return {"title": title, "date": date,
                 "text": "\n".join(text_lines_), "text_lines": text_lines_,
-                "pdf_urls": pdf_urls, "image_urls": image_urls}
+                "pdf_urls": pdf_urls, "office_urls": office_urls,
+                "image_urls": image_urls}
 
     def _download_and_extract_pdf(
         self, pdf_url: str, title: str, date: str

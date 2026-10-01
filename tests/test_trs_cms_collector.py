@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import ssl
 import sys
 from datetime import date
 from pathlib import Path
@@ -37,9 +38,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from construction_agent.collector import registry  # noqa: E402
 from construction_agent.collector.sources import trs_cms_base  # noqa: E402
 from construction_agent.collector.sources.trs_cms_base import (  # noqa: E402
-    TrsCmsCollector, TrsSiteConfig)
+    TrsCmsCollector, TrsSiteConfig, build_ssl_verify)
 from construction_agent.collector.stores import RawAccidentStore  # noqa: E402
 
 _LIST_URL = "https://tsrc.gov.cn/list/"
@@ -1169,5 +1171,132 @@ def test_判据自检_判据改回endswith就收不到Word(tmp_path, monkeypatch
     try:
         c.collect()
         assert c.raw_store.get_all()[0]["office_urls"] == []
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# K 组：站点 TLS 太老，需要放开老式重协商（2026-10-01 第三十七轮）
+# --------------------------------------------------------------------------
+#
+# `jx_em` 在健康检查表上一直是「列表 0 条」，与 `hub_em`（WAF 412 拦）、
+# `jl_em`（域名 DNS 解析不了）**逐格长得一模一样**。实测诊断到 TCP 层才发现
+# 三者毫不相干：本源的故障在**握手**上——服务器只认 RFC 5746 之前的老式
+# 重协商，而 OpenSSL 3.x 默认禁用它（CVE-2009-3555 的缓解措施）。放开后
+# TLSv1.2 谈成、HTTP 200 / 271,906 字节，站点本身完全健康。
+#
+# 修法**不是**全局关掉那个缓解措施，而是逐源显式开关。所以这一组测两件事：
+# 开关本身对不对（1–4），以及**十二个源里只有 `jx_em` 开了**（5–7）。
+
+
+def _legacy_bit_on(client) -> bool:
+    """从 httpx client 里读出**实际生效**的 SSLContext，看 legacy 位开没开。
+
+    `httpx.Client` 没有公开的 `verify` 属性，但探针实测
+    `client._transport._pool._ssl_context` **就是构造时传进去的那个对象**
+    （`is` 判断为真；httpx 0.28.1）。断言实际生效的对象比断言「我们传了什么」
+    强——传了但被丢掉也算过的那种测试没有意义。
+    """
+    ctx = client._transport._pool._ssl_context
+    assert ctx is not None, "client 上没有 SSLContext，断言无从谈起"
+    return bool(ctx.options & ssl.OP_LEGACY_SERVER_CONNECT)
+
+
+def _trs_collectors(tmp_path: Path) -> list[tuple[str, TrsCmsCollector]]:
+    """构造注册表里全部 TRS 系源（不联网），返回 `[(key, collector)]`。
+
+    **走 `registry` 而不是手写源名单**：手写的话，将来新增一个源忘了同步，
+    这组测试会安静地少测一个——而它恰恰是那种「漏测不可见」的测试。
+
+    `registry.build` 返回的是 `(collector, spec)` 元组（执行器两边都要用），
+    不是 collector 本身。
+    """
+    out: list[tuple[str, TrsCmsCollector]] = []
+    for spec in registry.all_sources():
+        try:
+            c, _ = registry.build(spec.key, data_dir=tmp_path / spec.key)
+        except Exception as e:      # 某些源构造需要 key/依赖，跳过不影响判据
+            logging.debug("构造 %s 失败，跳过：%s", spec.key, e)
+            continue
+        if isinstance(c, TrsCmsCollector):
+            out.append((spec.key, c))
+    return out
+
+
+def test_默认配置不开老式重协商():
+    """新字段默认必须是 False——默认值是这道防线的全部意义。"""
+    assert TrsSiteConfig().allow_legacy_renegotiation is False
+
+
+def test_开关关闭时传的就是True():
+    """不开开关的源，拿到的仍是 httpx 的默认严格校验（原先的 `verify` 缺省）。"""
+    assert build_ssl_verify(False) is True
+
+
+def test_开关打开时返回SSLContext且legacy位为真():
+    ctx = build_ssl_verify(True)
+    assert isinstance(ctx, ssl.SSLContext)
+    assert ctx.options & ssl.OP_LEGACY_SERVER_CONNECT
+
+
+def test_放开重协商不等于放宽证书校验():
+    """**反例**：修法容易被顺手写成 `verify=False`，那等于把证书校验也关掉。
+
+    本轮的故障自始至终是「重协商谈法」，不是「证书不可信」。这个 context
+    必须仍然 `CERT_REQUIRED` + 校验主机名——否则抓到的内容有没有被中间人
+    改过就没人保证了。
+    """
+    ctx = build_ssl_verify(True)
+    assert ctx.verify_mode == ssl.CERT_REQUIRED
+    assert ctx.check_hostname is True
+
+
+def test_十二个TRS源里只有jx_em开了开关(tmp_path):
+    rows = _trs_collectors(tmp_path)
+    try:
+        assert len(rows) >= 12, f"只构造出 {len(rows)} 个 TRS 源，源名单可能没走到"
+        on = sorted(k for k, c in rows if c.cfg.allow_legacy_renegotiation)
+        assert on == ["jx_em"], f"开了重协商的源是 {on}，预期只有 jx_em"
+    finally:
+        for _, c in rows:
+            _close(c)
+
+
+def test_jx_em的client真的拿到了开legacy位的context(tmp_path):
+    """配置位 → 函数 → client 的端到端：只有中间任何一环断开这条都会红。"""
+    c, _ = registry.build("jx_em", data_dir=tmp_path / "jx_em")
+    try:
+        assert isinstance(c, TrsCmsCollector)
+        assert _legacy_bit_on(c._client) is True
+    finally:
+        _close(c)
+
+
+def test_其余TRS源的client都没开legacy位(tmp_path):
+    """**反例（集成）**：其余源的实际 context 上这一位必须是 0。
+
+    只测「配置字段是 False」不够——若 `__init__` 里写成
+    `build_ssl_verify(True)` 常数，字段就变成摆设，而上面那条仍然会过。
+    """
+    rows = _trs_collectors(tmp_path)
+    try:
+        bad = sorted(k for k, c in rows if k != "jx_em" and _legacy_bit_on(c._client))
+        assert bad == [], f"这些源不该开 legacy 位却开了：{bad}"
+    finally:
+        for _, c in rows:
+            _close(c)
+
+
+def test_判据自检_函数改回恒返回True这条就红(tmp_path, monkeypatch):
+    """反改验证：把 `build_ssl_verify` 改回「什么都返回 True」。
+
+    这等价于**没修**——`jx_em` 的 client 会退回默认严格校验，握手仍然谈不成。
+    若这一条不红，说明 `test_jx_em的client真的拿到了开legacy位的context`
+    其实什么也没测到。
+    """
+    monkeypatch.setattr(trs_cms_base, "build_ssl_verify", lambda _flag: True)
+    c, _ = registry.build("jx_em", data_dir=tmp_path / "jx_em")
+    try:
+        assert _legacy_bit_on(c._client) is False
     finally:
         _close(c)

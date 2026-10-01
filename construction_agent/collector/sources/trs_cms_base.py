@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import ssl
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -108,6 +109,57 @@ class TrsSiteConfig:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
+    # 站点服务器太老、必须放开「不安全重协商」才谈得成 TLS 时置 True
+    # （2026-10-01 第三十七轮，为 `jx_em` 增设）。**默认 False，只给确实
+    # 需要的源开**——`OP_LEGACY_SERVER_CONNECT` 放开的是 CVE-2009-3555 的
+    # 缓解措施，全局打开等于把所有源一起降级。判据与来由见 `build_ssl_verify`。
+    allow_legacy_renegotiation: bool = False
+
+
+def build_ssl_verify(allow_legacy_renegotiation: bool) -> "ssl.SSLContext | bool":
+    """按站点配置决定传给 `httpx.Client(verify=...)` 的值。
+
+    ## 为什么需要它（2026-10-01 第三十七轮）
+
+    `jx_em` 在健康检查表上一直是「列表 0 条」。实测诊断到 TCP 层：
+
+    ```
+    DNS      ✓  yjglt.jiangxi.gov.cn 可解析
+    TCP      ✓  443 端口连得上
+    TLS      ✗  UNSAFE_LEGACY_RENEGOTIATION_DISABLED
+    ```
+
+    站点服务器仍在用**老式重协商**（RFC 5746 之前的做法），而 OpenSSL 3.x
+    默认禁用它——那是 CVE-2009-3555 的缓解措施，禁得对，但代价是与旧服务器
+    谈不成。放开 `OP_LEGACY_SERVER_CONNECT` 后 TLSv1.2 谈成，**HTTP 200 /
+    271,906 字节**，站点完全健康，只是协议版本太老。
+
+    ## 判据为什么是「逐源显式开关」而不是「失败后自动降级」
+
+    自动降级的写法更省事，但它把一次**安全降级**变成了悄悄发生的事：任何源
+    握手失败——包括真正被中间人劫持的那种——都会被自动放开重协商后重试。
+    `TrsSiteConfig.allow_legacy_renegotiation` 默认 False，需要它的源在自己的
+    配置文件里写清楚，是一句可以 review 的话。
+
+    ## 拿不到 `OP_LEGACY_SERVER_CONNECT` 时
+
+    该常量要求 OpenSSL 3.x + Python 3.10+（本机 Python 3.14.4 / OpenSSL 3.5.5
+    `hasattr` 为 True）。拿不到就退回默认严格校验并留一条 WARNING——**不静默
+    地什么都不做**，否则同一个源在两台机器上会一个抓得到一个抓不到，而日志里
+    看不出区别。
+    """
+    if not allow_legacy_renegotiation:
+        return True
+    if not hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+        logger.warning(
+            "站点配置要求放开老式重协商，但当前 SSL 库没有 "
+            "OP_LEGACY_SERVER_CONNECT（需 OpenSSL 3.x + Python 3.10+），"
+            "退回默认严格校验——该源可能仍然连不上。"
+        )
+        return True
+    ctx = ssl.create_default_context()
+    ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+    return ctx
 
 
 # ── PDF 文本提取工具函数 ──
@@ -241,6 +293,9 @@ class TrsCmsCollector(BaseCollector):
             timeout=self.cfg.timeout,
             follow_redirects=True,
             headers={"User-Agent": self.cfg.user_agent},
+            # 只有把 `allow_legacy_renegotiation` 打开的那些源才拿到 SSLContext，
+            # 其余 11 个源传的是 `True`（默认严格校验），一字未变。
+            verify=build_ssl_verify(self.cfg.allow_legacy_renegotiation),
         )
         self.raw_store = RawAccidentStore()
         # `_discover_pages` 探测分页时已经 GET 到正文，存这里供 `_fetch` 复用，

@@ -75,7 +75,10 @@ class TrsSiteConfig:
     detail_text_selector: str = "body"    # 详情正文容器: "body" / "article" / CSS选择器
     detail_pdf_selector: str = "a[href$='.pdf']"  # PDF 附件链接选择器
     detail_pdf_max: int = 5               # 一条详情页最多下载几个 PDF 附件
-    detail_image_max: int = 50            # 一条详情页最多登记几张内容图（0 = 不抽取）
+    # 一条详情页最多登记几张内容图（0 = 不抽取）。**200 不是随手定的**：
+    # 原为 50，而 `gd_em` 实测有一条 59 张的扫描件报告被截掉 9 张，理由见
+    # `collector.images.extract_page_images` 的 docstring。
+    detail_image_max: int = 200
 
     # ── 筛选配置 ──
     construction_keywords: list[str] = field(default_factory=lambda: DEFAULT_CONSTRUCTION_KW)

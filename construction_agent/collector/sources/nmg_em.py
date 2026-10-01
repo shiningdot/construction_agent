@@ -54,12 +54,13 @@ class NmgEMCollector(BaseCollector):
     """
 
     def __init__(self, delay: float = 1.0, enable_classify: bool = True,
-                 data_dir: Optional[Path] = None, image_max: int = 50):
+                 data_dir: Optional[Path] = None, image_max: int = 200):
         self._delay = delay
         self._enable_classify = enable_classify
         # 一条详情页最多登记几张内容图（0 = 不抽取）。**只登记 URL、不下载**
         # ——下载是阶段② OCR 的事，这个源实测 121 张内容图，全下等于把采集
-        # 任务变成图片搬运工。上限是防病态页面，不是常态截断。
+        # 任务变成图片搬运工。上限是防病态页面，不是常态截断：原为 50，
+        # `gd_em` 实测有 59 张的扫描件报告被截，故放到 200。
         self._image_max = image_max
         # `data_dir=None` 时落 `settings.DATA_DIR/<源名>`（旧行为）。在线采集
         # 传一个临时目录进来，`data/<源名>/` 就不再产生——采集产出自 M2 起

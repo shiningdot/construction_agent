@@ -2,8 +2,9 @@
 
 原先这段逻辑只写在 `sources/trs_cms_base.py` 里（第十八/十九轮）。`nmg_em`
 与 `gd_em` 不是 TRS 系、拿不到那个基类，但它们同样有图片型报告——`nmg_em`
-实测一个源就有 **121 张内容图**，是全项目最多的一块。所以把判据提出来共用，
-而不是各源再抄一份。
+实测一个源就有 **121 张内容图**，是全项目最多的一块；`gd_em` 有 152 张，
+而且它的图**不在页面同目录下**，逼出了第三条判据（见 `is_page_image`）。
+所以把判据提出来共用，而不是各源再抄一份。
 
 （这个文件与 `pdf_text.py` 是同一种东西：一份被几个源共用、又差点被复制成
 多份的工具。`pdf_text.py` 的 docstring 记着它当年被抄成三份、而另外三个模块
@@ -18,6 +19,21 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 
 IMG_EXT = re.compile(r"\.(png|jpe?g|gif|bmp|webp|tiff?)$", re.I)
+
+
+def page_article_id(page_url: str) -> str:
+    """页面 URL 末段里的文章 ID。
+
+        …/content/post_3554784.html   →  3554784
+        …/202608/t20260821_7356773.html  →  7356773
+        …/dw/1234.html                →  1234
+
+    规则是「末段去扩展名，再取最后一个下划线之后」。取「之后」而不是直接
+    用整段，是因为国内政府站的末段普遍带前缀（`post_`、`t20260821_`），
+    而图片名只留 ID。没有下划线时这一步是恒等变换，无副作用。
+    """
+    last = urlsplit(page_url).path.rsplit("/", 1)[-1]
+    return last.rsplit(".", 1)[0].rsplit("_", 1)[-1]
 
 
 def is_page_image(page_url: str, img_url: str) -> bool:
@@ -76,18 +92,62 @@ def is_page_image(page_url: str, img_url: str) -> bool:
 
     host 不同直接判否（图片放在 CDN 的站会全部漏判，但目前 10 个源没有一个
     这样——真遇到了，这个函数的注释就是查因的入口）。
+
+    ### 第三条判据：图片名主干 == 页面 ID
+
+    「同目录」有个前提——**图片和页面在同一台服务器、同一套目录结构下**。
+    `gd_em` 不满足，而且不是边缘情况，是它的全部：
+
+        页面  /gk/zdlyxxgk/sgdcbg/content/post_3554784.html
+        图    /img/0/670/670670/3554784.jpg
+
+    图片集中放在 `/img/0/{千位}/{千位细分}/` 下。2026-10-01 用它当前列表
+    跑了一遍（54 个详情页）：源自己用 `class="nfw-cms-img"` 标出的内容图
+    共 **152 张**，「同目录」命中 **0**——不是漏一两个，是一张都没认出来。
+
+    但两者共享一个更强的东西：
+
+        post_3554784.html  →  3554784.jpg
+        post_3263123.html  →  3263123.jpg
+        post_3257780.html  →  3257780.png
+
+    **图片名主干就是页面 ID。** 同一次实测：新判据命中 **152 / 152，漏 0**。
+
+    它不会把模板图收进来，而且这一点是**结构性的、不靠调参**：模板图的
+    定义就是「跨页恒定」（每个页面都挂同一张），而页面 ID 每页不同，所以
+    同一张模板图不可能同时等于多个页面的 ID。同一次实测里，跨页恒定的
+    3 张模板图（`www.gd.gov.cn/defres/ipv.png` 等）共出现 162 个「页×图」
+    格，新判据误纳 **0 格**。这个论证不依赖具体站点，对任何源都成立——
+
+    **图片名那侧只做全等，不剥前缀**。页面那侧剥（`post_` 不是 ID 的
+    一部分），图片这侧不剥：否则 `logo_3554784.png` 会剥出 `3554784`
+    而被误纳成内容图。宁可漏一两张图名带后缀的（如 `3554784_ORIGIN.jpg`
+    会漏），也不给下游塞模板图——这是这个模块一贯的方向。
     """
     p, i = urlsplit(page_url), urlsplit(img_url)
     if p.netloc != i.netloc:
         return False
     if p.path.rsplit("/", 1)[0] == i.path.rsplit("/", 1)[0]:
         return True
-    return i.path.startswith(p.path.rsplit(".", 1)[0] + "/")
+    if i.path.startswith(p.path.rsplit(".", 1)[0] + "/"):
+        return True
+    return i.path.rsplit("/", 1)[-1].rsplit(".", 1)[0] == page_article_id(page_url)
 
 
 def extract_page_images(page_url: str, soup: BeautifulSoup,
-                        max_n: int = 50) -> list[str]:
+                        max_n: int = 200) -> list[str]:
     """从详情页 DOM 里抽出内容图 URL（去重、保序、按 `max_n` 截断）。
+
+    **`max_n` 的默认值是 200 而不是 50**（2026-10-01 第二十一轮改）。原先是
+    50，写的时候以为「一条详情页挂不了多少图」；端到端跑 `gd_em` 才发现
+    有一条记录**正好落了 50 张**——正好等于上限，那不是「刚好 50 张」，是
+    被截断的。单独抓那一页数了：**59 张**，截掉 9 张（15%）。
+
+    那一条还是**纯图片型**（正文 0 字，一条扫描件报告转成的图组），缺页就是
+    缺内容。上限的语义写在下面「只登记 URL、不下载」那段里——它防的是
+    **病态页面**（某页挂了整站图片墙），而 50 对扫描件报告来说是**常态
+    截断**，把防线划在了正常数据里。200 仍能挡住病态页面：一份报告 200 页
+    已经极端，而 URL 只是字符串，200 个约 12 KB。
 
     **只登记 URL，不下载**。与 PDF 那边刻意不同：PDF 必须下载才能提出正文
     （正文就在里面），而图片的正文要 OCR，那是阶段②的事；采集层的职责只是

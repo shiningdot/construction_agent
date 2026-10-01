@@ -38,6 +38,7 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
 from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
@@ -138,10 +139,19 @@ class GdEMCollector(BaseCollector):
         crawl_details: bool = True,
         enable_classify: bool = True,
         data_dir: Optional[Path] = None,
+        image_max: int = 200,
     ):
         self._delay = delay
         self._crawl_details = crawl_details
         self._enable_classify = enable_classify
+        # 一条详情页最多登记几张内容图（0 = 不抽取）。与 `nmg_em` 同一个
+        # 出口、同一个上限。**只登记 URL、不下载**——图片的正文要 OCR，
+        # 那是阶段②的事；本源实测有 152 张内容图，全下等于把采集任务变成
+        # 图片搬运工。上限防的是病态页面，不是常态截断：原先 50，端到端
+        # 跑出来有一条记录**正好落 50 张**（= 上限），单抓那一页数了是
+        # **59 张**，截掉 9 张——而它正文 0 字，是纯图片型报告，缺页就是
+        # 缺内容。故放到 200。
+        self._image_max = image_max
         # 附件缓存目录。2026-10-01 起本源要下载附件提正文（见 `collect`），
         # 于是需要一个落盘位置——`data_dir=None` 落 `settings.DATA_DIR/gd_em`，
         # 在线采集传临时目录进来。此前本源不收这个参数，`registry.build()`
@@ -269,6 +279,7 @@ class GdEMCollector(BaseCollector):
             source = detail.get("source") or "广东省应急管理厅"
             pdf_urls = detail.get("pdf_urls") or []
             office_urls = detail.get("office_urls") or []
+            image_urls = detail.get("image_urls") or []
             has_images = detail.get("has_images", False)
 
             # 正文短而页面挂了附件 → 真正文多半在附件里，去取一次。
@@ -331,6 +342,11 @@ class GdEMCollector(BaseCollector):
                 "status": item_status,
                 "pdf_urls": pdf_urls,
                 "office_urls": office_urls,
+                # 内容图（2026-10-01 第二十一轮补）。此前这个源只知道
+                # `has_images=True`——图在哪儿一概不记，阶段②无从取件。
+                # 实测 152 张内容图，形态是 `/img/0/{a}/{b}/{文章ID}.jpg`，
+                # 与页面**不同目录**，判据见 `collector.images`。
+                "image_urls": image_urls,
                 # 全项目约定：有附件/图片 且 正文没提出来 → 需要后续处理。
                 # 判据看的是 `body_text`（含附件正文），所以提到了正文的条目
                 # 不再标 OCR——2026-10-01 之前这里看的是页面正文，`.docx`
@@ -472,9 +488,16 @@ class GdEMCollector(BaseCollector):
         Returns:
             {
                 "title": str, "content": str, "date": str,
-                "source": str, "pdf_urls": [str], "has_images": bool
+                "source": str, "pdf_urls": [str], "office_urls": [str],
+                "image_urls": [str], "has_images": bool
             }
             失败返回 None
+
+        `has_images` 与 `image_urls` 是两件事，别合并：前者是**「这页挂了
+        内容图标签」**（单一来源：`img.nfw-cms-img` 这个 class），后者是
+        **「抽出来的图 URL 列表」**（判据见 `collector.images`）。判据偏
+        「宁可漏」，图名带后缀的站会漏登 URL，但页面本身确实有图——
+        `needs_ocr` 与分类理由看的是 `has_images`，不该跟着漏。
         """
         html = self._fetch(url)
         if not html:
@@ -509,6 +532,7 @@ class GdEMCollector(BaseCollector):
         article_div = soup.find("div", class_="article_con")
         content_text = ""
         has_images = False
+        image_urls: list[str] = []
         pdf_urls: list[str] = []
         office_urls: list[str] = []
 
@@ -521,10 +545,16 @@ class GdEMCollector(BaseCollector):
             (pdf_urls if kind == "pdf" else office_urls).append(full)
 
         if article_div:
-            # 检测图片
-            images = article_div.find_all("img", class_="nfw-cms-img")
-            if images:
-                has_images = True
+            # 检测图片（只看这个 class，见 Returns 里的说明）
+            has_images = bool(article_div.find("img", class_="nfw-cms-img"))
+
+            # 内容图的 URL（2026-10-01 第二十一轮补）。本案此前的状态是
+            # **知道有图、但一张 URL 都不登记**——`has_images` 只写出一个
+            # bool，阶段②拿不到取件清单。抽取范围收紧在 `article_div`
+            # 内（与 `has_images` 同源），不扫全页，省得把页头页尾的
+            # 模板图也过一遍判据。实测 152 张内容图全部命中。
+            image_urls = extract_page_images(url, article_div,
+                                             max_n=self._image_max)
 
             # 提取纯文本
             content_text = article_div.get_text(separator="\n").strip()
@@ -548,6 +578,7 @@ class GdEMCollector(BaseCollector):
             "source": source,
             "pdf_urls": pdf_urls,
             "office_urls": office_urls,
+            "image_urls": image_urls,
             "has_images": has_images,
         }
 
@@ -573,6 +604,7 @@ class GdEMCollector(BaseCollector):
             "status": "review",
             "pdf_urls": [pdf_url],
             "office_urls": [],
+            "image_urls": [],
             "needs_ocr": True,
             "issuing_authority": "广东省应急管理厅",
             "classification": "pending_review",
@@ -592,6 +624,7 @@ class GdEMCollector(BaseCollector):
             "status": "new",
             "pdf_urls": [],
             "office_urls": [],
+            "image_urls": [],
             "needs_ocr": False,
             "issuing_authority": "广东省应急管理厅",
             "classification": "auto_construction",

@@ -6,6 +6,9 @@
 （或以页面路径为前缀）。它的前身「同目录 + 编号/时间戳连续」被 `tj_em`
 当场推翻——那个源有 10 张同目录、时间戳连续递增的图，却是模板图（四个不同
 页面每页都挂同一批）。所以这里的反例测试比正例更要紧。
+
+第二十一轮加了第三条：**图片名主干 == 页面 ID**（`gd_em` 形态，它的图不在
+页面同目录下，「同目录」在它身上 152 张里漏 152 张）。
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 from bs4 import BeautifulSoup  # noqa: E402
 
 from construction_agent.collector.images import (  # noqa: E402
-    extract_page_images, is_page_image)
+    extract_page_images, is_page_image, page_article_id)
 from construction_agent.collector.sources.nmg_em import (  # noqa: E402
     NMGEM_LIST_URL, NmgEMCollector)
 from construction_agent.collector.stores import RawAccidentStore  # noqa: E402
@@ -61,6 +64,58 @@ def test_换域名的图不算内容图():
 
 def test_同目录但不同站也不算():
     assert not is_page_image(_PAGE, "https://other.gov.cn/zwgk/zdxx/sgxxccpg/202511/a.jpg")
+
+
+# ── A2 组：第三条判据「图片名主干 == 页面 ID」（第二十一轮，gd_em 逼出来的）──
+#
+# `gd_em` 的内容图集中放在 `/img/0/{a}/{b}/` 下，与页面**不同目录**，「同目录」
+# 在它身上 152 张内容图漏 152 张。而图名主干恰好就是页面 ID。
+
+_GD_PAGE = "https://yjgl.gd.gov.cn/gk/zdlyxxgk/sgdcbg/content/post_3554784.html"
+
+
+def test_图名等于页面ID时算内容图():
+    """`gd_em` 形态：跨目录，但 `/img/0/670/670670/3554784.jpg` 的主干
+    就是页面的 `post_3554784` 里的 ID。"""
+    assert is_page_image(_GD_PAGE, "https://yjgl.gd.gov.cn/img/0/670/670670/3554784.jpg")
+
+
+def test_页面末段带前缀时剥掉前缀再比():
+    """`post_3554784` 里的 `post_` 不是 ID 的一部分，得剥。TRS 的
+    `t20260821_7356773` 同理——取最后一个下划线之后。"""
+    assert page_article_id(_GD_PAGE) == "3554784"
+    assert page_article_id("https://x.gov.cn/202608/t20260821_7356773.html") == "7356773"
+    assert page_article_id("https://x.gov.cn/dw/1234.html") == "1234"
+
+
+def test_TRS的资源图名不等于页面ID():
+    """第三条判据在 TRS 系上**不该命中**——那边靠「同目录」。这条钉的是
+    「新判据不会把 TRS 的资源图误认成页面自己的图」的判据侧。"""
+    page = "https://yjgl.tj.gov.cn/ZWGK6939/SGDCBG354/202608/t20260821_7356773.html"
+    assert not is_page_image(page, "https://yjgl.tj.gov.cn/qdfy/tytb/202008/"
+                                   "W020200824411649201603.png")
+
+
+def test_图名只是以页面ID结尾不算():
+    """**反例，比正例更要紧。** `logo_3554784.png` 的主干以 `3554784` 结尾，
+    但如果图片那侧也剥前缀，它就会被误纳成内容图。所以图片名**只做全等**。"""
+    assert not is_page_image(_GD_PAGE, "https://yjgl.gd.gov.cn/img/0/1/2/logo_3554784.png")
+    assert not is_page_image(_GD_PAGE, "https://yjgl.gd.gov.cn/img/0/1/2/x3554784.png")
+
+
+def test_换域名时图名相同也不算():
+    assert not is_page_image(_GD_PAGE, "https://cdn.example.com/img/3554784.jpg")
+
+
+def test_图名带后缀时的已知漏判():
+    """明知会漏、且选择不修：`3554784_ORIGIN.jpg` 的主干不等于页面 ID。
+
+    修它就得让图片那侧也剥后缀，而那正是上一条反例会失守的地方。
+    方向是**宁可漏**——漏一张图不等于整条记录丢失；误纳一张模板图则是
+    给下游塞噪音。这条测试是留给将来遇到「某源图片全带后缀」时的路标：
+    到时候改这里，别改判据的方向。
+    """
+    assert not is_page_image(_GD_PAGE, "https://yjgl.gd.gov.cn/img/0/1/2/3554784_ORIGIN.jpg")
 
 
 # --------------------------------------------------------------------------
@@ -119,6 +174,20 @@ def test_超过上限时截断并保序():
     s = _soup("".join(f'<img src="./{i:03d}.jpg">' for i in range(8)))
     got = extract_page_images(_PAGE, s, max_n=3)
     assert got == [_DIR + f"{i:03d}.jpg" for i in range(3)]
+
+
+def test_默认上限容得下扫描件报告():
+    """默认上限是 200，不是 50。
+
+    原为 50。端到端跑 `gd_em` 时有一条记录**正好落 50 张**——正好等于上限，
+    那不是「刚好 50 张」，是被截断的。单抓那一页数出来是 **59 张**，而且
+    正文 0 字（纯图片型报告，缺页就是缺内容）。
+
+    59 是实测形态里最长的一页，所以这条钉住的是「默认值得容得下它」，
+    而不是「59 这个数有什么特别」。
+    """
+    s = _soup("".join(f'<img src="./{i:04d}.jpg">' for i in range(59)))
+    assert len(extract_page_images(_PAGE, s)) == 59
 
 
 def test_带查询串的图片URL归一后不重复():

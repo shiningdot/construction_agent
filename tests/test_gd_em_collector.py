@@ -49,8 +49,9 @@ _ATTACHMENT_BODY = "点击链接查看报告详情："
 
 
 def _detail_page(attach_href: str, body: str = _ATTACHMENT_BODY,
-                 img: bool = False) -> str:
-    image_tag = '<img class="nfw-cms-img" src="/x.png"/>' if img else ""
+                 img: bool = False, img_hrefs: list[str] | None = None) -> str:
+    hrefs = img_hrefs if img_hrefs is not None else (["/x.png"] if img else [])
+    image_tag = "".join(f'<img class="nfw-cms-img" src="{h}"/>' for h in hrefs)
     return f"""<html><body>
 <h1 class="article_t">{_TITLE}</h1>
 <div class="bor_bot"><div class="article_item fl">信息来源：广东省应急管理厅</div>
@@ -228,6 +229,119 @@ def test_图片型报告仍标needs_ocr(tmp_path):
         item = c.raw_store.get_all()[0]
         assert item["needs_ocr"] is True
         assert "[图片格式报告，需 OCR 提取文字]" in item["content"]
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# 内容图通路（2026-10-01 第二十一轮）
+# --------------------------------------------------------------------------
+#
+# 改之前：`has_images` 只写出一个 bool，**一张图 URL 都不登记**——阶段②
+# 拿不到取件清单。实测本源 152 张内容图，形态 `/img/0/{a}/{b}/{文章ID}.jpg`，
+# 与页面**不同目录**，所以第十九轮的「同目录」判据在它身上一张都没认出来。
+
+# 页面是 `post_1.html`，所以内容图的文件名主干必须是 `1`。
+_IMG_URL = f"{GDEM_BASE}/img/0/1/2/1.jpg"
+
+
+def test_内容图登记为image_urls(tmp_path):
+    """`/img/0/1/2/1.jpg` 与页面 `content/post_1.html` 不同目录，靠
+    「图名主干 == 页面 ID」命中。"""
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf",
+                                          img_hrefs=["/img/0/1/2/1.jpg"]))
+    c._download_and_extract = lambda url: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL]
+    finally:
+        _close(c)
+
+
+def test_页头模板图不登记(tmp_path):
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf", img_hrefs=[
+        "/images/logo.png", "/img/0/1/2/1.jpg", "https://www.gd.gov.cn/ggtp/wza.png",
+    ]))
+    c._download_and_extract = lambda url: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL]
+    finally:
+        _close(c)
+
+
+def test_图片标签与图URL是两回事(tmp_path):
+    """`/x.png` 的主干不是页面 ID，登记不上 URL——**但页面确实挂了图**。
+
+    这两件事不能合并：`needs_ocr` 与分类理由看的是「页面挂了图标签」，判据
+    漏了也得照标 OCR。合并的写法会让「判据漏判」变成「这条记录看起来没图」。
+
+    （`has_images` 本身不写进产出，所以这里看它的两处可见产物：`needs_ocr`
+    与摘要里那行 OCR 标志。`test_图片型报告仍标needs_ocr` 用的就是这个
+    `/x.png` 形态。）
+    """
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf", img=True))
+    c._download_and_extract = lambda url: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == []
+        assert item["needs_ocr"] is True
+        assert "[图片格式报告，需 OCR 提取文字]" in item["content"]
+    finally:
+        _close(c)
+
+
+def test_图片上限为0时不抽图(tmp_path):
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf",
+                                          img_hrefs=["/img/0/1/2/1.jpg"]),
+                   image_max=0)
+    c._download_and_extract = lambda url: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == []
+        # 上限只管「登记几张」，不管「有没有图」——摘要里的 OCR 标志照旧
+        assert "[图片格式报告，需 OCR 提取文字]" in item["content"]
+    finally:
+        _close(c)
+
+
+def test_PDF直链与兜底记录也带image_urls(tmp_path):
+    """schema 一致性：三条产出通路（详情页 / PDF 直链 / 详情页失败的兜底）
+    的键集合要对得上，否则下游 `item["image_urls"]` 会 KeyError。"""
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf"))
+    try:
+        assert "image_urls" in c._make_basic_item("标题", _DETAIL_URL, "2022-08-01")
+        assert "image_urls" in c._handle_pdf_direct(
+            {"title": "标题", "url": f"{GDEM_BASE}/a/b.pdf", "pub_date": "2022-08-01"})
+    finally:
+        _close(c)
+
+
+def test_内容图能落成image类型asset(tmp_path):
+    """落到 `raw_accident_assets` 里是 `asset_type='image'`——这一个源
+    此前在该表里的 image 行数恒为 0。"""
+    from construction_agent.collector.base import RawAccidentText
+    from construction_agent.collector.executor import _row_from_raw_item
+
+    c = _collector(tmp_path, _detail_page("/attachment/0/1/2/3.pdf",
+                                          img_hrefs=["/img/0/1/2/1.jpg"]))
+    c._download_and_extract = lambda url: ""
+    try:
+        c.collect()
+        raw = c.raw_store.get_all()[0]
+        row = _row_from_raw_item(
+            RawAccidentText(source="gd_em", title=raw.get("title", ""),
+                            raw_text=raw.get("content", ""),
+                            source_url=raw.get("source_url", ""),
+                            fetch_time="", extracted_date=None,
+                            extra={"image_urls": raw.get("image_urls") or [],
+                                   "pdf_urls": raw.get("pdf_urls") or []}),
+            "gd_em", "task1")
+        assert [a["asset_type"] for a in row["_assets"]] == ["pdf", "image"]
     finally:
         _close(c)
 

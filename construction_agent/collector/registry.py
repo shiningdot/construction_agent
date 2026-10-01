@@ -239,8 +239,9 @@ def build(key: str, *, data_dir: Optional[Path] = None
     """按登记表构造一个采集器。
 
     `data_dir` 传了就透给采集器（7 个源是本轮才加的这个参数，其余 15 个本来
-    就有）；源不接受这个参数时**静默跳过**——实测只有 `esafety` 与 `gd_em`
-    不接受，而这两个源本身不建任何目录，跳过是安全的。
+    就有）；源不接受这个参数时**静默跳过**——实测只剩 `esafety` 不接受
+    （`gd_em` 第二十轮补上了，它要下载附件提正文，需要落盘位置），而
+    `esafety` 本身不建任何目录，跳过是安全的。
 
     返回 `(collector, spec)`：执行器两边都要用，spec 用来写 `collect_tasks`
     与日志，collector 用来真跑。

@@ -29,7 +29,8 @@ from construction_agent.collector.classifier import classify_v2, is_construction
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
+                                               RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -38,6 +39,28 @@ logger = logging.getLogger(__name__)
 # ── URL 常量 ──
 NMGEM_BASE = "https://yjglt.nmg.gov.cn"
 NMGEM_LIST_URL = "https://yjglt.nmg.gov.cn/zwgk/zdxx/sgxxccpg/"
+
+# 附件链接藏在 `<script>` 里（2026-10-01 第二十二轮补）。
+#
+# 这个站的模板把附件写成 JS 变量，`<a>` 是**运行时**由 JS 拼出来的：
+#
+#     <div class="article_content" style="display:none">附件：
+#       <script>
+#         var fujian = './P020251024611236404050.pdf';
+#         var file = '<a href="./P020251024611236404050.pdf" …>…</a>';
+#         … $(".article_content").append(file[i]) …
+#       </script>
+#     </div>
+#
+# 于是 `soup.find_all("a", href=True)` 在这页上 **0 次命中**——`div#pare` 里
+# 一个 `<a>` 都没有，整页也没有任何 `<a>` 指向那个 PDF。
+#
+# 8 页实测的命中分布：`<a href>` 带 `.pdf` 的 **0 条**，这个正则在 1 条上命中
+# （就是真有附件的那一页），其余 7 条都没有——不是误纳风险高的形态。
+# 只匹配 `var fujian` 这一个变量名，不扫 `script` 里所有 `.pdf` 引号串：
+# 后者在这 8 页上结果相同，但边界更松，将来页面底部挂个统计脚本就可能误吞。
+_RE_SCRIPT_ATTACH = re.compile(
+    r"""var\s+fujian\s*=\s*['"]([^'"]+)['"]""", re.I)
 
 # ── PDF 文本提取 ──
 # 本地那份已收敛到 `construction_agent.collector.pdf_text`（2026-10-01）。
@@ -125,6 +148,7 @@ class NmgEMCollector(BaseCollector):
             detail_date = pub_date
             detail_source = "内蒙古自治区应急管理厅"
             detail_text = ""
+            text_source = ""
             pdf_url = ""
             image_urls: list[str] = []
             local_path = ""
@@ -134,6 +158,7 @@ class NmgEMCollector(BaseCollector):
                 detail_date = detail.get("date") or pub_date
                 detail_source = detail.get("source") or detail_source
                 detail_text = detail.get("text") or ""
+                text_source = detail.get("text_source") or ""
                 pdf_url = detail.get("pdf_url") or ""
                 image_urls = detail.get("image_urls") or []
                 if pdf_url:
@@ -157,12 +182,29 @@ class NmgEMCollector(BaseCollector):
             else:
                 classification, reason, conf, status = "pending_review", "未启用分类", "low", "review"
 
+            # 真正文没提到：页面挂了附件或内容图，而正文区是空的
+            needs_ocr = ((bool(pdf_url) or bool(image_urls))
+                         and len(detail_text) < BODY_MIN_CHARS)
+
+            # 进审核队列时把理由写准。`classify_v2` 拿 3 字的正文只能给出
+            # 「置信度低」，说不出「这页的正文在图片里」。
+            if needs_ocr and status == "review":
+                reason = ("图片格式报告，需 OCR 提取文字" if image_urls
+                          else "附件未提到正文，待下载处理")
+
             # 构建内容
             parts = [detail_title, f"信息来源: {detail_source}"]
             if local_path:
                 parts.append(f"[本地文件: {local_path}]")
             if pdf_url:
                 parts.append(f"PDF: {pdf_url}")
+            if image_urls:
+                parts.append(f"内容图 {len(image_urls)} 张")
+            # 页面挂了内容图、正文区却是空的 → 报告本体就在图里。此前这条
+            # 页面交出的是 `body` 全文（导航+页脚 1,225 字），从外观看是
+            # 「一条有正文的普通记录」，图片一张也不标——正是缺陷 C 的形态。
+            if image_urls and needs_ocr:
+                parts.append("[图片格式报告，需 OCR 提取文字]")
             if detail_text:
                 preview = detail_text[:3000]
                 if len(detail_text) > 3000:
@@ -181,7 +223,13 @@ class NmgEMCollector(BaseCollector):
                 # 里那项 `("image_urls", "image")` 声明着，却没有源往外传。
                 # 判据与抽取逻辑共用 `construction_agent.collector.images`。
                 "image_urls": image_urls,
-                "needs_ocr": bool(pdf_url) and not detail_text,
+                # 判据见上方 `needs_ocr` 那行。改前是 `bool(pdf_url) and
+                # not detail_text`——只看 PDF、且把 `body` 全文当正文，
+                # 于是图片型页（正文区 3 字、body 1,225 字模板）恒为 False。
+                "needs_ocr": needs_ocr,
+                # 正文是从哪个容器取的（`pare` = 正文区 / `body` = 站点改版后
+                # 的退化路径）。落进 extra 便于事后排查，不参与业务判断。
+                "text_source": text_source,
                 "issuing_authority": detail_source,
                 "classification": classification,
                 "classification_reason": reason,
@@ -249,13 +297,35 @@ class NmgEMCollector(BaseCollector):
             elif name == "ContentSource":
                 source = content
 
-        # 正文
+        # 正文 —— 取正文容器，**不是 `body`**（2026-10-01 第二十二轮改）
+        #
+        # 改之前取的是 `body.get_text()`，于是正文里混着导航与页脚。实测这个
+        # 站的模板文字恒定 **1,225 字**：图片型页 `body` 全文 1,313–1,359 字，
+        # **去掉模板只剩 88–134 字**——这些条目靠模板文字混过了正文长度这道
+        # 防线（缺陷 G）。
+        #
+        # 正文容器是 `div#pare`，实测 8 页全部命中：
+        #     图片型页  `div#pare` **3 字**（含 69 张内容图）
+        #     文字型页  `div#pare` **18,724 字**
+        # 口径分得很干净。注意**不能写成 `class_="content"`**——该站还有一个
+        # `div.article_content` 也带 `content` 类，`find(class_="content")` 拿到
+        # 的是它（9 字），不是正文区。只有 `id="pare"` 是对的。
         soup = BeautifulSoup(html, "html.parser")
         text = ""
-        body = soup.find("body")
-        if body:
-            text = body.get_text(separator="\n").strip()
+        text_source = ""
+        box = soup.find("div", id="pare")
+        if box is not None:
+            text = box.get_text(separator="\n").strip()
             text = re.sub(r"\n{3,}", "\n\n", text)
+            text_source = "pare"
+        else:
+            # 站点改版时退化到旧口径。**退化不是无声的**：`text_source`
+            # 会一路传到产出里，`needs_ocr` 的判据也会因此偏保守（宁可标）。
+            body = soup.find("body")
+            if body:
+                text = body.get_text(separator="\n").strip()
+                text = re.sub(r"\n{3,}", "\n\n", text)
+                text_source = "body"
 
         # PDF 附件
         pdf_url = ""
@@ -263,10 +333,27 @@ class NmgEMCollector(BaseCollector):
             if ".pdf" in a["href"].lower():
                 pdf_url = a["href"] if a["href"].startswith("http") else urljoin(url, a["href"])
                 break
+        # DOM 里找不到时，去 `<script>` 里找（来由见 `_RE_SCRIPT_ATTACH`）。
+        # 这是**退化路径的顺序**：先认真正的 `<a>`，再认 JS 变量。反过来的话，
+        # 某天页面同时有两者、且 JS 那个是旧版本时会取错。
+        if not pdf_url:
+            for sc in soup.find_all("script"):
+                m = _RE_SCRIPT_ATTACH.search(sc.get_text())
+                if not m:
+                    continue
+                href = m.group(1)
+                if href.lower().endswith(".pdf"):
+                    pdf_url = urljoin(url, href)
+                    break
+                # 模板的扩展名白名单还有 .doc/.docx/.xls/.xlsx/.rar/.zip/.txt，
+                # 但 `_process_pdf` 只解得了 PDF。**不静默跳过**——这个源实测
+                # 只有 `.pdf`，出现别的说明站点改版了，得有人知道。
+                logger.warning(f"    附件非 PDF，暂不处理: {href[:80]}")
 
         image_urls = extract_page_images(url, soup, max_n=self._image_max)
 
         return {"title": title, "date": date, "source": source, "text": text,
+                "text_source": text_source,
                 "pdf_url": pdf_url, "image_urls": image_urls}
 
     def _process_pdf(self, pdf_url: str, title: str, pub_date: str) -> tuple[str, str]:

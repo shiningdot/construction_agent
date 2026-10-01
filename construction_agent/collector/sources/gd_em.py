@@ -37,7 +37,8 @@ import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
-from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
+                                               RawAccidentText)
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
@@ -93,8 +94,9 @@ NON_ACCIDENT_KW = [
 
 # 正文短于这个数、且页面挂了附件时，就去下载附件看看——省级站的常态是
 # 页面只有一行「点击链接查看报告详情：」，报告本体在 .pdf/.docx 里。
-# 这个阈值与 `needs_ocr` 的判据共用，两处必须同源，所以提成常量。
-_BODY_MIN = 200
+# 这个阈值与 `needs_ocr` 的判据共用，且 `nmg_em` 也用同一个口径，
+# 所以 2026-10-01 第二十二轮把它提到了 `collector.base.BODY_MIN_CHARS`。
+_BODY_MIN = BODY_MIN_CHARS
 
 # `_build_content_summary` 正文预览的截断长度。外层 item 还会再截到
 # 50000，这里留出标题与附件列表的余量。**别再写回三位数**：实测这里的

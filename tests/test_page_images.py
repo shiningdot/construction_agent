@@ -214,22 +214,43 @@ def _list_html() -> str:
             '</body></html>')
 
 
-def _detail_html() -> str:
+def _detail_html(pare: str | None = None, pdf: bool = False,
+                 script_attach: str = "") -> str:
+    """`pare=None` → 造一个**没有正文容器**的页面（走退化到 `body` 那条路）。
+
+    `div.article_content` 是**故意放进去的**：实测那个站上有它，也带 `content`
+    类，且在 `div#pare` 之前出现——`soup.find("div", class_="content")` 拿到
+    的是它（9 字），不是正文区。只有 `id="pare"` 是对的，这一条钉住这件事。
+
+    `script_attach` 给扩展名（如 `"pdf"`）→ 造「附件链接藏在 `<script>` 里」
+    的那个形态，`<a href>` 一个都不给。
+    """
+    box = f'<div id="pare" class="content">{pare}</div>' if pare is not None else ""
+    att = '<a href="./W020251121650679042482.pdf">附件</a>' if pdf else ""
+    sc = (f'<script>var fujian = "./W020251121650679042482.{script_attach}";'
+          f'var file = \'<a href="./W020251121650679042482.{script_attach}">报告</a>\';'
+          '</script>' if script_attach else "")
     return ('<html><head>'
             '<meta name="ArticleTitle" content=\'某地高处坠落事故调查报告\'/>'
             '<meta name="PubDate" content=\'2025-11-21 10:00:00\'/>'
             '</head><body>'
+            '<div class="article_content">站点导航</div>'
             '<div class="con">正文正文正文</div>'
+            f'{box}'
+            f'{att}'
+            f'{sc}'
             '<img src="/material/2021_static/logo.png">'
             '<img src="./W020251121650679042482_ORIGIN.jpg">'
             '<img src="./W020251121650679093210_ORIGIN.jpg">'
             '</body></html>')
 
 
-def _nmg(tmp_path: Path, image_max: int = 50) -> NmgEMCollector:
+def _nmg(tmp_path: Path, image_max: int = 50, pare: str | None = None,
+         pdf: bool = False, script_attach: str = "") -> NmgEMCollector:
     c = NmgEMCollector(delay=0, enable_classify=False,
                        data_dir=tmp_path / "nmg", image_max=image_max)
-    c._fetch = lambda url: _list_html() if url == NMGEM_LIST_URL else _detail_html()
+    c._fetch = lambda url: (_list_html() if url == NMGEM_LIST_URL
+                            else _detail_html(pare, pdf, script_attach))
     c.raw_store = RawAccidentStore(filepath=tmp_path / "raw.json")
     return c
 
@@ -293,6 +314,157 @@ def test_nmg_em_的图能落成image类型asset(tmp_path):
         raw = c.raw_store.get_all()[0]
         row = _row_from_raw_item(_as_raw_item(raw), "nmg_em", "task1")
         assert [a["asset_type"] for a in row["_assets"]] == ["image", "image"]
+    finally:
+        _close(c)
+
+
+# ── C2 组：正文口径与 `needs_ocr`（第二十二轮）──
+#
+# 这个站的模板文字实测**恒定 1,225 字**：图片型页 `body` 全文 1,313–1,359 字，
+# 去掉模板只剩 **88–134 字**。取 `body` 的后果不是「多读了几个字」，而是
+# 「一条报告本体全在图里的记录，从外观看是条有 1,300 字正文的普通记录」——
+# 缺陷 G 正是这个。正文区是 `div#pare`（图片型 3 字 / 文字型 18,724 字）。
+
+_PAREN = ("某地高处坠落事故调查报告\n一、事故经过\n"
+          "2025年11月21日，某工地发生高处坠落事故，造成一人死亡。")
+
+
+def test_正文取自pare容器而不是body(tmp_path):
+    c = _nmg(tmp_path, pare=_PAREN)
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert d["text"] == _PAREN
+        assert d["text_source"] == "pare"
+    finally:
+        _close(c)
+
+
+def test_正文不含body里的导航与页脚(tmp_path):
+    """钉「**不能**取 `body`」。fixture 里 `div.article_content`（站点导航）
+    与 `div.con`（正文正文正文）都在 `div#pare` 之外，取 pare 就看不到它们。"""
+    c = _nmg(tmp_path, pare=_PAREN)
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert "站点导航" not in d["text"]
+        assert "正文正文正文" not in d["text"]
+    finally:
+        _close(c)
+
+
+def test_没有pare容器时退化到body并标记来源(tmp_path):
+    """站点改版时 `div#pare` 消失，退化到旧口径。退化**必须可见**——
+    `text_source` 一路传到产出里，否则「正文突然多了 1,200 字」无从解释。"""
+    c = _nmg(tmp_path)
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert d["text_source"] == "body"
+        assert "站点导航" in d["text"]
+    finally:
+        _close(c)
+
+
+def test_图片型条目标needs_ocr(tmp_path):
+    """正文区空 + 挂了内容图 = 报告本体在图里。
+
+    改前这个源 `needs_ocr` 恒为 False（判据是 `bool(pdf_url) and not
+    detail_text`，而 detail_text 是 body 全文，模板文字永远把它填满）。
+    `classify_v2` 拿 3 字的正文只会说「置信度低」，说不出「正文在图片里」，
+    所以进审核队列时把理由也一并写准。"""
+    c = _nmg(tmp_path, pare="")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["needs_ocr"] is True
+        assert item["text_source"] == "pare"
+        assert "[图片格式报告，需 OCR 提取文字]" in item["content"]
+        assert item["classification_reason"] == "图片格式报告，需 OCR 提取文字"
+    finally:
+        _close(c)
+
+
+def test_文字型条目不标needs_ocr(tmp_path):
+    """有正文的页不该被误标——`needs_ocr` 不是「有图就标」。"""
+    c = _nmg(tmp_path, pare=_PAREN * 20)
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["needs_ocr"] is False
+        assert "[图片格式报告，需 OCR 提取文字]" not in item["content"]
+    finally:
+        _close(c)
+
+
+def test_只有附件没有正文时标needs_ocr(tmp_path):
+    """PDF 分支。`_process_pdf` 换掉——不换就要联网下真 PDF。省级站的常态是
+    页面上只有一行「点击链接查看报告详情：」，报告本体在附件里。"""
+    c = _nmg(tmp_path, pare="", pdf=True)
+    c._process_pdf = lambda url, title, pub: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["needs_ocr"] is True
+        assert item["classification_reason"] in (
+            "附件未提到正文，待下载处理", "图片格式报告，需 OCR 提取文字")
+    finally:
+        _close(c)
+
+
+# ── C3 组：附件链接藏在 `<script>` 里（第二十二轮实测撞出来的）──
+#
+# 端到端跑完那一轮，3 条落库记录里有 1 条 `needs_ocr=False`——查下去发现
+# 它的附件链接根本不在 DOM 里：页面把附件写成 JS 变量，`<a>` 是运行时拼的。
+# 8 页实测：`<a href>` 带 `.pdf` 的 **0 条**，这个形态 1 条。
+
+_SCRIPT_PDF = NMGEM_LIST_URL + "202511/W020251121650679042482.pdf"
+
+
+def test_附件链接藏在script里也要抽到(tmp_path):
+    c = _nmg(tmp_path, pare="附件：", script_attach="pdf")
+    c._process_pdf = lambda url, title, pub: ("", "")
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert d["pdf_url"] == _SCRIPT_PDF
+    finally:
+        _close(c)
+
+
+def test_script附件也能把正文提到(tmp_path):
+    """抽到 `pdf_url` 之后，`_process_pdf` 提出的正文才算真正文——
+    这条是端到端那一步的单测替身，`_process_pdf` 换成假的不去联网，
+    但走的是 `collect()` 的完整分支。"""
+    c = _nmg(tmp_path, pare="附件：", script_attach="pdf")
+    c._process_pdf = lambda url, title, pub: ("某地高处坠落事故调查报告全文" * 20, "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["pdf_urls"] == [_SCRIPT_PDF]
+        assert item["needs_ocr"] is False
+        assert "某地高处坠落事故调查报告全文" in item["content"]
+    finally:
+        _close(c)
+
+
+def test_非PDF的script附件不当成pdf_url(tmp_path):
+    """模板的扩展名白名单还有 `.doc/.docx/.xls/.rar/.zip/.txt`，但
+    `_process_pdf` 只解得了 PDF。**不静默吞掉**——它会被记 warning，
+    只是不落 `pdf_url`。"""
+    c = _nmg(tmp_path, pare="附件：", script_attach="docx")
+    c._process_pdf = lambda url, title, pub: ("", "")
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert d["pdf_url"] == ""
+    finally:
+        _close(c)
+
+
+def test_真a标签优先于script变量(tmp_path):
+    """两者同时存在时取 `<a>`。顺序反过来的话，某天页面里的 JS 变量是旧版本
+    就会取错地址。"""
+    c = _nmg(tmp_path, pare="附件：", pdf=True, script_attach="docx")
+    c._process_pdf = lambda url, title, pub: ("", "")
+    try:
+        d = c._crawl_detail(_DETAIL_URL)
+        assert d["pdf_url"] == NMGEM_LIST_URL + "202511/W020251121650679042482.pdf"
     finally:
         _close(c)
 

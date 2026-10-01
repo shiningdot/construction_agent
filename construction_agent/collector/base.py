@@ -9,6 +9,17 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
 
+# 正文短于这个字数、且页面挂了附件或内容图时，认为「真正文没提到」——
+# 省级站的常态是页面只有一行「点击链接查看报告详情：」，报告本体在附件里
+# （`gd_em` 实测 `.docx` 一条 8,170 字）或图片里（`nmg_em` 实测正文区 3 字、
+# 69 张内容图）。
+#
+# **放在共享位置，不各源各写一份**：这个值背后的口径（正文必须取正文区、
+# 不能取 `body` 全文）两处必须一致，否则会出现「同一个页面在一个源上标了
+# `needs_ocr`、在另一个源上没标」。`pdf_text.py` 被抄成三份、另外三个模块
+# 调它却没有定义的教训还在。
+BODY_MIN_CHARS = 200
+
 
 @dataclass
 class RawAccidentText:

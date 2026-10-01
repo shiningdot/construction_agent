@@ -192,7 +192,6 @@ class HebeiEMCollector(BaseCollector):
             detail_source = "河北省应急管理厅"
             detail_text = ""
             pdf_url = ""
-            local_path = ""
 
             if detail:
                 detail_title = detail.get("title") or title
@@ -202,9 +201,15 @@ class HebeiEMCollector(BaseCollector):
                 pdf_url = detail.get("pdf_url") or ""
 
             # ── 下载 PDF 并提取文本 ──
+            #
+            # 落盘路径**不往外传**（2026-10-01 第二十四轮）。`_process_pdf` 仍要
+            # 落盘（`extract_pdf_text` 读的是文件），但那个路径只在内部有意义：
+            # 经在线采集进来的 `data_dir` 是临时目录，任务结束即被
+            # `shutil.rmtree` 删掉——写进产出等于记录一个必然消失的位置。
+            # 裁决的出处与实测见 `sources/nmg_em.py` 同一处注释。
             pdf_text = ""
             if pdf_url:
-                pdf_text, local_path = self._process_pdf(pdf_url, title, detail_date)
+                pdf_text, _ = self._process_pdf(pdf_url, title, detail_date)
                 if pdf_text:
                     detail_text = pdf_text
 
@@ -227,9 +232,8 @@ class HebeiEMCollector(BaseCollector):
                 classification, reason_c, conf, status = "pending_review", "无正文内容", "low", "review"
 
             # ── 构建内容 ──
+            # 不拼 `[本地文件: …]`（2026-10-01 第二十四轮）——理由见上方注释。
             parts = [detail_title, f"信息来源: {detail_source}"]
-            if local_path:
-                parts.append(f"[本地文件: {local_path}]")
             if pdf_url:
                 parts.append(f"PDF: {pdf_url}")
             if detail_text:
@@ -248,7 +252,7 @@ class HebeiEMCollector(BaseCollector):
                 "classification": classification,
                 "classification_reason": reason_c,
                 "classification_confidence": conf,
-                "review_note": "", "local_file_path": local_path,
+                "review_note": "",
             })
 
             if status == "review":

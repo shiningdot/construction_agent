@@ -206,10 +206,15 @@ class HenanEMCollector(BaseCollector):
                 detail_text = detail.get("text") or ""
 
             # ── 处理 PDF ──
+            #
+            # 落盘路径**不往外传**（2026-10-01 第二十四轮）。`_process_pdf` 仍要
+            # 落盘（`extract_pdf_text` 读的是文件），但那个路径只在内部有意义：
+            # 经在线采集进来的 `data_dir` 是临时目录，任务结束即被
+            # `shutil.rmtree` 删掉——写进产出等于记录一个必然消失的位置。
+            # 裁决的出处与实测见 `sources/nmg_em.py` 同一处注释。
             pdf_text = ""
-            local_path = ""
             if pdf_url and self._download_pdfs:
-                pdf_text, local_path = self._process_pdf(pdf_url, title, detail_date)
+                pdf_text, _ = self._process_pdf(pdf_url, title, detail_date)
 
             # 合并所有文本用于分类
             combined_text = detail_text
@@ -254,11 +259,12 @@ class HenanEMCollector(BaseCollector):
                 item_status = "review"
 
             # ── 构建内容摘要 ──
+            # 不拼 `[本地文件: …]`（2026-10-01 第二十四轮）。`local_path` 只在
+            # `_process_pdf` 内部有意义，见上方注释；此前那行会把
+            # `/tmp/collect_<urandom>/…` 混进正文。
             parts = [detail_title]
             if detail_source:
                 parts.append(f"信息来源: {detail_source}")
-            if local_path:
-                parts.append(f"[本地文件: {local_path}]")
             if pdf_url:
                 parts.append(f"PDF: {pdf_url}")
             if combined_text:
@@ -281,7 +287,6 @@ class HenanEMCollector(BaseCollector):
                 "classification_reason": classification_reason,
                 "classification_confidence": classification_confidence,
                 "review_note": "",
-                "local_file_path": local_path,
             }
 
             batch_items.append(item)

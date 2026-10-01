@@ -151,7 +151,6 @@ class NmgEMCollector(BaseCollector):
             text_source = ""
             pdf_url = ""
             image_urls: list[str] = []
-            local_path = ""
 
             if detail:
                 detail_title = detail.get("title") or title
@@ -162,7 +161,18 @@ class NmgEMCollector(BaseCollector):
                 pdf_url = detail.get("pdf_url") or ""
                 image_urls = detail.get("image_urls") or []
                 if pdf_url:
-                    pdf_text, local_path = self._process_pdf(pdf_url, title, detail_date)
+                    # 落盘路径**不往外传**（2026-10-01 第二十四轮）。`_process_pdf`
+                    # 仍要落盘（`extract_pdf_text` 读的是文件），但那个路径只在
+                    # 这一步内部有意义：经在线采集进来的 `data_dir` 是
+                    # `_run_source` 建的**临时目录**，任务一结束就被
+                    # `shutil.rmtree` 删掉——写进产出等于**记录一个必然消失的
+                    # 位置**。空着只是缺信息，填错值是在撒谎。
+                    #
+                    # 这条裁决 `executor._assets_from` 的 docstring 里早就写着
+                    # （第十七轮定的），只是这四个源各自拼 content 时绕过了它，
+                    # 于是正文里混进一行 `/tmp/collect_d474f0794894_yaro70_1/…`
+                    # ——而且那串目录名是 `urandom` 生成的，每次采集都不同。
+                    pdf_text, _ = self._process_pdf(pdf_url, title, detail_date)
                     if pdf_text:
                         detail_text = pdf_text
 
@@ -194,8 +204,6 @@ class NmgEMCollector(BaseCollector):
 
             # 构建内容
             parts = [detail_title, f"信息来源: {detail_source}"]
-            if local_path:
-                parts.append(f"[本地文件: {local_path}]")
             if pdf_url:
                 parts.append(f"PDF: {pdf_url}")
             if image_urls:
@@ -235,7 +243,6 @@ class NmgEMCollector(BaseCollector):
                 "classification_reason": reason,
                 "classification_confidence": conf,
                 "review_note": "",
-                "local_file_path": local_path,
             })
 
             if status == "review":

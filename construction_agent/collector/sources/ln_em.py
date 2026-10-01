@@ -200,15 +200,22 @@ class LnEMCollector(BaseCollector):
             time.sleep(self._delay)
 
             # ── 处理 PDF viewer 链接 ──
+            #
+            # 落盘路径**不往外传**（2026-10-01 第二十四轮）。`_process_pdf` /
+            # `_process_html_detail` 仍要落盘（`extract_pdf_text` 读的是文件、
+            # HTML 也是先写盘再解析），但那个路径只在各自内部有意义：经在线
+            # 采集进来的 `data_dir` 是 `_run_source` 建的**临时目录**，任务一
+            # 结束就被 `shutil.rmtree` 删掉——写进产出等于记录一个必然消失的
+            # 位置。空着只是缺信息，填错值是在撒谎。裁决的出处与实测见
+            # `sources/nmg_em.py` 同一处注释。
             if is_pdf and pdf_url and self._download_pdfs:
-                detail_text, local_path = self._process_pdf(pdf_url, title, pub_date)
+                detail_text, _ = self._process_pdf(pdf_url, title, pub_date)
             elif is_pdf:
                 # 不下载PDF，仅记录URL
                 detail_text = ""
-                local_path = ""
             else:
                 # ── 处理 HTML 详情页 ──
-                detail_text, local_path = self._process_html_detail(
+                detail_text, _ = self._process_html_detail(
                     record_url, title, pub_date
                 )
 
@@ -255,9 +262,8 @@ class LnEMCollector(BaseCollector):
                 item_status = "review"
 
             # ── 构建内容摘要 ──
+            # 不拼 `[本地文件: …]`（2026-10-01 第二十四轮）——理由见上方注释。
             content_parts = [title]
-            if local_path:
-                content_parts.append(f"[本地文件: {local_path}]")
             if is_pdf and pdf_url:
                 content_parts.append(f"PDF: {pdf_url}")
             if detail_text:
@@ -284,7 +290,6 @@ class LnEMCollector(BaseCollector):
                 "classification_confidence": classification_confidence,
                 "review_note": "",
                 "is_pdf_format": is_pdf,
-                "local_file_path": local_path,
             }
 
             batch_items.append(item)

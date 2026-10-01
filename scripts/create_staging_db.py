@@ -39,6 +39,27 @@ def print_info(path: Path) -> None:
     size_mb = path.stat().st_size / 1024 / 1024
     print(f"  大小：{size_mb:.1f} MB")
 
+    # 「文件在、表不在」是一种**真实且常见**的状态，不是异常（2026-10-01 第二十五轮）。
+    #
+    # 它怎么产生的：`staging_db.connect()` 的写连接第一句就是
+    # `PRAGMA journal_mode = WAL`——**光打开就把库文件连同 `-wal`/`-shm` 建出来**，
+    # 建表要等 `init_db()`。于是任何一个「打开过工作库、但没跑到建表那一步」的进程
+    # （采集页面首次访问、脚本中途报错、只读查询走错分支…）都会留下这么一具空壳。
+    #
+    # 此前这里不判直接查 `staging_metadata`，对这种库抛
+    # `sqlite3.OperationalError: no such table: staging_metadata`（实测复现）——
+    # **最需要看现状的时候，它给的是 traceback**。判据复用 `is_initialized()`
+    # （它查的是 `sqlite_master` 里有没有 `raw_accidents`，对空壳返回 False），
+    # 不在这里另写一套。
+    if not sdb.is_initialized(path):
+        print("  状态：**文件存在，但它不是工作库**（没有 raw_accidents 表）")
+        print("       成因多为「写连接打开过、init_db() 没跑」——"
+              "`connect()` 的 `journal_mode=WAL` 光打开就会建文件。")
+        print("       处理：直接再跑一次本脚本（不带参数）即可建表，"
+              "幂等，不会动已有数据；")
+        print("             确要清掉重来用 `--drop`。")
+        return
+
     con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
     con.execute("PRAGMA foreign_keys = ON")  # 连接级开关，SQLite 默认 OFF
     try:

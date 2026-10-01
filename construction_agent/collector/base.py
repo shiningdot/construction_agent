@@ -7,7 +7,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
+from typing import Any, Optional, Union
 
 # 正文短于这个字数、且页面挂了附件或内容图时，认为「真正文没提到」——
 # 省级站的常态是页面只有一行「点击链接查看报告详情：」，报告本体在附件里
@@ -134,12 +134,36 @@ class RawAccidentText:
         return False
 
 
+# ── `collect()` 的两种返回形态（2026-10-01 第三十一轮正式收进契约）──────────
+#
+# 实测 15 个 `collect()` 实现分两类：
+#
+#   * **文本通路**（5 个）：`trs_cms_base` / `mohurd` / `news_aggregator` /
+#     `open_gov` / `academic_import` → `list[RawAccidentText]`，产出就在返回值里。
+#   * **store 通路**（9 个）：`beijing_em` / `esafety` / `gd_em` / `hebei_em` /
+#     `henan_em` / `ln_em` / `mem` / `nmg_em` / `safehoo` → `CollectStats`。
+#     产出走 `raw_store.add()`，返回值只是**顺带交出的采集元信息**
+#     （列表条数、收录/审核/排除计数、缓存增量、耗时）。
+#   * `safehoo` 还特殊：**同一个方法两种都可能**——抓不到首页时早退返
+#     `CollectStats`，正常跑完返 `list`。
+#
+# 这 9 个源的注解此前一律写着 `-> list[RawAccidentText]`，**是错的**。
+# 注解不影响运行，但它是给人和工具看的契约：新写一个源的人照着基类
+# 抄，会以为「只有列表这一种形态」；而下游稍一疏忽（`len(ret)`、
+# `for x in ret`）就会**静默出错**——`len(dict)` 给键数、遍历给键名，
+# 都不报错。`pipeline.py` 撞的正是这个（见该文件 Step 1 的注释）。
+#
+# 所以这里给两种形态各起一个名字，让注解说实话：
+CollectStats = dict[str, Any]
+CollectResult = Union[list["RawAccidentText"], CollectStats]
+
+
 class BaseCollector(ABC):
     """所有数据源采集器的抽象基类。
 
     子类只需实现：
     1. source_name() — 返回数据源唯一标识
-    2. collect() — 从数据源获取原始文本列表，返回 RawAccidentText 列表
+    2. collect() — 采集原始文本；返回形态见 `CollectResult`（**两种**）
 
     注意：
     - collect() 不应调用任何 LLM
@@ -156,11 +180,17 @@ class BaseCollector(ABC):
         ...
 
     @abstractmethod
-    def collect(self) -> list[RawAccidentText]:
+    def collect(self) -> CollectResult:
         """从数据源采集原始事故文本。
 
         Returns:
-            RawAccidentText 列表，采集失败时返回空列表
+            **两种形态，下游必须先判**（见 `CollectResult` 的说明）：
+
+            * `list[RawAccidentText]` —— 产出就在返回值里；
+            * `CollectStats` —— 产出已走 `raw_store`，返回值是元信息。
+
+            采集失败时，两种情况都可能：返回空列表，或返回一份计数为 0
+            的统计字典。**不要用 `len()` 或直接遍历来假定它是列表。**
         """
         ...
 

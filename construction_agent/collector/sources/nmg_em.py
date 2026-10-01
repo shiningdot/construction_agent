@@ -30,7 +30,7 @@ from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 
 from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
-                                               RawAccidentText)
+                                               CollectResult, RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -117,7 +117,7 @@ class NmgEMCollector(BaseCollector):
     @property
     def collected_count(self) -> int: return self._collected
 
-    def collect(self) -> list[RawAccidentText]:
+    def collect(self) -> CollectResult:
         t_start = time.time()
         logger.info("开始采集内蒙古应急管理厅事故信息和查处评估...")
 

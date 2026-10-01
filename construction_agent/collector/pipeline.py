@@ -132,6 +132,38 @@ class CollectorPipeline:
             try:
                 # Step 1: 采集原始数据
                 raw_items = collector.collect()
+
+                # **先判形态，再碰 `len()`。** `collect()` 有两种返回形态
+                # （详见 `collector/executor.py` 模块 docstring）：5 个源返回
+                # `list[RawAccidentText]`，9 个 store-backed 的源返回
+                # `_make_stats()` 统计字典。
+                #
+                # 字典这一路会**静默出错**，而且错得很有欺骗性——
+                # `len(dict)` **不报错**，给的是键的个数（实测 8），于是
+                # 「一条文本都没有」被显示成「采集 8 条」；紧接着
+                # `for item in dict` 遍历出的是**键名字符串**，
+                # `item.raw_text` 抛 `AttributeError`，被下面的
+                # `except Exception` 吞成一条 `logger.debug`——默认 INFO 级别
+                # 下**一个字都看不见**。实测（2026-10-01）整段日志是：
+                #
+                #     Step 1 采集: 8 条原始文本
+                #     Step 2 清洗: 0 条有效文本（过滤 8 条）
+                #
+                # **看起来像清洗环节把 8 条全滤掉了**——去查清洗规则、去调
+                # 最短长度阈值，永远查不到真因。
+                if not isinstance(raw_items, list):
+                    logger.warning(
+                        f"  Step 1 采集: {source_name} 的 collect() 返回的是 "
+                        f"{type(raw_items).__name__} 统计字典，不是文本列表。"
+                        f"本源的产出走 raw_store 通路，旧编排器这一路没有东西"
+                        f"可处理，跳过（**条数不是 {len(raw_items)}**）"
+                    )
+                    self.stats["by_source"][source_name] = {
+                        "collected": 0, "added": 0, "duplicates": 0, "merged": 0,
+                        "note": "collect() 返回统计字典，产出已走 raw_store 通路",
+                    }
+                    continue
+
                 self.stats["total_collected"] += len(raw_items)
                 self.stats["by_source"][source_name] = {
                     "collected": len(raw_items),

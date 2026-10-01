@@ -66,7 +66,8 @@ from construction_agent.collector.attachments import kind_of_suffix
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.base import (BaseCollector, CollectResult,
+                                               RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -197,7 +198,7 @@ class HebeiEMCollector(BaseCollector):
     @property
     def collected_count(self) -> int: return self._collected
 
-    def collect(self) -> list[RawAccidentText]:
+    def collect(self) -> CollectResult:
         t_start = time.time()
         logger.info("开始采集河北省应急管理厅事故调查...")
 

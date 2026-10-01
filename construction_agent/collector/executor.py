@@ -13,9 +13,13 @@
 
 **还有一个坑**：9 个 store-backed 的非 TRS 源（`beijing_em` / `hebei_em` /
 `henan_em` / `ln_em` / `nmg_em` / `esafety` / `gd_em` / `mem` / `safehoo`）的
-`collect()` **返回的是 `_make_stats()` 统计字典，不是列表**，尽管类型标注写着
-`-> list[RawAccidentText]`。所以返回值这一路不能假设是列表——类型判断放在
-运行期做，写成 `isinstance(ret, list)`，不是断言。
+`collect()` **返回的是 `_make_stats()` 统计字典，不是列表**。所以返回值这一路
+不能假设是列表——类型判断放在运行期做，写成 `isinstance(ret, list)`，不是断言。
+
+（这 9 个源的注解原先是 `-> list[RawAccidentText]`，与实际不符；第三十一轮已
+统一改为 `base.CollectResult`，见那里对两种形态的完整说明。**注解改了，
+`isinstance` 不能删**——`safehoo` 是全项目唯一两种情况都可能返回的源，静态
+上看不出哪一次走哪一支。）
 """
 
 from __future__ import annotations
@@ -433,7 +437,8 @@ def _run_source(spec: SourceSpec, task_id: str, *,
         ret = collector.collect()
 
         # 通路 B。`isinstance(ret, list)` 不是防御性写法，是必需的：
-        # 9 个 store-backed 的源这里返回的是 stats dict（见模块 docstring）。
+        # 9 个 store-backed 的源这里返回的是 stats dict（见模块 docstring），
+        # 且 `safehoo` 两种情况都可能。
         if isinstance(ret, list):
             for item in ret:
                 if isinstance(item, RawAccidentText):

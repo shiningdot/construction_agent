@@ -39,7 +39,7 @@ from construction_agent.collector.classifier import classify_v2, is_construction
 
 from construction_agent.collector.attachments import attachment_kind
 from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
-                                               RawAccidentText)
+                                               CollectResult, RawAccidentText)
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
@@ -194,7 +194,7 @@ class GdEMCollector(BaseCollector):
     def collected_count(self) -> int:
         return self._collected
 
-    def collect(self) -> list[RawAccidentText]:
+    def collect(self) -> CollectResult:
         """执行采集，返回统计字典。"""
         t_start = time.time()
 

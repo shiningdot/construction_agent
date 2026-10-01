@@ -22,7 +22,8 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 
-from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.base import (BaseCollector, CollectResult,
+                                               RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -218,8 +219,14 @@ class SafehooCollector(BaseCollector):
     def collected_count(self) -> int:
         return self._collected
 
-    def collect(self) -> list[RawAccidentText]:
-        """执行采集，返回 RawAccidentText 列表。
+    def collect(self) -> CollectResult:
+        """执行采集。
+
+        **本源是全项目唯一两种情况都可能返回的源**，下游不能假定是列表：
+        正常跑完返回 `list[RawAccidentText]`；而**抓不到第一页时早退**，
+        返回的是 `_make_stats(0)` 统计字典。这两种形态在 `isinstance`
+        之外看不出区别——`len()` 和 `for` 对字典都不报错（见
+        `base.CollectResult` 的说明）。
 
         同时将原始数据缓存到 RawAccidentStore (data/raw_accidents.json)。
         """

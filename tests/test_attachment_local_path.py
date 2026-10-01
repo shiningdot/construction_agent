@@ -84,8 +84,9 @@ def _fake_store() -> tuple[types.SimpleNamespace, list[dict]]:
     """别碰 `data/raw_accidents.json`：真实的 store 会写盘。
 
     返回 `(store, 产出)`。**产出要从这里接**，不走 `collect()` 的返回值：
-    `collect()` 返回的是 `_make_stats()` 的统计字典（尽管类型标注写着
-    `list[RawAccidentText]`），条目是在 `add_batch` 那一步交出去的。
+    `collect()` 返回的是 `_make_stats()` 的统计字典（注解已由第三十一轮
+    改为 `base.CollectResult`，不再是那个说假话的 `list[RawAccidentText]`），
+    条目是在 `add_batch` 那一步交出去的。
     """
     captured: list[dict] = []
     store = types.SimpleNamespace(

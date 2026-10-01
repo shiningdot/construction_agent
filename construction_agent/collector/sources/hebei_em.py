@@ -8,8 +8,27 @@
   参数: id=sgdc, type=2, limit=15, pageNo=N
   返回: {data: {count, resultList: [{articletitle, articleid, createdate, ...}]}}
 - 详情页 URL: /portal/index/getPortalNewsDetails?id={articleid}&categoryid={categoryid}
-- PDF 附件: /portal/upload/downloadFile?id={uuid}
-- 详情页正文极少，事故报告全文在 PDF 中
+- 附件: /portal/upload/downloadFile?id={uuid}
+- 详情页正文极少，事故报告全文在附件中
+
+**附件不全是 PDF，而且 URL 上看不出来**（2026-10-01 第三十轮实测全站 110 页、
+18 个去重附件）：`.pdf` 15、`.doc` 1、`.png` 1、另有 1 个 id 已被删（404）。
+
+这个 URL 形态（`downloadFile?id={uuid}`）**没有扩展名**，所以类型判不了在下载
+之前——而 `Content-Type` 一律是 `application/octet-stream`，也没用。**可靠的信号
+是响应头 `Content-Disposition` 的 `filename`**（17/18 个带，后缀是 ASCII 没坏；
+汉字部分是坏的，GBK 被当 latin-1 读，不影响取后缀）。判据因此挪到下载之后，
+见 `_process_pdf`。
+
+> 上一轮（§2.5.29）把本源算作「14 个有后缀判据的源之一」，那是错的：正则只
+> 认路径前缀 `/portal/upload/downloadFile?`，它**不是类型判据**。本源的附件
+> 与 `esafety`（图片塞进 `pdf_urls`，§2.5.28）、`beijing_em`（Word 塞进
+> `pdf_urls`，§2.5.29）是同一族，只是更靠后一轮才发现。
+
+**每页附件个数也不止一个**：110 页里 93 页无附件、16 页 1 个、1 页 3 个
+（沧州鼎睿石化"5·31"，其中两个是同一个 id）。`_crawl_detail` 原先用
+`re.search` 只取第一个，那一页会漏掉后面的 PDF——而漏掉的正巧是唯一能提出
+正文的那个（第一个是 PNG）。
 
 **这个接口有两条响应路径，cookie 决定走哪一条：**
 
@@ -43,6 +62,7 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
+from construction_agent.collector.attachments import kind_of_suffix
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
@@ -60,12 +80,42 @@ HBEM_DETAIL_URL = f"{HBEM_BASE}/portal/index/getPortalNewsDetails"
 # 事故调查报告的分类 ID
 HBEM_CATEGORY_ID = "3a9d0375-6937-4730-bf52-febb997d8b48"
 
+# 附件链接。**没有扩展名**——类型要等下载后看 `Content-Disposition`（见 `_process_pdf`）。
+_ATTACH_RE = re.compile(r'["\'](/portal/upload/downloadFile\?id=[^"\']+)["\']')
+
+# `Content-Disposition` 里的 filename。汉字部分是坏的（GBK 被当 latin-1 读），
+# 但**后缀是 ASCII、没坏**——要取的正是它。
+_CD_FILENAME_RE = re.compile(r'filename\*?=(?:UTF-8\'\')?["\']?([^"\';]+)')
+
 # ── PDF 文本提取 ──
 # 本地那份已收敛到 `construction_agent.collector.pdf_text`（2026-10-01）。
 
 # (classify_v2 已迁移至 construction_agent.collector.classifier)
 
 # (is_construction_candidate 已迁移至 classifier 模块)
+
+
+def _kind_from_disposition(resp: httpx.Response) -> tuple[str, str]:
+    """从响应头 `Content-Disposition` 里取 `(类型, 后缀)`。
+
+    实测这条头长这样（汉字是坏的，GBK 被当 latin-1 读）：
+
+        attachment; filename=¡°3?13¡±½Ï´óÈ¼Æø±¬È¼ÊÂ¹Êµ÷²é±¨¸æ.pdf
+
+    **判据只用后缀那一段 ASCII**，所以汉字坏掉不影响它——这一点是有意利用的，
+    不是侥幸：`.pdf` / `.doc` / `.png` 都是 ASCII。
+
+    说不清是哪种的时候返回 `("", 后缀)`：后缀照用（落盘文件名诚实），类型空
+    字符串让调用方不收。
+    """
+    m = _CD_FILENAME_RE.search(resp.headers.get("content-disposition", "") or "")
+    if not m:
+        return "", ""
+    name = m.group(1).strip()
+    suffix = Path(name).suffix.lower()
+    # 用 `kind_of_suffix` 而不是 `attachment_kind(name)`：后者按 URL 解析，
+    # 会把 filename 里那个乱码产生的 `?` 之后的整段（含真后缀）当查询串丢掉。
+    return kind_of_suffix(suffix), suffix
 
 
 def _decode_json(resp: httpx.Response) -> dict:
@@ -191,27 +241,41 @@ class HebeiEMCollector(BaseCollector):
             detail_date = date_str
             detail_source = "河北省应急管理厅"
             detail_text = ""
-            pdf_url = ""
+            attach_urls: list[str] = []
 
             if detail:
                 detail_title = detail.get("title") or title
                 detail_date = detail.get("date") or date_str
                 detail_source = detail.get("source") or detail_source
                 detail_text = detail.get("text") or ""
-                pdf_url = detail.get("pdf_url") or ""
+                attach_urls = detail.get("attach_urls") or []
 
-            # ── 下载 PDF 并提取文本 ──
+            # ── 下载附件、判类型、提取文本 ──
             #
             # 落盘路径**不往外传**（2026-10-01 第二十四轮）。`_process_pdf` 仍要
             # 落盘（`extract_pdf_text` 读的是文件），但那个路径只在内部有意义：
             # 经在线采集进来的 `data_dir` 是临时目录，任务结束即被
             # `shutil.rmtree` 删掉——写进产出等于记录一个必然消失的位置。
             # 裁决的出处与实测见 `sources/nmg_em.py` 同一处注释。
-            pdf_text = ""
-            if pdf_url:
-                pdf_text, _ = self._process_pdf(pdf_url, title, detail_date)
-                if pdf_text:
-                    detail_text = pdf_text
+            #
+            # **类型只能在下载之后判**（URL 没有扩展名，见 `_process_pdf`）。
+            # 认不出的不入产出——`_process_pdf` 已经记了警告，这里不重复。
+            # 与 `beijing_em` 同一处置，理由也一样：宁可漏登记一条，也不要把
+            # 一个 PNG 塞进 `pdf_urls` 让阶段② 拿 PyMuPDF 去解。
+            pdf_urls: list[str] = []
+            office_urls: list[str] = []
+            attach_texts: list[str] = []
+            for attach_url in attach_urls:
+                a_text, _local, kind = self._process_pdf(
+                    attach_url, title, detail_date)
+                if not kind:
+                    continue
+                (pdf_urls if kind == "pdf" else office_urls).append(attach_url)
+                if a_text:
+                    attach_texts.append(a_text)
+            if attach_texts:
+                # 多个附件时全拼上（改前只可能有一个，见 `_crawl_detail`）
+                detail_text = "\n\n".join(attach_texts)
 
             # ── classify_v2 ──
             if self._enable_classify and detail_text:
@@ -226,16 +290,19 @@ class HebeiEMCollector(BaseCollector):
                     continue
                 else:
                     classification, reason_c, conf, status = "pending_review", result["reason"], "low", "review"
-            elif not detail_text and pdf_url:
-                classification, reason_c, conf, status = "pending_review", "PDF文本提取失败", "low", "review"
+            elif not detail_text and attach_urls:
+                classification, reason_c, conf, status = "pending_review", "附件文本提取失败", "low", "review"
             else:
                 classification, reason_c, conf, status = "pending_review", "无正文内容", "low", "review"
 
             # ── 构建内容 ──
             # 不拼 `[本地文件: …]`（2026-10-01 第二十四轮）——理由见上方注释。
             parts = [detail_title, f"信息来源: {detail_source}"]
-            if pdf_url:
-                parts.append(f"PDF: {pdf_url}")
+            # 分行按类型写（改前一律写「PDF:」，Word 附件也顶着这个标签）
+            if pdf_urls:
+                parts.append("PDF: " + " / ".join(pdf_urls))
+            if office_urls:
+                parts.append("Office 文档: " + " / ".join(office_urls))
             if detail_text:
                 preview = detail_text[:3000]
                 if len(detail_text) > 3000:
@@ -246,8 +313,15 @@ class HebeiEMCollector(BaseCollector):
                 "title": detail_title, "content": "\n".join(parts)[:50000],
                 "source_url": detail_url, "source_name": "hebei_em",
                 "publish_date": detail_date, "status": status,
-                "pdf_urls": [pdf_url] if pdf_url else [],
-                "needs_ocr": bool(pdf_url) and not detail_text,
+                "pdf_urls": pdf_urls,
+                "office_urls": office_urls,
+                # 全项目约定（§2.5.13）：有附件 且 正文没提出来。
+                # 「有附件」取的是**页面上的链接**，不是「下载成功的附件」——
+                # 实测有 404 的死链（`downloadFile?id=` 返回 404 空响应），
+                # 那种更要标：资料确实存在过，只是这次没拿到。
+                # 本轮这一项的行为没变（`search` 与 `findall` 对「非空」等价），
+                # 变的是第二项：`detail_text` 现在可能是多个附件正文的拼接。
+                "needs_ocr": bool(attach_urls) and not detail_text,
                 "issuing_authority": detail_source,
                 "classification": classification,
                 "classification_reason": reason_c,
@@ -351,29 +425,68 @@ class HebeiEMCollector(BaseCollector):
             text = body.get_text(separator="\n").strip()
             text = re.sub(r"\n{3,}", "\n\n", text)
 
-        # PDF 附件: /portal/upload/downloadFile?id={uuid}
-        pdf_url = ""
-        pdf_match = re.search(r'["\'](/portal/upload/downloadFile\?id=[^"\']+)["\']', html)
-        if pdf_match:
-            pdf_url = urljoin(HBEM_BASE, pdf_match.group(1))
+        # 附件链接。**`findall` 不是 `search`** —— 2026-10-01 第三十轮实测
+        # 沧州鼎睿石化"5·31"那页有 3 个链接（其中两个指向同一个 id），
+        # `search` 只收第一个；而那一页第一个恰好是张 PNG（提不出正文），
+        # 唯一能用的 PDF 在第三个。
+        #
+        # 按出现顺序去重：同一个 id 在一页里出现多次是常态（正文里引一次、
+        # 附件区再列一次）。
+        attach_urls: list[str] = []
+        for hit in _ATTACH_RE.findall(html):
+            full = urljoin(HBEM_BASE, hit)
+            if full not in attach_urls:
+                attach_urls.append(full)
 
-        return {"title": title, "date": date, "source": source, "text": text, "pdf_url": pdf_url}
+        return {"title": title, "date": date, "source": source,
+                "text": text, "attach_urls": attach_urls}
 
-    def _process_pdf(self, pdf_url: str, title: str, pub_date: str) -> tuple[str, str]:
-        url_hash = hashlib.md5(pdf_url.encode()).hexdigest()[:12]
+    def _process_pdf(self, url: str, title: str, pub_date: str) -> tuple[str, str, str]:
+        """下载一个附件，返回 `(正文, 落盘路径, 类型)`。
+
+        **类型只能在这里判。** 本源的附件 URL 是
+        `/portal/upload/downloadFile?id={uuid}`——**没有扩展名**；响应头
+        `Content-Type` 一律是 `application/octet-stream`（实测 18/18），也没用。
+        可靠的信号只有 `Content-Disposition` 的 `filename`（17/18 个带，
+        后缀是 ASCII 没坏）。所以判据在**下载之后**，这不是绕远，是这里只有
+        下载之后才有信号。
+
+        认不出的（实测有 `.png`，612×374 一张图）**照旧落盘、但不报类型**——
+        落盘是为了文件名诚实、便于人工去看它到底是什么；类型给空字符串，
+        由调用方决定不收。
+
+        函数名里的 `pdf` 是历史包袱：它从 2026-10-01 第三十轮起处理的是「附件」。
+        """
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50]
-        local_path = self.data_dir / f"{pub_date}_{safe_title}_{url_hash}.pdf"
-        if local_path.exists():
-            return extract_pdf_text(local_path), str(local_path)
+        stem = f"{pub_date}_{safe_title}_{url_hash}"
+
+        # 缓存：后缀下载前不知道（也就没法拼出确切文件名），按 stem 找已落盘的。
+        # 用 `iterdir` 不用 `glob`——标题里可能有 `[`，那在 glob 里是字符集语法。
+        for cached in self.data_dir.iterdir():
+            if cached.name.startswith(stem + "."):
+                return (extract_pdf_text(cached), str(cached),
+                        kind_of_suffix(cached.suffix))
+
         try:
-            resp = self._session.get(pdf_url)
-            if resp.status_code == 200 and len(resp.content) >= 100:
-                local_path.write_bytes(resp.content)
-                logger.info(f"    PDF: {local_path.name} ({len(resp.content)} bytes)")
-                return extract_pdf_text(local_path), str(local_path)
+            resp = self._session.get(url)
+            if resp.status_code != 200 or len(resp.content) < 100:
+                # 实测有 404 的死链（附件已从站点删掉，链接还挂着）
+                logger.warning(f"    附件取不到（HTTP {resp.status_code}，"
+                               f"{len(resp.content)} bytes）: {url}")
+                return "", "", ""
+            kind, suffix = _kind_from_disposition(resp)
+            local_path = self.data_dir / f"{stem}{suffix}"
+            local_path.write_bytes(resp.content)
+            logger.info(f"    附件[{kind or '认不出'}]: {local_path.name} "
+                        f"({len(resp.content)} bytes)")
+            if not kind:
+                logger.warning(f"    附件类型认不出，不入产出: {url}（后缀 "
+                               f"{suffix or '无'}）")
+            return extract_pdf_text(local_path), str(local_path), kind
         except Exception as e:
-            logger.error(f"    PDF异常: {e}")
-        return "", ""
+            logger.error(f"    附件异常: {e}")
+        return "", "", ""
 
     def _make_stats(self, duration: float) -> dict:
         cs = self.raw_store.stats()

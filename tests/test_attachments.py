@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from construction_agent.collector.attachments import (  # noqa: E402
-    attachment_kind)
+    attachment_kind, kind_of_suffix)
 from construction_agent.collector.executor import _ASSET_KEYS  # noqa: E402
 
 # --------------------------------------------------------------------------
@@ -56,6 +56,37 @@ from construction_agent.collector.executor import _ASSET_KEYS  # noqa: E402
 ])
 def test_附件后缀判据(url, expected):
     assert attachment_kind(url) == expected
+
+
+def test_按已取出的后缀判类型():
+    """`kind_of_suffix` —— 给「手里已经有后缀」的调用方（`hebei_em`）。
+
+    它拿到的不是 URL 而是 `Content-Disposition` 里的 filename，见下一条。
+    """
+    for s, want in [(".pdf", "pdf"), (".PDF", "pdf"),
+                    (".doc", "office"), (".docx", "office"),
+                    (".png", ""), (".xlsx", ""), ("", ""), (None, "")]:
+        assert kind_of_suffix(s) == want, f"{s!r} 应判成 {want!r}"
+
+
+def test_filename里那个问号不能走URL判据():
+    """**`kind_of_suffix` 存在的第二个理由。**
+
+    `hebei_em` 的 `Content-Disposition` 实测长这样（GBK 被当 latin-1 读）：
+
+        attachment; filename=¡°3?13¡±½Ï´óÈ¼Æø±¬È¼ÊÂ¹Êµ÷²é±¨¸æ.pdf
+
+    那个 `?` 是乱码产生的，而 `urlsplit` 把它当**查询串分隔符**——后面整段
+    （含真后缀 `.pdf`）全被丢进 query，`attachment_kind` 于是判成「认不出」，
+    一条本来好好的 PDF 会被当成未知类型丢掉。
+
+    `Path(...).suffix` 不解析 `?`，在这儿是对的。
+    """
+    from pathlib import Path
+
+    name = "¡°3?13¡±½Ï´óÈ¼Æø±¬È¼ÊÂ¹Êµ÷²é±¨¸æ.pdf"
+    assert attachment_kind(name) == "", "前提变了：URL 判据不再被 `?` 截断"
+    assert kind_of_suffix(Path(name).suffix) == "pdf"
 
 
 def test_子串判据会误收而这版不会():

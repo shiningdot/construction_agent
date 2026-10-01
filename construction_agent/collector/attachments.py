@@ -19,24 +19,42 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import urlsplit
 
 # 目前只认 Word。`.xlsx` / `.pptx` 这类**有意不收**——截至本轮，全部 24 个源
-# 实测到的非 PDF 附件都是 Word，放宽到没见过的类型等于替站点猜它的意图；
-# 真出现了，`attachment_kind` 会给 `""`，调用方那条 warning 会把它暴露出来。
+# 实测到的非 PDF 附件都是 Word（第三十轮又实测到一张 `.png`，同样不收，
+# 理由见 `hebei_em` 的 warning 那一处）；放宽到没见过的类型等于替站点猜它的
+# 意图。真出现了，判据会给 `""`，调用方那条 warning 会把它暴露出来。
 _PDF_EXT = (".pdf",)
 _OFFICE_EXT = (".docx", ".doc")
 
 
+def kind_of_suffix(suffix: str) -> str:
+    """按**已经取出来的后缀**判断类型，返回 `"pdf"` / `"office"` / `""`。
+
+    给「手里已经有后缀」的调用方用——典型是 `hebei_em`：它得从响应头
+    `Content-Disposition` 的 `filename` 判类型（那个 URL 没有扩展名）。
+
+    **`filename` 不能走 `attachment_kind`**：那函数拿 `urlsplit` 拆 URL，而
+    `filename` 里可能有 `?`——实测这条头是 GBK 被当 latin-1 读的乱码，
+    `¡°3?13¡±½Ï´ó...报告.pdf` 里那个 `?` 会被 `urlsplit` 当查询串分隔符，
+    后面整段（含真后缀）全被当成 query 丢掉。`Path().suffix` 不解析 `?`，
+    在这儿是对的。
+    """
+    s = str(suffix or "").lower()
+    if s in _PDF_EXT:
+        return "pdf"
+    if s in _OFFICE_EXT:
+        return "office"
+    return ""
+
+
 def attachment_kind(url: str) -> str:
-    """按后缀判断附件类型，返回 `"pdf"` / `"office"` / `""`（认不出）。
+    """按 URL 后缀判断附件类型，返回 `"pdf"` / `"office"` / `""`（认不出）。
 
     大小写、查询串、锚点都在这一个函数里统一处理（`gd_em` 那版是手工
     `lower().split("?")[0].split("#")[0]`，等价但漏一半情形就出错）。
     """
-    path = urlsplit(str(url or "")).path.lower()
-    if path.endswith(_PDF_EXT):
-        return "pdf"
-    if path.endswith(_OFFICE_EXT):
-        return "office"
-    return ""
+    path = urlsplit(str(url or "")).path
+    return kind_of_suffix(Path(path).suffix)

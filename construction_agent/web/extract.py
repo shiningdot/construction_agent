@@ -27,11 +27,13 @@ import json
 import math
 from typing import Any, Optional
 
+import sqlite3
+
 from flask import Blueprint, jsonify, request
 
 from ..extraction import staging_executor as ex
 from ..extraction.evidence_quality import LEVEL_LABELS
-from . import db, staging_db
+from . import db, dberr, staging_db
 
 extract_bp = Blueprint("extract", __name__, url_prefix="/api/extract")
 
@@ -39,8 +41,6 @@ PAGE_SIZE_DEFAULT = 50
 PAGE_SIZE_MAX = 200
 
 # 与采集页同一个提示语，两个页面共用一份工作库
-BUILD_HINT = "工作库未建：请先运行 python3 scripts/create_staging_db.py"
-
 # 取消粒度到**条**，比采集那边强：每条本来就有一串 LLM 往返，天然是检查点。
 CANCEL_NOTE = "取消在当前这条提取完成后生效（每条跑完检查一次）"
 
@@ -48,19 +48,6 @@ CANCEL_NOTE = "取消在当前这条提取完成后生效（每条跑完检查�
 _TEXT_TYPES = ("single", "multi", "regulatory", "aggregate", "training", "other")
 _RELEVANCE = ("construction", "non_construction", "insufficient")
 _REVIEW = ("pending", "approved", "edited", "rejected")
-
-
-def _has_table(name: str) -> bool:
-    try:
-        return bool(staging_db.scalar(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?",
-            (name,), default=0))
-    except Exception:  # noqa: BLE001
-        return False
-
-
-def _unavailable() -> dict:
-    return {"ok": True, "available": False, "hint": BUILD_HINT, "data": []}
 
 
 def _page_args() -> tuple[int, int]:
@@ -145,8 +132,8 @@ def api_taxonomy():
 @extract_bp.get("/pending")
 def api_pending():
     """已确认相关、还没进过暂存区的原文。页面②的列表用它。"""
-    if not _has_table("raw_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("raw_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="raw_accidents"))
     try:
         limit = max(1, min(int(request.args.get("limit", 200) or 200), 1000))
     except (TypeError, ValueError):
@@ -224,8 +211,8 @@ def api_estimate():
     迟早会漂移，而这个项目刚吃过「两处各算一遍、结果对不上」的亏
     （`evidence_quality` 的 6 份复制品）。
     """
-    if not _has_table("raw_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("raw_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="raw_accidents"))
     try:
         n = max(0, int(request.args.get("n", 0) or 0))
     except (TypeError, ValueError):
@@ -244,9 +231,8 @@ def api_estimate():
 @extract_bp.post("/tasks")
 def api_create_task():
     """建任务 + 给预估。**不执行**，等 `POST .../start`。"""
-    if not _has_table("extract_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="extract_tasks")}), 503
 
     body = request.get_json(silent=True) or {}
     raw_ids = body.get("raw_ids")
@@ -285,9 +271,8 @@ def api_create_task():
 
 @extract_bp.post("/tasks/<task_id>/start")
 def api_start_task(task_id: str):
-    if not _has_table("extract_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="extract_tasks")}), 503
     task = ex.get_task(task_id)
     if task is None:
         return jsonify({"ok": False, "error": "task_not_found",
@@ -301,8 +286,8 @@ def api_start_task(task_id: str):
 
 @extract_bp.get("/tasks")
 def api_list_tasks():
-    if not _has_table("extract_tasks"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify(staging_db.unavailable_payload(missing="extract_tasks"))
     try:
         limit = max(1, min(int(request.args.get("limit", 50) or 50), 500))
     except (TypeError, ValueError):
@@ -313,8 +298,8 @@ def api_list_tasks():
 
 @extract_bp.get("/tasks/<task_id>")
 def api_get_task(task_id: str):
-    if not _has_table("extract_tasks"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify(staging_db.unavailable_payload(missing="extract_tasks"))
     task = ex.get_task(task_id)
     if task is None:
         return jsonify({"ok": False, "error": "task_not_found",
@@ -324,9 +309,8 @@ def api_get_task(task_id: str):
 
 @extract_bp.post("/tasks/<task_id>/cancel")
 def api_cancel_task(task_id: str):
-    if not _has_table("extract_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="extract_tasks")}), 503
     if not ex.cancel_task(task_id):
         return jsonify({"ok": False, "error": "not_cancellable",
                         "message": "任务不存在或已经结束",
@@ -343,9 +327,8 @@ def api_cancel_task(task_id: str):
 def api_delete_task(task_id: str):
     """删任务行。**产出留着**——暂存区的条目是阶段③的审核对象，
     删任务不该连带毁掉已经花过 token 的东西。"""
-    if not _has_table("extract_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("extract_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="extract_tasks")}), 503
     task = ex.get_task(task_id)
     if task is None:
         return jsonify({"ok": False, "error": "task_not_found",
@@ -413,8 +396,8 @@ def _result_where(args) -> tuple[str, list[Any]]:
 @extract_bp.get("/results")
 def api_results():
     """暂存区列表——阶段③的审核入口。"""
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
 
     where, params = _result_where(request.args)
     page, size = _page_args()
@@ -457,8 +440,8 @@ _META_KEYS = {
 @extract_bp.get("/results/<stage_id>")
 def api_result_detail(stage_id: str):
     """单条完整产出：31 字段 + 致因树 + 过程元数据。"""
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
     row = staging_db.query_one(
         "SELECT * FROM staging_accidents WHERE stage_id = ?", (stage_id,))
     if row is None:
@@ -527,9 +510,8 @@ def api_rerun(stage_id: str):
     它会明显抬高查询复杂度，而重跑目前是低频操作，先用覆盖。响应里把
     `replaced` 带上，让调用方知道旧的那条没了。
     """
-    if not _has_table("staging_accidents"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify({"ok": False, **staging_db.probe(missing="staging_accidents")}), 503
     row = staging_db.query_one(
         "SELECT stage_id, raw_id, task_id FROM staging_accidents WHERE stage_id = ?",
         (stage_id,))
@@ -575,3 +557,32 @@ def api_rerun(stage_id: str):
         "status": out.status,
         "causes": out.causes,
     }})
+
+
+# ══════════════════════════════════════════════════════════════
+# 工作库不可用：本 blueprint 的统一出口
+# ══════════════════════════════════════════════════════════════
+# Flask 的 blueprint errorhandler **只对属于本 blueprint 的路由生效**，所以
+# 三个 blueprint 各挂一份；第四十一轮给 `api_bp` 挂的那份管不到这里。
+#
+# 改前这一层没有兜底：库里的表**登记了但列不全**时，闸门
+# `has_table("raw_accidents")` 返回真，查询才撞 `no such column` ——那时
+# 异常一路冒到 Flask 默认处理器，端点崩成 500。第四十二轮实测，`partial`
+# 形态下 4 个端点就是这么崩的（`/api/collect/raw`、`/api/collect/raw/<id>`、
+# `/api/collect/stats`、`/api/extract/pending`）。
+#
+# 兜在 blueprint 上而不是逐个端点 try/except：一个端点的判据错是一句话错，
+# 一整层的判据错是整层端点崩成 500——**兜底要兜在层上**。
+
+
+@extract_bp.errorhandler(sqlite3.Error)
+@extract_bp.errorhandler(staging_db.StagingDBNotInitialized)
+def _on_db_unavailable(exc):
+    """工作库里任何 SQLite 层面的异常 → 503 + 分档后的 `error`/`message`/`hint`。
+
+    两个装饰器叠在同一个函数上：Flask 的 `errorhandler` 注册后原样返回被装饰
+    函数，所以两次注册都生效。`StagingDBNotInitialized` 继承
+    `dberr.NotFound`，`classify()` 认它作 `database_not_found`。
+    """
+    body = dberr.diagnose(exc, staging_db.resolve_staging_path(), kind="staging")
+    return jsonify({"ok": False, **body}), 503

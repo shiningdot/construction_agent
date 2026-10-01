@@ -9,7 +9,9 @@
 ## 工作库还没建的时候不能 500
 
 `caiems_staging.db` 要跑 `scripts/create_staging_db.py` 才有。用户第一次打开
-`/collect` 时它多半不存在。这里所有查询都先过 `_has_table()`：
+`/collect` 时它多半不存在。这里所有查询都先过 `staging_db.has_table()`，
+**表在但列不全**这类判据拦不住的情况由 blueprint 的 errorhandler 兜底（见文件
+末尾）。
 
 - **源清单以 `registry` 为准**，左连接表里的运行期状态。所以库没建也返回
   完整的 24 条，只是健康度列全空——代码才是源清单的唯一真源，表只是它的
@@ -24,10 +26,12 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import sqlite3
+
 from flask import Blueprint, jsonify, request
 
 from ..collector import executor, registry
-from . import staging_db
+from . import dberr, staging_db
 
 collect_bp = Blueprint("collect", __name__, url_prefix="/api/collect")
 
@@ -38,8 +42,6 @@ PAGE_SIZE_MAX = 200
 # 判定清掉、挂回人工队列，而不是第三种结论。
 VERDICTS = ("confirmed", "rejected", "review")
 
-BUILD_HINT = "工作库未建：请先运行 python3 scripts/create_staging_db.py"
-
 # 取消只到源级：24 个适配器都是一次性 `return` 整个列表，中间没有可检查
 # 标志位的 yield 点。这句话成功与失败两条分支都要说——用户点了取消之后
 # 页面显示「取消中」却还在跑，不解释一句会被当成按钮没生效。
@@ -48,20 +50,6 @@ CANCEL_NOTE = "取消会在当前源采集完成后生效（适配器没有更�
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _has_table(name: str) -> bool:
-    try:
-        return bool(staging_db.scalar(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?",
-            (name,), default=0))
-    except Exception:  # noqa: BLE001 —— 库文件损坏等极端情况也不该 500
-        return False
-
-
-def _unavailable() -> dict:
-    """工作库不可用时的统一响应体。前端认 `available: false`。"""
-    return {"ok": True, "available": False, "hint": BUILD_HINT, "data": []}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -75,13 +63,13 @@ def sources_payload() -> dict:
     清单来自 `registry`（代码），状态来自 `collect_sources`（库）。两者按键
     对齐——这样「代码里加了源但还没跑过」也能显示出来，而不是从表里消失。
     """
-    available = _has_table("collect_sources")
+    available = staging_db.has_table("collect_sources", strict=False)
     live: dict[str, dict] = {}
     pending: dict[str, int] = {}
     if available:
         for r in staging_db.query("SELECT * FROM collect_sources"):
             live[r["source_key"]] = r
-        if _has_table("raw_accidents"):
+        if staging_db.has_table("raw_accidents", strict=False):
             for r in staging_db.query(
                     "SELECT source_key, COUNT(*) AS n FROM raw_accidents "
                     "WHERE status = 'new' GROUP BY source_key"):
@@ -119,7 +107,8 @@ def sources_payload() -> dict:
     return {
         "ok": True,
         "available": available,
-        "hint": None if available else BUILD_HINT,
+        "hint": None if available else
+                staging_db.probe(missing="collect_sources")["hint"],
         "groups": registry.GROUP_LABELS,
         "data": data,
     }
@@ -202,9 +191,8 @@ def api_sources():
 @collect_bp.post("/tasks")
 def api_create_task():
     """起一场采集。立刻返回 task_id，采集在线程池里跑。"""
-    if not _has_table("collect_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("collect_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="collect_tasks")}), 503
 
     body = request.get_json(silent=True) or {}
     try:
@@ -237,8 +225,8 @@ def api_create_task():
 
 @collect_bp.get("/tasks")
 def api_list_tasks():
-    if not _has_table("collect_tasks"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("collect_tasks"):
+        return jsonify(staging_db.unavailable_payload(missing="collect_tasks"))
     limit = min(int(request.args.get("limit", 50) or 50), 500)
     tasks = [_task_payload(t) for t in executor.list_tasks(limit)]
     return jsonify({"ok": True, "available": True, "data": tasks})
@@ -246,8 +234,8 @@ def api_list_tasks():
 
 @collect_bp.get("/tasks/<task_id>")
 def api_get_task(task_id: str):
-    if not _has_table("collect_tasks"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("collect_tasks"):
+        return jsonify(staging_db.unavailable_payload(missing="collect_tasks"))
     task = executor.get_task(task_id)
     if task is None:
         return jsonify({"ok": False, "error": "task_not_found",
@@ -258,9 +246,8 @@ def api_get_task(task_id: str):
 
 @collect_bp.post("/tasks/<task_id>/cancel")
 def api_cancel_task(task_id: str):
-    if not _has_table("collect_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("collect_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="collect_tasks")}), 503
     if not executor.cancel_task(task_id):
         return jsonify({
             "ok": False, "error": "not_cancellable",
@@ -275,9 +262,8 @@ def api_cancel_task(task_id: str):
 def api_delete_task(task_id: str):
     """删任务行。`running` 的必须先取消——删掉一行不会让线程停下来，
     只会留下一个往不存在的任务里写统计的线程。"""
-    if not _has_table("collect_tasks"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("collect_tasks"):
+        return jsonify({"ok": False, **staging_db.probe(missing="collect_tasks")}), 503
     task = executor.get_task(task_id)
     if task is None:
         return jsonify({"ok": False, "error": "task_not_found",
@@ -332,8 +318,8 @@ def _raw_where(args) -> tuple[str, list[Any]]:
 
 @collect_bp.get("/raw")
 def api_raw_list():
-    if not _has_table("raw_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("raw_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="raw_accidents"))
 
     where, params = _raw_where(request.args)
     try:
@@ -359,7 +345,7 @@ def api_raw_list():
 
     # 资产数一次查完（`has_assets` 是列表页的图标，N+1 查询会让 200 行变慢）
     with_assets: set[str] = set()
-    if rows and _has_table("raw_accident_assets"):
+    if rows and staging_db.has_table("raw_accident_assets", strict=False):
         ids = [r["raw_id"] for r in rows]
         marks = ",".join("?" * len(ids))
         with_assets = {
@@ -382,8 +368,8 @@ def api_raw_list():
 
 @collect_bp.get("/raw/<raw_id>")
 def api_raw_detail(raw_id: str):
-    if not _has_table("raw_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("raw_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="raw_accidents"))
     row = staging_db.query_one(
         "SELECT * FROM raw_accidents WHERE raw_id = ?", (raw_id,))
     if row is None:
@@ -401,7 +387,7 @@ def api_raw_detail(raw_id: str):
     row["assets"] = staging_db.query(
         "SELECT id, asset_type, url, ocr_status FROM raw_accident_assets "
         "WHERE raw_id = ? ORDER BY id", (raw_id,)
-    ) if _has_table("raw_accident_assets") else []
+    ) if staging_db.has_table("raw_accident_assets", strict=False) else []
     row["source"] = next(
         (s for s in ({"key": spec.key, "name": spec.display_name,
                       "authority": spec.authority, "group": spec.group}
@@ -417,9 +403,8 @@ def api_gate_raw():
     走出去的记录 `gate_stage='manual'`、`status='gated'`——阶段②的提取入口
     就查这批，不重复筛选。
     """
-    if not _has_table("raw_accidents"):
-        return jsonify({"ok": False, "error": "staging_db_missing",
-                        "message": BUILD_HINT}), 503
+    if not staging_db.has_table("raw_accidents"):
+        return jsonify({"ok": False, **staging_db.probe(missing="raw_accidents")}), 503
 
     body = request.get_json(silent=True) or {}
     ids = body.get("raw_ids")
@@ -467,9 +452,10 @@ _FUNNEL = (
 
 
 def stats_payload() -> dict:
-    if not _has_table("raw_accidents"):
-        return {**_unavailable(),
-                "data": {"funnel": [], "by_source": [], "by_verdict": {}}}
+    if not staging_db.has_table("raw_accidents"):
+        return staging_db.unavailable_payload(
+            {"funnel": [], "by_source": [], "by_verdict": {}},
+            missing="raw_accidents")
 
     total = staging_db.scalar("SELECT COUNT(*) FROM raw_accidents", default=0)
     funnel = []
@@ -510,3 +496,32 @@ def stats_payload() -> dict:
 @collect_bp.get("/stats")
 def api_stats():
     return jsonify(stats_payload())
+
+
+# ══════════════════════════════════════════════════════════════
+# 工作库不可用：本 blueprint 的统一出口
+# ══════════════════════════════════════════════════════════════
+# Flask 的 blueprint errorhandler **只对属于本 blueprint 的路由生效**，所以
+# 三个 blueprint 各挂一份；第四十一轮给 `api_bp` 挂的那份管不到这里。
+#
+# 改前这一层没有兜底：库里的表**登记了但列不全**时，闸门
+# `has_table("raw_accidents")` 返回真，查询才撞 `no such column` ——那时
+# 异常一路冒到 Flask 默认处理器，端点崩成 500。第四十二轮实测，`partial`
+# 形态下 4 个端点就是这么崩的（`/api/collect/raw`、`/api/collect/raw/<id>`、
+# `/api/collect/stats`、`/api/extract/pending`）。
+#
+# 兜在 blueprint 上而不是逐个端点 try/except：一个端点的判据错是一句话错，
+# 一整层的判据错是整层端点崩成 500——**兜底要兜在层上**。
+
+
+@collect_bp.errorhandler(sqlite3.Error)
+@collect_bp.errorhandler(staging_db.StagingDBNotInitialized)
+def _on_db_unavailable(exc):
+    """工作库里任何 SQLite 层面的异常 → 503 + 分档后的 `error`/`message`/`hint`。
+
+    两个装饰器叠在同一个函数上：Flask 的 `errorhandler` 注册后原样返回被装饰
+    函数，所以两次注册都生效。`StagingDBNotInitialized` 继承
+    `dberr.NotFound`，`classify()` 认它作 `database_not_found`。
+    """
+    body = dberr.diagnose(exc, staging_db.resolve_staging_path(), kind="staging")
+    return jsonify({"ok": False, **body}), 503

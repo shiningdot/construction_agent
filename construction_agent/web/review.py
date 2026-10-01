@@ -35,19 +35,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlite3
+
 from flask import Blueprint, jsonify, request
 
 from ..extraction.evidence_quality import LEVEL_LABELS
 from ..review import promote as pm
 from ..review import warnings as wn
-from . import accidents_query, db, staging_db
+from . import accidents_query, db, dberr, staging_db
 
 review_bp = Blueprint("review", __name__, url_prefix="/api/review")
 
 PAGE_SIZE_DEFAULT = 25
 PAGE_SIZE_MAX = 200
-
-BUILD_HINT = "工作库未建：请先运行 python3 scripts/create_staging_db.py"
 
 _REVIEW_STATUS = ("pending", "approved", "edited", "rejected")
 _TEXT_TYPES = ("single", "multi", "regulatory", "aggregate", "training", "other")
@@ -76,19 +76,6 @@ _FLOAT_FIELDS = ("fall_height", "direct_economic_loss")
 # ══════════════════════════════════════════════════════════════
 # 辅助
 # ══════════════════════════════════════════════════════════════
-
-
-def _unavailable() -> dict:
-    return {"ok": True, "available": False, "hint": BUILD_HINT, "data": []}
-
-
-def _has_table(name: str) -> bool:
-    try:
-        return bool(staging_db.scalar(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?",
-            (name,), default=0))
-    except Exception:  # noqa: BLE001 — 库文件不存在时连接即抛
-        return False
 
 
 def _page_args() -> tuple[int, int]:
@@ -214,8 +201,8 @@ def _counts(warn_rows: list[dict], promoted_ids: set[str]) -> dict[str, Any]:
 
 @review_bp.get("/queue")
 def queue():
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
 
     status = request.args.get("review_status", "pending")
     want = request.args.get("warnings", "")
@@ -303,8 +290,8 @@ def queue():
 
 @review_bp.get("/items/<stage_id>")
 def item(stage_id: str):
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
 
     rows = _fetch_rows("WHERE s.stage_id = ?", [stage_id], _taxonomy_codes())
     if not rows:
@@ -445,8 +432,8 @@ def _apply_edits(stage_id: str, edits: dict, note: str) -> list[str]:
 
 @review_bp.post("/items/<stage_id>")
 def review_item(stage_id: str):
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
     body = request.get_json(silent=True) or {}
     action = (body.get("action") or "").strip()
     note = (body.get("note") or "").strip()
@@ -503,8 +490,8 @@ def review_item(stage_id: str):
 
 @review_bp.post("/batch-approve")
 def batch_approve():
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
     body = request.get_json(silent=True) or {}
     ids = _ids_arg(body)
     if ids is None:
@@ -564,8 +551,8 @@ def _ids_arg(body: dict) -> list[str] | None:
 
 @review_bp.post("/promote")
 def promote():
-    if not _has_table("staging_accidents"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("staging_accidents"):
+        return jsonify(staging_db.unavailable_payload(missing="staging_accidents"))
     body = request.get_json(silent=True) or {}
     ids = _ids_arg(body)
     if ids is None:
@@ -598,8 +585,8 @@ def promote():
 
 @review_bp.post("/rollback")
 def rollback():
-    if not _has_table("promote_log"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("promote_log"):
+        return jsonify(staging_db.unavailable_payload(missing="promote_log"))
     try:
         out = pm.rollback()
     except pm.PromoteError as e:
@@ -609,8 +596,8 @@ def rollback():
 
 @review_bp.get("/history")
 def history():
-    if not _has_table("promote_log"):
-        return jsonify(_unavailable())
+    if not staging_db.has_table("promote_log"):
+        return jsonify(staging_db.unavailable_payload(missing="promote_log"))
     return jsonify({"ok": True, "available": True, "data": pm.history(20)})
 
 
@@ -621,8 +608,9 @@ def history():
 
 def funnel_payload() -> dict:
     """供审核页与总览页共用，避免两处各算一遍、口径不同。"""
-    if not _has_table("staging_accidents"):
-        return {"available": False, "hint": BUILD_HINT}
+    if not staging_db.has_table("staging_accidents"):
+        return {"available": False,
+                **staging_db.probe(missing="staging_accidents")}
     warn_rows = _warn_scan(_taxonomy_codes())
     counts = _counts(warn_rows, pm.promoted_accident_ids())
     return {
@@ -642,3 +630,32 @@ def funnel_payload() -> dict:
 @review_bp.get("/stats")
 def stats():
     return jsonify({"ok": True, "data": funnel_payload()})
+
+
+# ══════════════════════════════════════════════════════════════
+# 工作库不可用：本 blueprint 的统一出口
+# ══════════════════════════════════════════════════════════════
+# Flask 的 blueprint errorhandler **只对属于本 blueprint 的路由生效**，所以
+# 三个 blueprint 各挂一份；第四十一轮给 `api_bp` 挂的那份管不到这里。
+#
+# 改前这一层没有兜底：库里的表**登记了但列不全**时，闸门
+# `has_table("raw_accidents")` 返回真，查询才撞 `no such column` ——那时
+# 异常一路冒到 Flask 默认处理器，端点崩成 500。第四十二轮实测，`partial`
+# 形态下 4 个端点就是这么崩的（`/api/collect/raw`、`/api/collect/raw/<id>`、
+# `/api/collect/stats`、`/api/extract/pending`）。
+#
+# 兜在 blueprint 上而不是逐个端点 try/except：一个端点的判据错是一句话错，
+# 一整层的判据错是整层端点崩成 500——**兜底要兜在层上**。
+
+
+@review_bp.errorhandler(sqlite3.Error)
+@review_bp.errorhandler(staging_db.StagingDBNotInitialized)
+def _on_db_unavailable(exc):
+    """工作库里任何 SQLite 层面的异常 → 503 + 分档后的 `error`/`message`/`hint`。
+
+    两个装饰器叠在同一个函数上：Flask 的 `errorhandler` 注册后原样返回被装饰
+    函数，所以两次注册都生效。`StagingDBNotInitialized` 继承
+    `dberr.NotFound`，`classify()` 认它作 `database_not_found`。
+    """
+    body = dberr.diagnose(exc, staging_db.resolve_staging_path(), kind="staging")
+    return jsonify({"ok": False, **body}), 503

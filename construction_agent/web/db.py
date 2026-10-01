@@ -27,13 +27,13 @@
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 from ..config import settings
+from . import dberr
 
 DB_FILENAME = "caiems_v2.db"
 ENV_DB_PATH = "CAIEMS_DB"
@@ -50,15 +50,6 @@ REQUIRED_TABLES: frozenset[str] = frozenset(
     {"accidents", "caics_causes", "enum_definitions"}
 )
 
-#: `sqlite3.Error` 的消息里，「这个文件不是 SQLite 库」的说法（版本不同措辞不同）。
-_NOT_A_DB = ("file is not a database", "file is encrypted")
-_NO_SUCH_TABLE = re.compile(r"no such table:\s*([A-Za-z_][A-Za-z0-9_]*)")
-#: 表在、列不在。**与缺表同一档**——下一步动作相同（跑建表脚本，或换个库）。
-#: 实测（第四十一轮）它不罕见：「建了一张表、列只建了一半」的库查 `deaths`
-#: 就报这个，而 SQLite 说的是 `no such column: deaths`，与「缺表」是两句不同的话。
-_NO_SUCH_COLUMN = re.compile(r"no such column:\s*([A-Za-z_][A-Za-z0-9_.]*)")
-
-
 def missing_tables(db_path: str | Path | None = None) -> set[str]:
     """必需表里缺了哪几张。
 
@@ -72,7 +63,11 @@ def missing_tables(db_path: str | Path | None = None) -> set[str]:
 def diagnose(exc: BaseException, db_path: str | Path | None = None) -> dict[str, str]:
     """把一个数据库异常翻译成「哪一种不可用 + 下一步做什么」。
 
-    **按来路分档，不按异常类型分档，也不按 SQLite 的报错文案分档。**
+    分类与提示的**唯一出口**在 `dberr.py`——工作库那边要的是同一套分类、
+    不同的下一步动作，所以分类只有一份，这里只负责补上最终库的路径与其
+    `hint` 方向（`kind="final"`）。**本函数是薄转发，不要在这里加分支**：
+    加在这里的分支，工作库那份就落下。
+
     2026-10-01 第四十一轮实测：造七种最终库、各起干净子进程打 28 个端点，
     「库不可用」这一个状态在改前给出了这几种对外表现：
 
@@ -82,7 +77,7 @@ def diagnose(exc: BaseException, db_path: str | Path | None = None) -> dict[str,
       合法 SQLite、0 张表        10 个端点 500 崩      schema_mismatch 建表
       非 SQLite 内容的文件        10 个端点 500 崩      not_a_database  指对路径
       只建了一张表               10 个端点 500 崩      schema_mismatch 建表
-      表在、列不全               10 个端点 500 崩      schema_mismatch 建表
+      表在、列不全               10 个端点 500 崩      schema_mismatch 移走重建
       表齐全、0 行               200「0 条」✓          （不归这里）     正常态
       正常库                     200 ✓                 （不归这里）     正常态
 
@@ -91,70 +86,28 @@ def diagnose(exc: BaseException, db_path: str | Path | None = None) -> dict[str,
     要到第一条 SQL 才报 `no such table`，那时已经没有 handler 接了。这与
     第四十轮工作库那处的 `available()` 是**同一个来路**，只是换了一层。
 
-    「缺表」与「缺列」合成同一个 `schema_mismatch` 是**故意的**：SQLite 说的是
-    两句不同的话（`no such table: x` / `no such column: x`），但下一步动作相同
-    （跑建表脚本，或换个库文件）。而 `not_a_database` 必须单独一档——它是
-    **路径指错了**，跑建表脚本会把错误固化下来。
-
     「表齐全、0 行」**不是故障**：那是刚建完库还没导入数据的正常状态，与第四十轮
     的 `empty` 同档，照常返回 0 是对的。
 
-    这里的 `hint` 必须指向**下一步动作**，不能只说「失败了」——第四十轮的
-    教训是：说错方向的提示比没有提示更费事（用户照做会多跑一步才知道真相）。
+    **第四十二轮修正一处**：这张表里「表在、列不全」那一行的下一步，第四十一轮
+    写的是「建表」，与另两行并列——**错了**。`create_db_v2.py` 用的是
+    `CREATE TABLE IF NOT EXISTS`，对这个文件什么都不做，跑完还是 `no such
+    column`。缺列与缺表同属一个**码**（动的是同一个文件），但**下一步动作不同**，
+    已改成「移走重建」。
     """
     path = Path(db_path).expanduser().resolve() if db_path else resolve_db_path()
-
-    if isinstance(exc, DatabaseNotFoundError):
-        return {
-            "error": "database_not_found",
-            "message": f"最终库不存在：{path}",
-            "hint": f"用环境变量 {ENV_DB_PATH} 指定库文件，例如 "
-                    f"{ENV_DB_PATH}=/home/suntianhao/construction_agent/data/{DB_FILENAME}",
-        }
-
-    msg = str(exc)
-    low = msg.lower()
-
-    if any(k in low for k in _NOT_A_DB):
-        return {
-            "error": "not_a_database",
-            "message": f"这不是一个 SQLite 数据库文件：{path}",
-            "hint": f"路径多半指错了（指向了别的文件或半截下载）。"
-                    f"用 {ENV_DB_PATH} 重新指定",
-        }
-
-    # 表与列分开说，但**同一档**——下一步动作相同（跑建表脚本，或换个库文件）。
-    # 码取 `schema_mismatch` 而不是 `missing_tables`：缺列时那句 `missing_tables`
-    # 会与自己的 message 打架（「没有 `deaths` 列」却报「缺表」）。
-    m = _NO_SUCH_TABLE.search(msg)   # 在**原大小写**的消息上搜，名字要原样带出去
-    if m:
-        return {
-            "error": "schema_mismatch",
-            "message": f"最终库里没有 `{m.group(1)}` 表：{path}",
-            "hint": "这是一个还没有建表的空库（0 字节文件也走到这里）。"
-                    "跑 scripts/create_db_v2.py 建九张表；"
-                    "若路径本就是空的，改用正确的库文件",
-        }
-
-    m = _NO_SUCH_COLUMN.search(msg)
-    if m:
-        return {
-            "error": "schema_mismatch",
-            "message": f"最终库的表结构不完整：缺 `{m.group(1)}` 列（{path}）",
-            "hint": "这个文件有表名但没有完整列，多半是别的程序建的同名表，"
-                    "或建表脚本跑了一半。跑 scripts/create_db_v2.py 重建；"
-                    "若路径本就该指向别处，改用 CAIEMS_DB 重新指定",
-        }
-
-    return {
-        "error": "database_error",
-        "message": f"读取最终库失败（{type(exc).__name__}）：{exc}",
-        "hint": "库文件可能存在但已损坏。先备份，再用 sqlite3 的 integrity_check 查",
-    }
+    return dberr.diagnose(exc, path, kind="final")
 
 
-class DatabaseNotFoundError(RuntimeError):
-    """最终库文件不存在。附带已尝试的路径，便于定位配置问题。"""
+class DatabaseNotFoundError(dberr.NotFound):
+    """最终库文件不存在。
+
+    继承 `dberr.NotFound`（→ `dberr.DBUnavailable`）而不是直接 `RuntimeError`：
+    `dberr.classify()` 靠这个基类认「文件不在」这一档，**不能靠
+    `isinstance(exc, RuntimeError)`**——那会把程序里任何一个笔误导致的
+    `RuntimeError` 都说成「库文件不存在」。工作库的
+    `staging_db.StagingDBNotInitialized` 继承同一个基类。
+    """
 
 
 def resolve_db_path() -> Path:

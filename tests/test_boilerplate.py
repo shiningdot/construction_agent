@@ -23,6 +23,11 @@ from bs4 import BeautifulSoup  # noqa: E402
 from construction_agent.collector.boilerplate import (  # noqa: E402
     MIN_PAGES, page_lines, strip_template, template_lines, text_lines)
 
+# 站点 HTML 里的字面量转义序列（反斜杠是字符本身，不是控制符）。
+# 实测形态只有两种，见 `boilerplate._ESCAPE_HEAD` 上方那段。
+ESC_RN = "\\r\\n"        # 4 字符
+ESC_RNT = "\\r\\n\\t"     # 6 字符
+
 
 # ── A 组：切行 ──
 
@@ -141,3 +146,122 @@ def test_可以换选择器():
     html = ("<html><body><div>不要</div>"
             "<article><p>要</p></article></body></html>")
     assert page_lines(html, "article") == ["要"]
+
+
+# ── E 组：行首的字面量转义序列 ──
+#
+# 缺陷与实测见 `boilerplate._ESCAPE_HEAD` 上方那段。一句话：站点编辑从 Word
+# 粘贴，把 `\r\n\t` 当成**文本**存进了 `<p>` 里；`str.strip()` 剥不掉它
+# （反斜杠不是空白），而 12 个 TRS 源又不过 `cleaners.TextCleaner`。
+#
+# 这一组的**反例比正例要紧**：剥多了会把正文里合法的反斜杠吃掉。
+
+
+def test_行首的字面量转义被剥掉():
+    """实测形态：`<p>\\r\\n\\t\\xa0\\xa0 正文`。"""
+    soup = BeautifulSoup(f"<div><p>{ESC_RNT}   某工地发生坍塌事故。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["某工地发生坍塌事故。"]
+
+
+def test_不带制表符的字面量也剥():
+    """全站 140 个 `\\r\\n` 里有一半后面不跟 `\\t`。"""
+    soup = BeautifulSoup(f"<div><p>{ESC_RN}某工地发生坍塌事故。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["某工地发生坍塌事故。"]
+
+
+def test_不带回车符的字面量也剥():
+    """**这一条钉的是初版判据漏掉的第三种形态。**
+
+    初版只认 `\\r\\n`（可跟 `\\t`），理由是「按字符统计只有 `\\r` 140 /
+    `\\n` 140 / `\\t` 70，都能被前两种形态解释完」。那是**字符**账，而形态
+    是**序列**——46 组 `\\n\\t` 混在里面看不出缺口。修后复核残留 92 个转义
+    才把它逼出来，全部在「4·19」神木县板定梁塔煤矿透水事故那一页。
+    """
+    soup = BeautifulSoup("<div><p>\\n\\t2017年4月19日凌晨，神木县发生透水事故。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["2017年4月19日凌晨，神木县发生透水事故。"]
+
+
+def test_连续多组字面量都剥():
+    soup = BeautifulSoup(f"<div><p>{ESC_RNT}{ESC_RN}正文。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["正文。"]
+
+
+def test_贴着nbsp的字面量也剥():
+    """实测是 `\\r\\n\\t` 紧接一串 `\\xa0`（`&nbsp;`）——先 strip 再剥再 strip。"""
+    soup = BeautifulSoup(f"<div><p>{ESC_RNT}\xa0\xa0\xa0 正文。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["正文。"]
+
+
+def test_整行只有字面量时该行被剔掉():
+    """剥完是空串，按「非空行」规则丢掉，不会留一条空行。"""
+    soup = BeautifulSoup(f"<div><p>{ESC_RNT}</p><p>正文。</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["正文。"]
+
+
+def test_反例_正文里合法的反斜杠不动():
+    """**剥多了比剥少了糟。** 正文里合法出现的反斜杠不能碰——
+    比如 Windows 路径、正则写法。判据只在**行首**且匹配实测形态时动手。"""
+    soup = BeautifulSoup(
+        "<div><p>安装路径 C:\\temp\\build 下的文件</p>"
+        "<p>正则是 \\d+ 匹配数字</p></div>", "html.parser")
+    assert text_lines(soup.find("div")) == [
+        "安装路径 C:\\temp\\build 下的文件", "正则是 \\d+ 匹配数字"]
+
+
+def test_反例_行首单独的字面量换行不动():
+    """判据只认实测的三种形态：`\\r\\n\\t` / `\\r\\n` / `\\n\\t`。
+
+    **单独一个 `\\n`（后面不跟 `\\t`）不剥**——本项目语料里没有这种形态，
+    而放宽会把「正文里真以 `\\n` 开头的行」也吃掉。宁可少剥。
+
+    注意边界就在那个 `\\t` 上：`\\n\\t` 剥，`\\n `（后跟空格）不剥。
+    """
+    soup = BeautifulSoup("<div><p>\\n 这一行以字面量反斜杠n开头</p></div>",
+                         "html.parser")
+    assert text_lines(soup.find("div")) == ["\\n 这一行以字面量反斜杠n开头"]
+
+
+def test_反例_行中间的字面量不动():
+    """只在行首剥。句子中间的 `\\r\\n` 保持原样（它可能是正文的一部分）。"""
+    soup = BeautifulSoup("<div><p>前一句\\r\\n后一句</p></div>", "html.parser")
+    assert text_lines(soup.find("div")) == ["前一句\\r\\n后一句"]
+
+
+def test_真实页面形态_端到端():
+    """照实测 HTML 写一条：正文四段，每段带 `\\r\\n\\t` + `&nbsp;` 前缀。"""
+    html = ("<html><body><div class='lfNewsDetail'>"
+            f"<p>{ESC_RNT}&nbsp;&nbsp;&nbsp; 2013年7月23日10时30分左右，"
+            "渭南市澄城县硫磺矿井下炸药库炸药自燃，发生火灾。</p>"
+            f"<p>{ESC_RNT}&nbsp;&nbsp;&nbsp; 事故发生后，省委、省政府高度重视。</p>"
+            "</div></body></html>")
+    lines = page_lines(html)
+    assert len(lines) == 2
+    assert all(not ln.startswith("\\") for ln in lines)
+    assert lines[0].startswith("2013年7月23日10时30分左右")
+
+
+def test_字面量不再虚增正文长度():
+    """**这条钉的是危害本身**，不只是字符串处理。
+
+    `trs_cms_base.py:396` 用 `len(combined_text) < BODY_MIN_CHARS(200)` 判
+    「无有效正文」→ 进审核队列。字面量每段白送 6 个字符，实测 `shaanxi_em`
+    178 页里有 3 条本该进审核队列的页被顶过门槛（196→216、192→222）。
+
+    这里用一段短正文复现那条通路：剥之前够 200、剥之后不够。
+    """
+    from construction_agent.collector.base import BODY_MIN_CHARS
+    # 20 段，每段 6 个字面量字符 + 5 个正文字
+    body = "".join(f"<p>{ESC_RNT}正文五字</p>" for _ in range(20))
+    html = f"<html><body><div>{body}</div></body></html>"
+    raw = "".join(ln + "\n" for ln in
+                  [f"{ESC_RNT}正文五字"] * 20)
+    assert len(raw) > BODY_MIN_CHARS          # 旧行为：过闸
+    cleaned = "\n".join(page_lines(html))
+    assert len(cleaned) < BODY_MIN_CHARS      # 新行为：该进审核队列
+    assert "\\" not in cleaned

@@ -53,7 +53,46 @@ N 页上的行 = 模板文字**。真正文 = 全部行 − 模板行。
 
 from __future__ import annotations
 
+import re
+
 from bs4 import BeautifulSoup
+
+# 站点编辑从 Word 粘贴时带进正文的**字面量**转义序列。HTML 源码里真的写着
+# `<p>\r\n\t&nbsp;&nbsp;&nbsp; 正文…`——反斜杠是字符本身，不是控制符，
+# 浏览器渲染出来后谁也看不见它。
+#
+# ## 为什么要在这里剥（2026-10-01 第三十六轮）
+#
+# `str.strip()` 剥不掉它：反斜杠不是空白字符，所以行首那几个字符一路活到
+# `raw_text`。
+#
+# 那清洗器呢？`collector/cleaners/text_cleaner.py` 的 `_basic_clean` 里
+# 确实有一行 `text.replace('\r\n', '\n')`——处理的是**真实**换行，与这里的
+# **字面量**换行是两回事，在源码里它们长得几乎一样。
+#
+# 更要紧的是：**12 个 TRS 源根本不过那一层**。它们走 `raw_store` 通路，
+# `collector/pipeline.py:154` 在 Step 2 清洗之前就 `continue` 了，
+# `TextCleaner` 一次都没跑过（那一处的注释早就写着「看起来像清洗环节把
+# 条数滤掉了——去查清洗规则永远查不到真因」）。所以本条修在 TRS 系正文的
+# 唯一入口上，而不是修在没人走的路上。
+#
+# ## 判据为什么只认实测形态
+#
+# 实测 `shaanxi_em` 全站 178 条详情页，只有三种形态：`\r\n\t`、`\r\n`、
+# `\n\t`（**没有**单独出现的 `\r` 或 `\n`）。所以不写通用的
+# `(?:\\[rnt])+`：本项目语料里没有别的形态，而通用式有误伤面（正文里真以
+# `\n` 开头的行会被吃掉）。**宁可少剥**——与 `MIN_PAGES` 同一个方向。
+#
+# **第三种形态是第一版判据漏掉的**，值得记一笔：初版只写了
+# `\\r\\n(?:\\t)?`，理由是「按字符统计只有 `\r` 140 / `\n` 140 / `\t` 70，
+# 都能被 `\r\n` 与 `\r\n\t` 解释完」。**这个推理是错的**——它按**字符**数，
+# 而形态是**序列**：46 组 `\n\t`（全部在 `t20170516_2545694.html`，「4·19」
+# 神木县板定梁塔煤矿透水事故）在字符账上是 `\n` 46 + `\t` 46，与另两种
+# 形态混在一起看不出缺口。一份规模对不上的账，只要每项都能对上就不显眼。
+# 修后复核时残留 92 个转义（46 组）才把它逼出来。
+#
+# 站点哪天换了形态，这里只是不匹配、退化成剥前行为，不会剥错东西。
+_ESCAPE_HEAD = re.compile(r"^(?:\\r\\n(?:\\t)?|\\n\\t)+")
 
 # 少于这么多页时**整体放弃剥离**。
 #
@@ -69,9 +108,21 @@ def text_lines(node) -> list[str]:
     **必须带 `separator`**：`get_text()` 不给分隔符时相邻标签的文字会直接
     粘成一整块，「行」这个概念就没了——而本模块整个判据都建立在行上。
     （`trs_cms_base._crawl_detail` 原先用的正是无分隔符的 `get_text()`。）
+
+    **同时剥掉行首的字面量转义序列**（2026-10-01 第三十六轮）。判据与来由
+    见 `_ESCAPE_HEAD` 上方那段。两层剥的顺序不能省：先 `strip()` 再剥字面量
+    是没用的（反斜杠不是空白，`strip()` 动不了它），所以先 `strip()` 掉
+    `\\xa0`/空格，再判断行首是不是 `\\`，剥完还要再 `strip()` 一次——实测
+    形态是 `<p>\\r\\n\\t\\xa0\\xa0\\xa0 正文`，字面量后面还跟着一串 `\\xa0`。
     """
-    return [ln.strip() for ln in node.get_text(separator="\n").split("\n")
-            if ln.strip()]
+    out: list[str] = []
+    for raw in node.get_text(separator="\n").split("\n"):
+        ln = raw.strip()
+        if ln.startswith("\\"):
+            ln = _ESCAPE_HEAD.sub("", ln).strip()
+        if ln:
+            out.append(ln)
+    return out
 
 
 def page_lines(html: str, selector: str = "body") -> list[str]:

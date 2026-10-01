@@ -455,9 +455,21 @@
   }
 
   function renderImages(d) {
-    // 「这条事故没有图片」与「图片索引还没重建」是两件事：前者是数据事实，
-    // 后者要去跑 scripts/build_image_manifest.py。分开说。
-    if (!d.images.length && d.images_available) {
+    // **三件事，不是两件。** 「这条事故没有图片」（数据事实）、「清单还没跑过」
+    // （去跑 build_image_manifest.py）、「工作库压根没建」（去跑
+    // create_staging_db.py）——处置各不同。原先这里只有布尔
+    // `d.images_available`，后两种被压成同一句话：工作库没建时页面上写着
+    // 「需要先跑 build_image_manifest.py」，照做，脚本自己会退 3 说「工作库
+    // 未初始化，先跑 create_staging_db.py」（build_image_manifest.py:451）。
+    // 用户要多跑一步才知道真相，而真相本该写在这句话里。三态来自
+    // `/api/accidents/<id>` 的 `images_state`。
+    //
+    // 回退：旧缓存里没有 `images_state`，按原行为走（`false` → 说「清单没
+    // 跑过」）。不猜是哪一种——猜错了就是把旧文案的毛病原样搬回来。
+    const state = d.images_state
+      || (d.images_available ? 'ready' : 'empty');
+
+    if (!d.images.length && state === 'ready') {
       const panel = el('section', { cls: 'panel' });
       panel.appendChild(el('div', { cls: 'panel-head' }, [
         el('h2', { text: '现场图片' }),
@@ -472,7 +484,7 @@
       ]));
       return panel;
     }
-    if (!d.images.length) {
+    if (!d.images.length && state === 'empty') {
       const panel = el('section', { cls: 'panel' });
       panel.appendChild(el('div', { cls: 'panel-head' }, [
         el('h2', { text: '现场图片' }),
@@ -481,6 +493,19 @@
         el('strong', { text: '图片索引未重建' }),
         el('span', { text: '图片登记表与磁盘对不上，需要先跑 ' +
                            'scripts/build_image_manifest.py。' }),
+      ]));
+      return panel;
+    }
+    if (!d.images.length) {
+      const panel = el('section', { cls: 'panel' });
+      panel.appendChild(el('div', { cls: 'panel-head' }, [
+        el('h2', { text: '现场图片' }),
+      ]));
+      panel.appendChild(el('div', { cls: 'empty' }, [
+        el('strong', { text: '工作库未初始化' }),
+        el('span', { text: '图片清单存在工作库里，而工作库还没建（或本进程' +
+                           '没找到它）。先跑 scripts/create_staging_db.py ' +
+                           '建库，再跑 scripts/build_image_manifest.py 建清单。' }),
       ]));
       return panel;
     }

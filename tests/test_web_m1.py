@@ -870,6 +870,7 @@ class TestImages:
         d = dup_client.get("/api/accidents/a1").get_json()["data"]
         assert len(d["images"]) == 3
         assert d["images_available"] is True
+        assert d["images_state"] == "ready"
         first = d["images"][0]
         assert first["url"] == "/media/imageV3/a1/1.jpg"
         assert first["analyzed"] is True
@@ -942,10 +943,32 @@ class TestImages:
 
         「这条事故没有图片」与「图片索引还没重建」是两件事，前端要能分开
         处理——前者是数据事实，后者要去跑 `build_image_manifest.py`。
+
+        第四十轮把它再分了一层：这次 `client` 的工作库路径指向
+        `tmp_path/no-staging.db`（**文件根本不存在**），报的是
+        `unavailable` 而不是 `empty`——两者的下一步动作不同（先跑
+        `create_staging_db.py` 还是直接跑 `build_image_manifest.py`）。
         """
         d = client.get("/api/accidents/a1").get_json()["data"]
         assert d["images"] == []
         assert d["images_available"] is False
+        assert d["images_state"] == "unavailable"
+
+    @pytest.mark.parametrize("state,as_bool", [
+        ("ready", True), ("empty", False), ("unavailable", False)])
+    def test_详情接口把三态投影成布尔与state(self, tiny_db, monkeypatch,
+                                              state, as_bool):
+        """`detail.py` 只调一次 `availability()`，由同一个值派生两个字段。
+
+        分两次调会让工作库的状态在两条语句之间漂移（比如清单脚本正好跑到
+        一半），响应里两个字段就自相矛盾了。这条把「同源」钉住。
+        """
+        monkeypatch.setattr(images, "availability", lambda: state)
+        c = create_app({"TESTING": True}).test_client()
+
+        d = c.get("/api/accidents/a1").get_json()["data"]
+        assert d["images_state"] == state
+        assert d["images_available"] is as_bool
 
     def test_图片统计(self, dup_client):
         d = dup_client.get("/api/images/stats").get_json()["data"]

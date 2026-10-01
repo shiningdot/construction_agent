@@ -81,18 +81,58 @@ def _conn() -> sqlite3.Connection | None:
         return None
 
 
-def available() -> bool:
-    """`image_manifest` 是否可用（库存在且表里有数据）。"""
+def availability() -> str:
+    """`image_manifest` 现在处于哪种状态：`ready` / `empty` / `unavailable`。
+
+    **三态，不是两态。** 起初这里只有 `available() -> bool`，而布尔装不下
+    三条来路——「工作库压根没建」、「库建了但清单表是空的」、「表里有数据」。
+    前两条对外都是 `False`，于是详情页那句「图片索引未重建，需要先跑
+    `scripts/build_image_manifest.py`」在第一条上是**错的**：照做，脚本自己
+    会退 3 说「工作库未初始化，先跑 `create_staging_db.py`」（见
+    `build_image_manifest.py:451`）。用户要多跑一步才知道真相，而真相本来
+    就该写在页面上——只是写错了方向。
+
+    2026-10-01 第四十轮实测（造五种工作库、各起干净子进程打真实请求）：
+
+      工作库文件                availability()   真实处置
+      不存在                    unavailable      跑 create_staging_db.py
+      0 字节（空壳）            unavailable      同上——空壳文件骗过了 exists()
+      12,288 B、0 张表          unavailable      同上
+      16,384 B、表在、0 行      **empty**        **跑 build_image_manifest.py**
+      16,384 B、表在、有行      ready            正常
+
+    「0 表」与「库不在」合成同一个 `unavailable` 是**故意**的：两者的下一步
+    动作相同（`create_staging_db.py` 会建表，也会建库）。而 `empty` 必须
+    单独一档——它是**已经配好、只是还没跑过清单**，这是全新环境的正常状态，
+    不是故障。
+
+    概览页不受影响：`overview.js` 判 `if (img && img.available)`，为假时
+    整张卡不出现（作者当时就绕开了这个坑，注释写着「没有图片索引与『一张图
+    都没有』是两件事」）。详情页绕不开——那块面板的位置已经占了，必须说点
+    什么，于是把四条来路压成了两条。
+    """
     con = _conn()
     if con is None:
-        return False
+        return "unavailable"
     try:
-        return con.execute(
-            "SELECT COUNT(*) FROM image_manifest").fetchone()[0] > 0
+        n = con.execute("SELECT COUNT(*) FROM image_manifest").fetchone()[0]
     except sqlite3.Error:
-        return False
+        # 表不存在、库文件损坏都走这里。与「库连不上」同一档。
+        return "unavailable"
     finally:
         con.close()
+    return "ready" if n > 0 else "empty"
+
+
+def available() -> bool:
+    """布尔便捷版。**注意它把 `empty` 与 `unavailable` 压成同一个 `False`**。
+
+    调用方需要区分两者时用 `availability()`。这个版本留着是因为
+    `/api/accidents/<id>` 的 `images_available` 与 `/api/images/stats` 的
+    `available` 已是写进蓝图的对外契约（蓝图 05/06/09 三份文档 +
+    `check_api_contract` 的 `v is False` 判据），改名字的代价大于收益。
+    """
+    return availability() == "ready"
 
 
 def for_accident(accident_id: str) -> list[dict[str, Any]]:
@@ -177,12 +217,18 @@ def suspicious_sha1s(min_accidents: int = 3) -> set[str]:
 
 
 def stats() -> dict[str, Any]:
-    """图片覆盖统计（概览页与 `/api/images/stats`）。"""
+    """图片覆盖统计（概览页与 `/api/images/stats`）。
+
+    三个 `return empty` 里有两个是「库不可用」、一个是「表是空的」——它们
+    以前长得一模一样。`state` 字段把这条信息带出去，与 `availability()`
+    同一套取值。**注意 `available: False` 这条契约没动**：`overview.js`
+    靠它决定整张卡出不出现（`:642`），改语义会把概览页弄坏。
+    """
     empty: dict[str, Any] = {
         "files": 0, "accidents_with_images": 0, "accidents_total": 0,
         "accidents_with_images_legacy_only": 0,
         "coverage": 0.0, "by_ext": [], "analyzed": 0, "generated_at": None,
-        "available": False,
+        "available": False, "state": "unavailable",
     }
     con = _conn()
     if con is None:
@@ -212,7 +258,10 @@ def stats() -> dict[str, Any]:
 
     files = row["files"] or 0
     if not files:
-        return empty
+        # 与上面两个 `return empty` 分开：库是好的、表也在，只是清单还没跑过。
+        # 这是全新环境的正常状态，不是故障——页面上该说的是「去跑清单脚本」，
+        # 不是「工作库不可用」。
+        return {**empty, "state": "empty"}
 
     accs = row["accs"] or 0
     total = int(rodb.scalar("SELECT COUNT(*) FROM accidents", default=0) or 0)
@@ -235,6 +284,7 @@ def stats() -> dict[str, Any]:
         "analyzed": row["analyzed"] or 0,
         "generated_at": row["at"],
         "available": True,
+        "state": "ready",
     }
 
 

@@ -247,6 +247,10 @@ def build(
     # 后者的 local_path 是旧登记，与磁盘真源差 123 张 / 83 个事故，展示以工作库
     # 为准。工作库不可用时给空清单 + 标志位，前端据此区分「没有图」与「索引没重建」。
     image_items = images.for_accident_marked(accident_id)
+    # 只算一次：`available()` 与 `availability()` 各会连一次工作库，两次之间
+    # 状态理论上可以漂移（比如清单脚本正好在这中间跑完），那样响应里两个字段
+    # 会自相矛盾。同一个值派生两个表示，就不会。
+    image_state = images.availability()
 
     return {
         "id": row["id"],
@@ -259,6 +263,11 @@ def build(
         },
         "meta": meta,
         "images": image_items,
-        "images_available": images.available(),
+        # `images_available` 是布尔版（蓝图 05/06 已写死的对外契约），
+        # `images_state` 是三态版：`ready` / `empty` / `unavailable`。
+        # 两者由同一个值派生，`images_available` 恰等于
+        # `images_state == "ready"`——前端有旧缓存时仍读前者，新代码读后者。
+        "images_available": image_state == "ready",
+        "images_state": image_state,
         "raw_text": row.get("raw_text"),
     }

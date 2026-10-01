@@ -234,7 +234,12 @@ def test_PDF提不出正文时标needs_ocr为真(tmp_path):
         _close(c)
 
 
-def test_无PDF时不标needs_ocr(tmp_path):
+def test_既无附件也无内容图时不标needs_ocr(tmp_path):
+    """**原名是「无 PDF 时不标」——那个说法第二十七轮起不成立了。**
+
+    判据补了图片那一支之后，「无 PDF」不再蕴含「不标」：无 PDF 但有内容图、
+    且正文区短，照样要标。这一条钉的是它真正的条件——两样都没有。
+    """
     c = _collector(tmp_path, with_pdf=False)
     c._download_and_extract_pdf = lambda u, t, d: ("不该被调用", "/x/a.pdf")
     try:
@@ -758,5 +763,93 @@ def test_图片走的是URL而不是下载(tmp_path):
     try:
         c.collect()
         assert calls == []
+    finally:
+        _close(c)
+
+
+# --------------------------------------------------------------------------
+# `needs_ocr` 的图片支（2026-10-01 第二十七轮）
+#
+# 改前的判据是 `bool(pdf_urls) and not pdf_text`——**只看 PDF**。于是图片型报告
+# （正文区是空的、正文全在扫描页里）恒为 `False`：`sc_em` 实测那条「正文 154 字
+# + 24 张 `…/images/0001.jpg` 就是一份调查报告全部内容」的记录，产出里标的是
+# 「不需要 OCR」，阶段② 永远不会去取那 24 张图。
+#
+# 图片没有「提出文字」这个事件可用（采集层不做 OCR），所以这一支拿「正文区够
+# 不够」当代理；带 `BODY_MIN_CHARS` 那一半是为了别把 OCR 队列稀释掉。
+# 判据全文与理由见 `trs_cms_base.py` 里 `needs_ocr` 上方那段注释。
+# --------------------------------------------------------------------------
+
+
+def _short_body() -> str:
+    """正文区只有一百来字——图片型报告的样子（`sc_em` 实测 154 字）。"""
+    return "短正文。" * 20                          # 100 字，在 200 之下
+
+
+def _scan_hrefs(n: int = 24) -> list[str]:
+    """一页挂 n 张同目录图 —— 扫描件报告的形态。"""
+    return [f"./W0202607133876093{i:04d}.png" for i in range(1, n + 1)]
+
+
+def test_图片型条目标needs_ocr为真(tmp_path):
+    """改前恒为 `False` 的那一类。"""
+    c = _collector(tmp_path, with_pdf=False, body=_short_body(),
+                   img_hrefs=_scan_hrefs())
+    try:
+        c.collect()
+        items = c.raw_store.get_all()
+        assert len(items) == 5
+        for item in items:
+            assert len(item["image_urls"]) == 24
+            assert item["needs_ocr"] is True
+    finally:
+        _close(c)
+
+
+def test_有内容图但正文够长时不标needs_ocr(tmp_path):
+    """带 `BODY_MIN_CHARS` 那一半的作用：别把 OCR 队列稀释掉。
+
+    `gz_em` 有一条挂 30 张图、却有 16,670 字正文的记录。图片支若只判「有没有
+    内容图」，每个带插图的普通页面都会进 OCR 队列。
+    """
+    c = _collector(tmp_path, with_pdf=False, img_hrefs=[_IMG_HREF])
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == [_IMG_URL]
+        assert item["needs_ocr"] is False
+    finally:
+        _close(c)
+
+
+def test_判据自检_把图拿掉就不标了(tmp_path):
+    """同一条正文，只把图去掉——标不标必须跟着变。
+
+    没有这一条，上面那条可能只是在断言一个恒真的东西（正文短本来就不标）。
+    """
+    c = _collector(tmp_path, with_pdf=False, body=_short_body())
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["image_urls"] == []
+        assert item["needs_ocr"] is False
+    finally:
+        _close(c)
+
+
+def test_附件已提出正文时图片支仍独立成立(tmp_path):
+    """两支是**或**的关系，互不覆盖。
+
+    有 PDF 且提出了正文（第一支为假），但正文区仍是空的、还挂着内容图——图片
+    里的字照样没取过，第二支独立判真。
+    """
+    c = _collector(tmp_path, body=_short_body(), img_hrefs=[_IMG_HREF])
+    c._download_and_extract_pdf = lambda u, t, d: ("PDF 里的正文。" * 50, "/x/a.pdf")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["pdf_urls"] == [_PDF_URL]
+        assert item["image_urls"] == [_IMG_URL]
+        assert item["needs_ocr"] is True
     finally:
         _close(c)

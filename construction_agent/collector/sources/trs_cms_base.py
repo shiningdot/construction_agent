@@ -453,11 +453,38 @@ class TrsCmsCollector(BaseCollector):
                     # 正文只有 631 / 717 字，而 PDF 里有 8,635 / 7,523 字——
                     # 正文的主体在附件里，附着的是正文本身而不是什么补充材料。
                     "pdf_urls": pdf_urls,
-                    # 判据是「有 PDF **且** 一份都没提出正文」——不是
-                    # 「combined_text 为空」。`sh_em` 实测 HTML 正文 631 字、
-                    # PDF 里 8,635 字，HTML 那份非空不影响「附件里的主体还没
-                    # 拿到」这个事实。
-                    "needs_ocr": bool(pdf_urls) and not pdf_text,
+                    # 判据有**两条并列**，因为「文字还没拿到」在这两处形态不同
+                    # （2026-10-01 第二十七轮补第二条）。
+                    #
+                    # ① 附件里的文字没提出来：判据是「有 PDF **且** 一份都没
+                    #    提出正文」——不是「`combined_text` 为空」。`sh_em` 实测
+                    #    HTML 正文 631 字、PDF 里 8,635 字，HTML 那份非空不影响
+                    #    「附件里的主体还没拿到」这个事实。
+                    #
+                    #    这一支**故意不看正文长度**，两个理由：全 PDF 型站点的
+                    #    HTML 正文（631/717 字）会让长度判据恒过；而长度够不够
+                    #    是审核队列那条线在管（上面那个 `BODY_MIN_CHARS` 分支），
+                    #    一个字段管一件事。
+                    #
+                    # ② 报告本体是图片：图片没有「提出文字」这个事件——采集层
+                    #    不做 OCR，图片的文字永远提不出来——所以只能拿「正文区
+                    #    够不够」当代理。没有这一条，`sc_em` 那条「正文 154 字、
+                    #    24 张扫描页就是内容本身」的记录会标成 `needs_ocr=False`
+                    #    （第二十六轮实测就是这么发现的）。
+                    #
+                    #    主语取 `detail_text` 而不是 `combined_text`：后者是
+                    #    `pdf_text or detail_text`，有 PDF 文本时它就等于 PDF 的
+                    #    长度，问「页面正文区够不够」会问到错的东西上。
+                    #
+                    #    带 `len(...) < BODY_MIN_CHARS` 这一半是为了**别把队列
+                    #    稀释掉**：`gz_em` 有一条挂 30 张图却有 16,670 字正文的
+                    #    记录，标 OCR 没有意义。方向与 `nmg_em`（第二十二轮）
+                    #    一致。
+                    "needs_ocr": (
+                        (bool(pdf_urls) and not pdf_text)
+                        or (bool(image_urls)
+                            and len(detail_text) < BODY_MIN_CHARS)
+                    ),
                     # ── 内容图通路（2026-10-01 第十八轮补）─────────────
                     #
                     # 与 `pdf_urls` 同一套机制：`executor._ASSET_KEYS` 里早有

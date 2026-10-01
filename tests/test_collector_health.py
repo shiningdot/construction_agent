@@ -134,6 +134,69 @@ def test_没连上和真的空要分开():
     assert health._status_of({"count": 5, "closure": {"net_failed": 1}}) == "有数据"
 
 
+def test_列表页拿到了却解析不出要判成解析空():
+    """**第三十八轮的活样本 `jx_em`。**
+
+    TLS 修好之后它的 `net_failed = 0`、`listed = 0`，与「站点通了、栏目
+    确实没内容」逐格相同；真相是列表页 200 / 271,906 字节、49 条全在
+    JSON 接口里。修好一层只是把它从一种「看不出区别」挪到另一种。
+    """
+    jx = {"count": 0, "listed": 0,
+          "closure": {"net_failed": 0, "list_pages_ok": 1}}
+    assert health._status_of(jx) == "解析空"
+
+
+def test_页面没回来时还是空():
+    """页数为 0 与「真·空栏目」仍不可分——这一格没解决它，只缩小了它。"""
+    res = {"count": 0, "listed": 0,
+           "closure": {"net_failed": 0, "list_pages_ok": 0}}
+    assert health._status_of(res) == "空"
+
+
+def test_listed为None时不能落进解析空():
+    """**反例**：判据若写成 `not listed`，`None` 也是真。
+
+    `esafety` / `news_aggregator` / `open_gov` 这类源没有列表通路，`listed`
+    是 `None`；有 `list_pages_ok` 的几个源里也保不齐某个是 `None`。写成
+    `not listed` 会把它们一并报成「解析空」——凭空多出几个故障。
+    """
+    res = {"count": 0, "listed": None, "closure": {"list_pages_ok": 3}}
+    assert health._status_of(res) == "空"
+
+
+def test_没连上优先于解析空():
+    """两个计数器同时有值时，网络层的问题更根本，先报 `没连上`。"""
+    res = {"count": 0, "listed": 0,
+           "closure": {"net_failed": 2, "list_pages_ok": 1}}
+    assert health._status_of(res) == "没连上"
+
+
+def test_有数据时新增的分支不干扰():
+    res = {"count": 4, "listed": 40,
+           "closure": {"net_failed": 0, "list_pages_ok": 2}}
+    assert health._status_of(res) == "有数据"
+
+
+def test_有源抓到数据就退0():
+    assert health._exit_code([{"count": 0}, {"count": 3}], only=None) == 0
+
+
+def test_全量探测全灭才退2():
+    """这是为「跑全量却一个都没抓到」设计的：探测本身坏了的信号。"""
+    assert health._exit_code([{"count": 0}, {"count": 0}], only=None) == 2
+
+
+def test_限定探测全灭不退2():
+    """**2026-10-01 实测撞出来的。**
+
+    `--only jx_em,hub_em,jl_em,sc_em,esafety` 五个全灭 → 退 2 并在 stderr
+    打印「探测本身出了问题」。而它其实是这次探测最成功的一次——五个源各自
+    的三格判据全对。排查时挑的本来就是已知有问题的源，「0 个抓到」是预期结果。
+    判据的取值域里混进了「不适用」，和「闭环」那一栏的老毛病同族。
+    """
+    assert health._exit_code([{"count": 0}], only="jx_em") == 0
+
+
 def test_条数带星号表示被早停截断():
     """`cq_em` 的 13 和 `sh_em` 的 3 直接比是错的——后者列表 94 条，只是停在了 3。"""
     assert health._count_cell({"count": 13, "note": "通路A+通路B"}) == "13"

@@ -45,19 +45,29 @@
    `esafety` / `mem` / `mohurd` / `news_aggregator` / `open_gov` / `safehoo`）
    ——**全都表示「不适用」，不是「有问题」**。三者混着数，就会得出
    「十几个源闭环失败」这种自己吓自己的结论。
-6. **「空」也要分两种。** 站点通了、栏目本来就空，和 DNS 挂了 / TLS 谈不成 /
-   被 412 拦，在 `_total_listed` 上都是 0，日志里都只有一行 WARNING，采集任务
-   都报「成功」。2026-10-01 实测 `jl_em`（DNS）、`jx_em`（SSL 老式重协商）、
-   `hub_em`（412）三个源在旧表上逐格相同。TRS 基类现在记 `_fetch_failed`
-   （只数重试耗尽，404/410 不算），「结果」栏据此把 `空` 拆成 `空` 与
-   `没连上`。**只覆盖 12 个 TRS 源**，其余源仍只有 `空` 一种。
+6. **「空」要分三种。** 站点通了、栏目本来就空 / 列表页拿到了却解析不出条目 /
+   DNS 挂了、TLS 谈不成、被 412 拦——这三件事在 `_total_listed` 上都是 0，
+   日志里都只有一行 WARNING，采集任务都报「成功」。
+
+   2026-10-01 实测 `jl_em`（DNS）、`jx_em`（SSL 老式重协商）、`hub_em`（412）
+   三个源在旧表上逐格相同；第三十七轮把 `_fetch_failed` 加进 TRS 基类（只数
+   重试耗尽，404/410 不算），「结果」栏据此拆出 `没连上`。**但 `jx_em` 的 TLS
+   修好之后变成 `net_failed = 0` + `listed = 0`，与「栏目本来就空」又逐格相同**
+   ——它实际是列表页 200 / 271,906 字节（SPA 壳），修好一层只是把它从一种
+   「看不出区别」挪到另一种。
+
+   第三十八轮再加 `_list_pages_ok`（列表页正文真取到了几页），拆出 `解析空`。
+   **已知的不可分**：真·空栏目（站点通了、那个栏目确实零条）也落在 `解析空`，
+   两者都要人去看页面；这一格至少把「压根没取到页面」排除了。
+   **只覆盖 12 个 TRS 源**，其余源仍只有 `空` 一种。
 
 ## 退出码
 
 - `0` —— 探测跑完，**且至少有一个源抓到了数据**（结论已产出）
-- `2` —— **一个源都没抓到**。这大概率不是「全网 24 站同时失效」，而是探测
-  本身出了问题（没网、代理、sink 挂错）。跟 `build_image_manifest.py`
+- `2` —— **全量探测里一个源都没抓到**。这大概率不是「全网 24 站同时失效」，
+  而是探测本身出了问题（没网、代理、sink 挂错）。跟 `build_image_manifest.py`
   「扫到 0 张退 2」同一族判据：两头都真的判据等于没有判据。
+  **`--only` 时这条不适用**（退 0）——见 `_exit_code`。
 - `1` —— 脚本自身跑不动（源清单拿不到、结果目录写不进去）
 
 **注意退 0 不表示「源都健康」。** 「18 个源失效」是真实的探测结果、不是脚本
@@ -307,6 +317,10 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
         # 和「压根没连上」分开的东西——见 `_status_of`。
         nf = getattr(collector, "_fetch_failed", None)
         closure["net_failed"] = nf if isinstance(nf, int) else None
+        # 取到正文的列表页个数。`listed == 0` 时它把「页面拿到了但解析不出」
+        # 与「压根没取到页面」分开——见 `_status_of`。
+        lp = getattr(collector, "_list_pages_ok", None)
+        closure["list_pages_ok"] = lp if isinstance(lp, int) else None
         (work / f"{key}.closure").write_text(
             json.dumps(closure), encoding="utf-8")
     (work / f"{key}.elapsed").write_text(f"{time.monotonic() - started:.1f}",
@@ -407,12 +421,25 @@ def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> lis
 
 
 def _status_of(res: dict) -> str:
-    """四种取值变成五种：`空` 拆成「真的空」与「没连上」。
+    """四种取值变成六种：`空` 被拆成「没连上」与「解析空」。
 
     2026-10-01 实测：`jl_em`（DNS 解析失败）、`jx_em`（SSL 老式重协商被禁）、
     `hub_em`（HTTP 412 反爬）三个源，三种毫不相干的故障，在旧表上逐格相同。
     它们和「站点通了、栏目确实没内容」在 `_total_listed` 上都是 0——不拆开，
     这一栏就答不了「这个源还活着吗」。
+
+    第三十七轮只拆出了「没连上」。**第三十八轮的全源快照又造出一个反例**：
+    `jx_em` 的 TLS 修好之后变成 `net_failed = 0` + `listed = 0`——与「站点
+    通了、栏目确实没内容」**逐格相同**，而它的真相是列表页 HTTP 200 /
+    271,906 字节（SPA 壳，49 条全在 JSON 接口里）。修好一层只是把一个源从
+    一种「看不出区别」挪到另一种「看不出区别」。
+
+    判据用 `_list_pages_ok`：**列表页正文真取到了几页**。取到了却一条都没
+    解析出来，问题就在解析这一层（「列表页形态变了」优先于「栏目真的空了」），
+    而不是在网络或站点存活上。
+
+    **已知的不可分**：真·空栏目（站点通了、那个栏目确实零条）也会落到
+    `解析空`。两者都要人去看页面。这一格至少把「压根没取到页面」排除了。
     """
     if res.get("timed_out"):
         return "超时"
@@ -420,7 +447,12 @@ def _status_of(res: dict) -> str:
         return "出错"
     if res["count"]:
         return "有数据"
-    return "没连上" if (res.get("closure") or {}).get("net_failed") else "空"
+    c = res.get("closure") or {}
+    if c.get("net_failed"):
+        return "没连上"
+    if c.get("list_pages_ok") and res.get("listed") == 0:
+        return "解析空"
+    return "空"
 
 
 def _closure_cell(res: dict) -> str:
@@ -528,9 +560,36 @@ def _print_closure_hint(results: list) -> None:
         keys = "、".join(f"`{r['key']}`" for r in empty)
         print(f"> 空表的是列表解析出 0 条的源（{keys}）——`0 == 0 + 0 + 0` 恒真，"
               f"这一栏对它们没有信息量。**它们的问题不在「账对不对」，在"
-              f"「为什么一条都没有」**，看「结果」栏的 `空` / `没连上`。")
+              f"「为什么一条都没有」**，看「结果」栏的 `空` / `解析空` / `没连上`"
+              f"三者的区别。")
     if blank:
         print("> 无此判据的源没记这几个计数器，同样不是「闭环失败」。")
+
+
+def _print_parse_empty_hint(results: list) -> None:
+    """「列表页拿到了、却一条都没解析出来」的源单独列出来。
+
+    这是第三十八轮新增的一格。它比 `没连上` 更值得看：`没连上` 是网络/站点
+    层面的问题，人一眼知道要等或要绕；`解析空` 说明**站点活着、页面拿到了，
+    是我们的判据在这个页面上一条都对不上**——几乎总是「列表页形态变了」
+    （改版、换成 SPA、条目渲染进 JSON），而不是「栏目真的空了」。
+
+    区分靠 `_list_pages_ok`（取到正文的列表页数）。**已知不可分**：真·空栏目
+    也落在这一格，所以给出的动作是「去看一眼页面」，不是「一定有 bug」。
+    """
+    pe = [r for r in results
+          if (r.get("closure") or {}).get("list_pages_ok")
+          and r.get("listed") == 0]
+    if not pe:
+        return
+    for r in pe:
+        c = r["closure"]
+        print(f"\n⚠ `{r['key']}`：列表页取到正文 {c['list_pages_ok']} 页、"
+              f"解析出 0 条——**站点是活的，是判据对不上页面**。")
+    print("> 这一格与「栏目本来就空」在计数器上不可分（两者都是 pages_ok≥1 且 "
+          "listed=0），要人打开列表页看一眼才能定。")
+    print("> 若是改版：优先怀疑列表页换成 SPA / 条目进了 JSON 接口，"
+          "而不是真的没内容。")
 
 
 def _print_paging_hint(results: list) -> None:
@@ -555,6 +614,24 @@ def _print_paging_hint(results: list) -> None:
     print(">    去页面源码里找分页线索：`index_N.html`、`pagenav_N`、")
     print(">    `createPageHTML(总数, 页数, 当前索引, 文件名, 扩展名)`——最后这个")
     print(">    直接把总页数写在参数里。判据里少一维，那一维就不会报警。")
+
+
+def _exit_code(results: list, only: str | None) -> int:
+    """退出码判据。见模块 docstring「退出码」那一节。
+
+    **`--only` 时「一个源都没抓到」不适用这条判据。** 它是为「跑全量却全灭」
+    设计的——那说明探测本身坏了（没网、代理、sink 挂错）。限定几个源时，若
+    挑的正好是已知有问题的源（排查时就是这么挑的），「0 个抓到」是**预期
+    结果**。2026-10-01 第三十八轮实测：`--only jx_em,hub_em,jl_em,sc_em,
+    esafety` 五个全灭 → 退 2 并打印「探测本身出了问题」，而它其实是这次探测
+    最成功的一次（五个源各自的三格判据全对）。
+
+    与「闭环」那一栏同族：判据的取值域里混进了「不适用」，而它和「失败」
+    看起来一模一样。
+    """
+    if any(r["count"] for r in results):
+        return 0
+    return 0 if only else 2
 
 
 def main() -> int:
@@ -614,6 +691,7 @@ def main() -> int:
               "不带 = 列表本就短，跑到底的真实候选数。两者不要横向比。")
 
         _print_closure_hint(results)
+        _print_parse_empty_hint(results)
         _print_paging_hint(results)
 
         if args.samples:
@@ -641,13 +719,17 @@ def main() -> int:
                 ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"报告：{args.json}")
 
-        if not hit:
+        code = _exit_code(results, args.only)
+        if code == 2:
             print("\n✗ 一个源都没抓到。这大概率不是「24 个站同时失效」，"
                   "而是探测本身出了问题：", file=sys.stderr)
             print("  先确认能上外网（curl -sI https://www.baidu.com），"
                   "再看上面每行的备注。", file=sys.stderr)
-            return 2
-        return 0
+        elif not hit and args.only:
+            print(f"\n注：本次是 `--only` 限定探测（{len(results)} 个源），"
+                  f"「一个源都没抓到就判探测故障」这条不适用——"
+                  f"排查时挑的本来就是已知有问题的源。")
+        return code
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

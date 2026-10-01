@@ -1300,3 +1300,86 @@ def test_判据自检_函数改回恒返回True这条就红(tmp_path, monkeypatc
         assert _legacy_bit_on(c._client) is False
     finally:
         _close(c)
+
+
+# --------------------------------------------------------------------------
+# L 组：`_list_pages_ok`——列表页正文真取到了几页
+# --------------------------------------------------------------------------
+#
+# 第三十八轮。上一轮把 `jx_em` 的 TLS 修通之后，它在健康检查表上从
+# 「没连上」变成了「空」——**与「站点通了、栏目确实没内容」逐格相同**。
+# 而它的真相是列表页 HTTP 200 / 271,906 字节（SPA 壳，49 条全在 JSON 接口
+# 里）。修好一层只是把一个源从一种「看不出区别」挪到另一种。
+#
+# `_total_listed` 答的是「解析出几条」，答不了「页面拿到没有」。这一组测的
+# 就是这个新计数器：它在哪几种情形下该涨，以及它到底分开了什么。
+
+
+def test_列表页取到正文时页数加一(tmp_path):
+    c = _collector(tmp_path)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        assert c._list_pages_ok == 1
+        assert c._total_listed == 5
+    finally:
+        _close(c)
+
+
+def test_列表页压根取不到时页数为零(tmp_path):
+    """`hub_em`(412) / `jl_em`(DNS) 那一类：页面一张都没回来。"""
+    c = _collector(tmp_path)
+    c._fetch = lambda url: ""
+    try:
+        c.collect()
+        assert c._list_pages_ok == 0
+        assert c._total_listed == 0
+    finally:
+        _close(c)
+
+
+def test_页面拿到了却解析不出条目时页数为一而条数为零(tmp_path):
+    """**`jx_em` 的形态**：HTTP 200、27 万字节，一个可匹配的 href 都没有。
+
+    列表页是真取到了（`_list_pages_ok == 1`），只是 `list_link_pattern`
+    在这个页面上一条都对不上——条目全在 `…-articleList.json` 里。
+    """
+    c = _collector(tmp_path)
+    c._fetch = lambda url: ('<html><body><div class="col">'
+                            '<a href="javascript:void(0)">栏目</a>'
+                            '</div></body></html>')
+    try:
+        c.collect()
+        assert c._list_pages_ok == 1, "页面明明取到了，这个数必须是 1"
+        assert c._total_listed == 0
+    finally:
+        _close(c)
+
+
+def test_同一个零条两种来路只有页数分得开(tmp_path):
+    """**这是加这个计数器的全部理由。**
+
+    「页面没回来」与「页面回来了但解析不出」在 `_total_listed` 上都是 0，
+    在 `_fetch_failed` 上也都是 0（`_fetch` 返回空串不算重试耗尽）。
+    2026-10-01 的实测就是这个形状：`jx_em` 修好 TLS 之后的
+    `net_failed = 0` + `listed = 0`，与真·空栏目**逐格相同**。
+
+    所以这一条正着断两件事：`_fetch_failed` 分不开（断言两者相等），
+    `_list_pages_ok` 分得开（断言两者不等）。
+    """
+    down = _collector(tmp_path / "down")        # 页面取不到
+    down._fetch = lambda url: ""
+    parsed = _collector(tmp_path / "parsed")    # 页面取到了、解析不出
+    parsed._fetch = lambda url: ('<html><body><p>栏目暂无内容</p></body></html>')
+    try:
+        for c in (down, parsed):
+            c.collect()
+        # 旧有的两个计数器把它们看成同一个东西
+        assert (down._total_listed, down._fetch_failed) == (0, 0)
+        assert (parsed._total_listed, parsed._fetch_failed) == (0, 0)
+        # 新计数器分得开
+        assert down._list_pages_ok == 0
+        assert parsed._list_pages_ok == 1
+    finally:
+        _close(down)
+        _close(parsed)

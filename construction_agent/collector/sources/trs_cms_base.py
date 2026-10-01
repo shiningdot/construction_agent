@@ -315,6 +315,22 @@ class TrsCmsCollector(BaseCollector):
         # 被禁）、`hub_em`（HTTP 412）三个源——三种毫不相干的故障——在健康
         # 检查表上逐格相同地显示成「空」。有了这个计数才分得开。
         self._fetch_failed = 0
+        # 成功取到正文的**列表页**个数（2026-10-01 第三十八轮）。
+        #
+        # 它和 `_total_listed` 是两个数：前者说「列表页拿到了几页」，后者说
+        # 「从里面解析出几条」。`_total_listed == 0` 时，只有把这两个数放在
+        # 一起才答得出「是栏目本来就没内容，还是页面拿到了但对不上判据」。
+        #
+        # 实测（本轮全源快照）：`jx_em` 的 TLS 修好之后变成
+        # `_fetch_failed = 0` + `_total_listed = 0`——**与「站点通了、栏目确实
+        # 没内容」逐格相同**。而它的真相是列表页 HTTP 200 / 271,906 字节
+        # （SPA 壳，条目全在 JSON 里）。加了本计数器之后：
+        #   `hub_em` / `jl_em`  net_failed=1  → 没连上
+        #   `jx_em`             pages_ok=1    → 解析空
+        #   （真·空栏目）        pages_ok≥1 且 listed=0 → 也落在「解析空」
+        # 最后一行是**已知的不可分**：两者都要靠人去看页面。计数器至少把
+        # 「压根没取到页面」这条排除了。
+        self._list_pages_ok = 0
 
     # ── BaseCollector 接口 ──
 
@@ -335,6 +351,8 @@ class TrsCmsCollector(BaseCollector):
         for page_url in pages:
             html = self._fetch(page_url)
             if html:
+                # 列表页真取到了正文——与「取不到」分开记（见 `__init__`）。
+                self._list_pages_ok += 1
                 # 传 `page_url` 而不是让 `_parse_list` 自己去猜：相对链接
                 # （`./202609/…`）要对着**这一页**的地址解析，分页时页页不同。
                 all_links.extend(self._parse_list(html, page_url))

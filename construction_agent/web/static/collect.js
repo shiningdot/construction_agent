@@ -58,7 +58,7 @@
   // 由 `scripts/check_enum_alignment.py` 核两侧是否一一对应——**加取值先加注释**，
   // 否则这里漏一个键就是静默漏一次翻译，页面上直接冒英文码。
   var ASSET_TYPE_LABEL = {
-    pdf: 'PDF 文档', image: '图片', attachment: '附件',
+    pdf: 'PDF 文档', office: 'Office 文档', image: '图片', attachment: '附件',
   };
   var OCR_LABEL = {
     pending: '待处理', done: '已完成', failed: '失败', skipped: '已跳过',

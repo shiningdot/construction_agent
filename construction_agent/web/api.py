@@ -30,6 +30,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 from flask import Blueprint, jsonify, request
 
 from . import accidents_query, causes, db, detail, images, overview, province
@@ -183,18 +185,49 @@ def api_province_audit():
 
 @api_bp.get("/health")
 def api_health():
-    """库连通性与结构自检。启动时打开一次即可确认环境配置正确。"""
+    """库连通性与结构自检。启动时打开一次即可确认环境配置正确。
+
+    `ok` 的判据是「**必需表都在**」，不是「文件存在」。
+
+    蓝图 00 §4.5 给表行数那一栏写的目的正是「一眼看出表在不在、**是不是
+    空壳**」——而实现原先只判 `path.exists()`，于是 0 字节空壳与「建了文件、
+    零张表」这两种库都报 `ok: true`，`tables` 却是 `{}`：徽标照常显示、
+    只报「缺 3 个索引」，把用户引去跑 `add_indexes.py`（见 `db.diagnose`
+    的实测表）。判据换成必需表，空壳库才会掉进错误分支。
+    """
     path = db.resolve_db_path()
     if not path.exists():
+        return jsonify({"ok": False, "db_path": str(path),
+                        **db.diagnose(db.DatabaseNotFoundError())}), 503
+
+    try:
+        tables = db.list_tables()
+    except sqlite3.Error as exc:
+        # 库文件在、但读不动（不是 SQLite 文件 / 头损坏）。原先这里没有分支，
+        # 异常直接冒成 HTML 500。
+        return jsonify({"ok": False, "db_path": str(path),
+                        **db.diagnose(exc, path)}), 503
+
+    counts = {t: db.scalar(f"SELECT COUNT(*) FROM {t}", default=0) for t in tables}
+
+    missing_tables = sorted(db.REQUIRED_TABLES - set(tables))
+    if missing_tables:
+        # **不返回 `missing_indexes`**：表都不在，谈索引没有意义。返回空数组
+        # 等于把「不适用」伪装成「没有」——本项目已栽过四次的那个坑。缺了
+        # 这个键，前端若忘了判 `ok` 会抛 TypeError 掉进 catch 显示「数据库
+        # 不可用」，**失败方向是安全的**。
         return jsonify({
             "ok": False,
             "db_path": str(path),
-            "error": "库文件不存在",
-            "hint": "用环境变量 CAIEMS_DB 指定，例如 "
-                    "CAIEMS_DB=/home/suntianhao/construction_agent/data/caiems_v2.db",
+            "tables": counts,
+            "missing_tables": missing_tables,
+            "error": "schema_mismatch",
+            "message": f"最终库缺少必需表：{'、'.join(missing_tables)}",
+            "hint": "这个文件还不是本项目的最终库（0 字节文件也走到这里）。"
+                    "跑 scripts/create_db_v2.py 建九张表；"
+                    "若路径本就该指向别处，改用 CAIEMS_DB 重新指定",
         }), 503
 
-    counts = {t: db.scalar(f"SELECT COUNT(*) FROM {t}", default=0) for t in db.list_tables()}
     indexes = [i["name"] for i in db.list_indexes()]
 
     # 展示层最依赖的三个索引。缺了不报错，但列表页会慢两个数量级
@@ -224,9 +257,24 @@ def api_health():
 
 
 @api_bp.errorhandler(db.DatabaseNotFoundError)
-def _handle_db_missing(exc: db.DatabaseNotFoundError):
-    """库不存在时给结构化错误，而不是 Flask 的 HTML 500 页。"""
-    return jsonify({
-        "error": "database_not_found",
-        "message": str(exc),
-    }), 503
+@api_bp.errorhandler(sqlite3.Error)
+def _handle_db_unavailable(exc: BaseException):
+    """最终库不可用时给结构化错误，而不是 Flask 的 HTML 500 页。
+
+    原先这里只挂 `DatabaseNotFoundError`（= 库文件不存在），另两种来路没有任何
+    人接：**0 字节空壳文件**与**建了文件但零张表**——它们都通过了
+    `connect_readonly` 的 `path.exists()`，要到第一条 SQL 才报 `no such table`，
+    那时异常一路冒到 Flask 默认 500 页。2026-10-01 实测：展示层 11 个端点里
+    **10 个直接崩**，只有 `/api/health` 例外（它自己判 `path.exists()`，而那
+    判据本身也是错的，见 `api_health`）。
+
+    **为什么敢挂宽泛的 `sqlite3.Error`**：这个 handler 只对 `api_bp` 的路由生效，
+    而这些路由里读**工作库**的只有 `images.*` 与 `detail.build`，前者每个
+    `con.execute` 都有 `except sqlite3.Error`（`_conn` 也吞），不会把异常漏出来；
+    `collect_bp` / `extract_bp` / `review_bp` 是另外三个 blueprint，各有自己的
+    `_unavailable()`，不归这里管。所以在 `api_bp` 范围内，能冒到这儿的
+    `sqlite3.Error` 来自最终库。**新增读工作库的端点时要重新核这一条。**
+
+    具体是哪一种来路交给 `db.diagnose()` 判——按来路分档，不按异常类型分档。
+    """
+    return jsonify(db.diagnose(exc)), 503

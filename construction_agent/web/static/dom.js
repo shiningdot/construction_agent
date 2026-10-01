@@ -79,15 +79,38 @@
      哪个页面无关，所以放在公共文件里由 dom.js 加载时自动填一次——
      collector 页不读最终库，但用户仍该看到「库在不在、索引齐不齐」。
 
-     `overview.js` 里还留着一份等价的内联实现（早于本文件），两份写同一
-     个元素、内容一致，不会打架；合并留到 M1 收尾时做。 */
+     `overview.js` 里还留着一份等价的内联实现（早于本文件）——**概览页的
+     `{% block scripts %}` 里根本没引 dom.js**，它自带了 `$`/`num`/`jsonGet`
+     全套（自包含 IIFE），而本文件是把工具挂到 global。两种模式并存，合并
+     是架构选择不是缺陷修复，留到 M1 收尾时做；**两处的库状态呈现必须一起改**
+     （第四十一轮就是两处一起改的）。
+
+     第四十一轮之前这里无条件写 `h.tables.accidents`：`/api/health` 在空壳库
+     上报 `ok: true` + `tables: {}`，于是徽标显示「xxx.db · NaN 条」，并因为
+     `missing_indexes` 有值而报成「缺 3 个索引」、把用户引去跑 add_indexes.py
+     ——**指错方向**（库连 `accidents` 表都没有）。后端改成缺表即 503 之后
+     这条路径走不到了，但 `is-error` 那一支仍然**只能靠 JS 抛异常掉进 catch
+     才出现**：`db-chip` 的三种颜色，后端原先只给得出两种。 */
+  function applyDbDown(chip, text, info) {
+    chip.className = 'db-chip is-error';
+    text.textContent = '数据库不可用';
+    /* 三种来路（库文件不存在 / 不是 SQLite 文件 / 缺表）的文案由后端在 503
+       体里给出（`message` + `hint`），前端照原样显示。**不在前端另编一套**
+       ——编出来的那套正是「指错方向」的来源。`fetchJson` 已把响应体挂在
+       `e.body` 上。 */
+    const body = (info && info.body) || info || {};
+    chip.title = body.hint ? (body.message + '\n' + body.hint)
+                           : (body.message || (info && info.message) || '');
+  }
+
   function loadDbChip() {
     const chip = document.getElementById('dbChip');
     const text = document.getElementById('dbChipText');
     if (!chip || !text) return;
     fetchJson('/api/health').then(function (h) {
+      if (h.ok === false) return applyDbDown(chip, text, h);   // 兜底，正常走不到
       text.textContent = h.db_path.split('/').pop() + ' · '
-                         + num(h.tables.accidents) + ' 条';
+                         + num((h.tables || {}).accidents) + ' 条';
       const missing = h.missing_indexes || [];
       chip.title = h.db_path + (missing.length
         ? '\n缺索引：' + missing.join(', ') + '\n' + (h.hint || '')
@@ -101,9 +124,7 @@
         }
       }
     }).catch(function (e) {
-      chip.className = 'db-chip is-error';
-      text.textContent = '数据库不可用';
-      chip.title = e.message;
+      applyDbDown(chip, text, e);
     });
   }
 

@@ -124,26 +124,40 @@
   // 健康检查
   // ══════════════════════════════════════════════════════════
 
+  /* 库不可用时徽标的呈现。`dom.js` 里有一份等价实现（`applyDbDown`）——
+     概览页的 `{% block scripts %}` 没有引 dom.js，本文件是自包含 IIFE，
+     所以这份不能省。**两处必须一起改**，第四十一轮就是两处一起改的：
+     改前两份都无条件读 `h.tables.accidents`，而 `/api/health` 在空壳库上
+     报 `ok: true` + `tables: {}`，徽标于是显示「NaN 条」并报成「缺索引」，
+     把用户引去跑 add_indexes.py——**指错方向**。 */
+  function applyDbDown(chip, text, info) {
+    chip.className = 'db-chip is-error';
+    text.textContent = '数据库不可用';
+    // 三种来路的文案由后端在 503 体里给出（`message` + `hint`），照原样显示
+    const body = (info && info.body) || info || {};
+    chip.title = body.hint ? `${body.message}\n${body.hint}`
+                           : (body.message || (info && info.message) || '');
+  }
+
   function loadHealth() {
     const chip = $('dbChip');
     const text = $('dbChipText');
     return jsonGet('/api/health')
       .then((h) => {
+        if (h.ok === false) return applyDbDown(chip, text, h);   // 兜底
         const file = h.db_path.split('/').pop();
-        const rows = h.tables.accidents;
-        text.textContent = `${file} · ${num(rows)} 条`;
-        chip.title = h.db_path + (h.missing_indexes.length
-          ? `\n缺索引：${h.missing_indexes.join(', ')}\n${h.hint}` : '\n索引齐备');
-        chip.className = 'db-chip ' + (h.missing_indexes.length ? 'is-warn' : 'is-ok');
-        if (h.missing_indexes.length) {
+        const missing = h.missing_indexes || [];
+        text.textContent = `${file} · ${num((h.tables || {}).accidents)} 条`;
+        chip.title = h.db_path + (missing.length
+          ? `\n缺索引：${missing.join(', ')}\n${h.hint}` : '\n索引齐备');
+        chip.className = 'db-chip ' + (missing.length ? 'is-warn' : 'is-ok');
+        if (missing.length) {
           $('footMeta').textContent =
-            `⚠ 缺 ${h.missing_indexes.length} 个索引，列表筛选会明显变慢（scripts/add_indexes.py）`;
+            `⚠ 缺 ${missing.length} 个索引，列表筛选会明显变慢（scripts/add_indexes.py）`;
         }
       })
       .catch((e) => {
-        chip.className = 'db-chip is-error';
-        text.textContent = '数据库不可用';
-        chip.title = e.message;
+        applyDbDown(chip, text, e);
       });
   }
 

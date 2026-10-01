@@ -123,6 +123,14 @@ class OpenGovCollector(BaseCollector):
             # 默认只采集无条件开放的数据集
             self._active_sources = [ds for ds in GOV_DATASETS if ds["open_access"]]
 
+        # 没采到任何数据的数据集个数（2026-10-01 第三十九轮新增）。
+        #
+        # 与 TRS 基类的 `_fetch_failed` 同名同义：都是「没拿到有效内容」。
+        # 有了它，「结果」栏才分得出「这个源活着但平台今天没数据」与
+        # 「三个激活平台**一个都没通**」——修前两者在表上都是「空 / 0 条」，
+        # 日志里也都没有一句话说得出全部失败。
+        self._fetch_failed = 0
+
         logger.info(f"政府开放平台采集器: 激活 {len(self._active_sources)} 个数据源")
 
     def source_name(self) -> str:
@@ -160,15 +168,48 @@ class OpenGovCollector(BaseCollector):
                     logger.info(f"{ds_name}: 无数据或需要手动获取")
                     # 打印获取指引
                     self._print_manual_guide(ds)
+                    self._note_failure(ds, "API 与本地文件两条通路都没拿到数据")
 
             except Exception as e:
                 logger.warning(f"{ds_name} 采集失败: {e}")
                 self._print_manual_guide(ds)
+                self._note_failure(ds, f"{type(e).__name__}: {e}")
 
             # 请求间隔
             time.sleep(self.get_crawl_delay())
 
+        if self._fetch_failed >= len(self._active_sources) and self._active_sources:
+            logger.error(
+                f"[open_gov] {len(self._active_sources)} 个激活数据集**全部**"
+                f"没采到数据——这不是「平台今天没内容」，是通路本身不通。"
+                f"逐个原因见上面的 warning。"
+            )
         return results
+
+    def _note_failure(self, ds: dict, reason: str) -> None:
+        """把一个数据集的失败记成一件看得见的事，并计入 `_fetch_failed`。
+
+        **修前这类失败有三种去向，没有一种读得出来**（2026-10-01 第三十九轮
+        干跑实测，3 个激活数据集）：
+
+        - `shenyang`  `api_endpoint` 返回的是 **HTML**（一次 200 / 61,375 字节、
+          另一次 502 / 156 字节），**从来不是 JSON**——`resp.json()` 抛
+          `JSONDecodeError`，被 `logger.debug` 吞掉（默认级别看不见）。
+          而它的 `base_url` 本身是 200 / 96,594，站点完全活着。
+        - `heze`      `Network is unreachable`。这个域名**同时有 A 和 AAAA 记录**
+          （`58.59.15.41` + `2408:8614:402:7fff:ffff:ffff:0:30c9`），本机没有
+          IPv6 出口——**换一台有 IPv6 的机器可能就通了**，属环境依赖不是代码缺陷。
+        - `shandong`  `base_url` 200 / 179,446（站点活着），可是**配置里压根
+          没有 `api_endpoint`**，本地也没有手工下载的文件——三条通路只剩两条，
+          两条都空。
+
+        修前第二种会落进 `else: 无数据或需要手动获取`，与「这个平台今天确实
+        没数据」**同形**；第一种更糟，连 INFO 都没有。
+        """
+        self._fetch_failed += 1
+        logger.warning(
+            f"[open_gov] {ds['name']}（{ds['description']}）没采到：{reason}"
+        )
 
     def _fetch_dataset(self, ds: dict) -> list[dict]:
         """尝试多种方式获取数据集。"""
@@ -190,8 +231,30 @@ class OpenGovCollector(BaseCollector):
                     if items:
                         logger.info(f"API 获取成功: {len(items)} 条")
                         return items
+                    logger.warning(
+                        f"[open_gov] {ds['name']} 的 API 返回 200，但里面"
+                        f"解不出记录（拿到的不是预期的 JSON 结构）——"
+                        f"端点 {api_url} 未经确认，很可能早已失效。"
+                    )
+                else:
+                    # **修前这里什么都没有。** `if resp.status_code == 200:`
+                    # 为假时整个 API 分支静默跳过，于是「502」与「压根没配
+                    # api_endpoint」在日志里同形——都是一片安静。实测遇到过
+                    # 一次 502 / 156 字节。
+                    logger.warning(
+                        f"[open_gov] {ds['name']} 的 API 返回 HTTP "
+                        f"{resp.status_code}（端点 {api_url}，未经确认）——"
+                        f"非 200 同样是「没拿到数据」，不能静默跳过。"
+                    )
             except Exception as e:
-                logger.debug(f"API 获取失败: {e}")
+                # **原先是 `logger.debug`。** 默认级别下这一行等于没有，
+                # 于是「端点返回 HTML 不是 JSON」这件事从来没有出现在任何
+                # 日志里——见 `_note_failure` 的实测表。
+                logger.warning(
+                    f"[open_gov] {ds['name']} 的 API 取数失败："
+                    f"{type(e).__name__}: {e}"
+                    f"（端点 {api_url}，未经确认）"
+                )
 
         # 方式2: 搜索本地已下载文件
         for fmt in ds.get("formats", ["json", "csv"]):

@@ -311,18 +311,32 @@ def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
     # 但**照样写盘**——`early_stop` 这个标志要传回父进程，好让表格显示「早停」
     # 而不是一个看起来像差额的数字。
     closure = _closure_of(collector)
+    # 网络层失败次数。`_total_listed == 0` 时它是唯一能把「栏目本来就空」
+    # 和「压根没连上」分开的东西——见 `_status_of`。
+    nf = getattr(collector, "_fetch_failed", None)
+    nf = nf if isinstance(nf, int) else None
+    # 取到正文的列表页个数。`listed == 0` 时它把「页面拿到了但解析不出」
+    # 与「压根没取到页面」分开——见 `_status_of`。
+    lp = getattr(collector, "_list_pages_ok", None)
+    lp = lp if isinstance(lp, int) else None
     if closure is not None:
         closure["early_stop"] = early
-        # 网络层失败次数。`_total_listed == 0` 时它是唯一能把「栏目本来就空」
-        # 和「压根没连上」分开的东西——见 `_status_of`。
-        nf = getattr(collector, "_fetch_failed", None)
-        closure["net_failed"] = nf if isinstance(nf, int) else None
-        # 取到正文的列表页个数。`listed == 0` 时它把「页面拿到了但解析不出」
-        # 与「压根没取到页面」分开——见 `_status_of`。
-        lp = getattr(collector, "_list_pages_ok", None)
-        closure["list_pages_ok"] = lp if isinstance(lp, int) else None
+        closure["net_failed"] = nf
+        closure["list_pages_ok"] = lp
         (work / f"{key}.closure").write_text(
             json.dumps(closure), encoding="utf-8")
+    elif nf is not None or lp is not None:
+        # **闭环算不出来 ≠ 这两个数不存在。** `_closure_of` 返回 None 说的是
+        # 「列表 == 收录 + 审核 + 排除」这个等式凑不齐（这个源没记那三个
+        # 计数器），而「网络失败了几次」「列表页拿到几页」是**独立的**。
+        #
+        # 把两者压在一个 None 里，后果正是上一轮修的那个毛病：`news_aggregator`
+        # 与 `open_gov` 都记了 `_fetch_failed`，却因为没记闭环那三个数，
+        # `net_failed` 传不到父进程，表上还是「空」——**新的计数器加了，
+        # 表上看不出来**。2026-10-01 第三十九轮实测撞出来的。
+        (work / f"{key}.closure").write_text(
+            json.dumps({"net_failed": nf, "list_pages_ok": lp}),
+            encoding="utf-8")
     (work / f"{key}.elapsed").write_text(f"{time.monotonic() - started:.1f}",
                                          encoding="utf-8")
     if note:

@@ -125,7 +125,10 @@ def scan_version_dir(images_dir: Path, data_dir: Path) -> dict:
     weird: list[str] = []      # 非图片扩展名，跳过但在报告里点名
     bad_magic: list[str] = []  # 扩展名像图片、内容不是
 
-    for sub in sorted(p for p in images_dir.iterdir() if p.is_dir()):
+    # 跳过下划线开头的目录：那是管线的工作区（images/_rejected 存被 CLIP
+    # 剔除的图），不是事故目录，不该参与归属校验，也不该进清单
+    for sub in sorted(p for p in images_dir.iterdir()
+                      if p.is_dir() and not p.name.startswith("_")):
         files = sorted(p for p in sub.iterdir() if p.is_file())
         if not files:
             # 空目录是有价值的过程信息：曾计划为这些事故配图，最终没有可用图片

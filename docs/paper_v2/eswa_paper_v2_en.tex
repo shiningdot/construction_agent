@@ -133,9 +133,11 @@ Two design features distinguish CAICS from aviation-derived HFACS adaptations (S
 \subsection{3.4 Pipeline architecture}
 Figure 1 shows the overall architecture. The pipeline consists of six processing stages followed by storage and access layers.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig1_architecture.png}
+\end{figure}
 \textbf{Figure 1.** CAIEMS system architecture.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}1{\cjkfont 占位：待手绘} --- {\cjkfont 系统架构图}]}}\end{center}
-
 \textbf{Stage 1: Multi-source collection.} Accident reports are acquired from public safety information portals (safehoo.com, esafety.cn), provincial and national emergency-management bureaus, and published case compilations, following the dual-track scheme and the collection, cleaning, and filtering procedures described in Section 3.2. Stage 1 yields the deduplicated working corpus of 2,623 records whose composition is reported in Table 1. Reports at overseas sites of Chinese contractors (22 records) are retained but excluded from provincial statistics.
 
 \textbf{Stage 2: LLM text classification.} Candidate pages are heterogeneous, and a page that mentions accidents is not necessarily a report of one. A lightweight LLM classifier assigns each record one of six text types --- \textit{single-accident report}, \textit{multi-accident compilation}, \textit{regulatory document}, \textit{aggregate statistics}, \textit{training material}, or \textit{other} --- using few-shot prompting with five annotated examples. The six types reduce to three dispositions: single-accident reports proceed; multi-accident compilations are split into their constituent cases; and the remaining four types are routed out of the corpus. This stage is what removes regulatory notices, aggregate statistics, training material, and advertisement or navigation text that survived the rule-based gates of Section 3.2.4. The 895 digitized records described in Section 3.2 do not pass through this stage; their separation into individual cases is performed at the document level by the segmentation path described there, which effects the same distinction before the records enter the corpus. We note that the classifier is imperfect: in the agreement study's 300-record draw, 11 records were excluded at annotation time as multi-accident texts, indicating residual classification error that the current pipeline does not fully audit, and the multi-accident splitting rules remain partly heuristic.
@@ -144,9 +146,11 @@ Figure 1 shows the overall architecture. The pipeline consists of six processing
 
 \textbf{Stage 4: CAICS causal coding (Step 2).} The encoder applies the two-step judgment procedure --- explicit matching followed by authorized inference --- and records, per code, the evidence tier, the supporting text, and the inference chain (Section 3.1). Figure 2 illustrates the five-layer structure with an example from a real record.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig2_caics_tree.png}
+\end{figure}
 \textbf{Figure 2.** CAICS five-layer causal structure with an example evidence chain.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}2{\cjkfont 占位：待手绘} --- CAICS {\cjkfont 五层结构与示例证据链}]}}\end{center}
-
 \textbf{Stage 5: LLM-first MECE enum standardization.} Five free-text fields (work task, equipment, material, worker type, building structure) are normalized through an LLM-first procedure: the LLM reviews the value distribution across the corpus, designs a MECE framework, and maps every observed value. Table 3 reports the resulting enumerations with non-null denominators stated explicitly.
 
 \textbf{Table 3.} MECE enumerations produced by the LLM-first procedure.
@@ -197,9 +201,11 @@ VLM analyses & 282 across 176 accidents \\
 \end{table}
 Figure 3 shows the distribution of the nineteen CAICS categories; the top codes (M1 deficient supervision, H1 procedure violation, H3 failed risk perception) partly reflect the production prompt's authorized prior inference, which is why the tier breakdown is reported alongside the totals.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig3_code_dist.png}
+\end{figure}
 \textbf{Figure 3.** Distribution of causal annotations across the nineteen CAICS categories.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}3{\cjkfont 占位：待手绘} --- CAICS {\cjkfont 编码分布条形图}]}}\end{center}
-
 \section{4. Experimental Evaluation}
 The evaluation addresses three questions with explicitly stated scopes: which backbone model the pipeline should adopt under its actual cost constraints (Section 4.3), how the causal-coding prompt should be phrased (Section 4.4), and whether the LLM's basic-field annotations agree with a trained human annotator (Section 4.5). Sections 4.1 and 4.2 define the datasets and metrics.
 
@@ -214,9 +220,11 @@ The evaluation addresses three questions with explicitly stated scopes: which ba
 
 Figure 4 summarizes the sample hierarchy.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig4_sampling.png}
+\end{figure}
 \textbf{Figure 4.** Dataset hierarchy and the three evaluation samples.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}4{\cjkfont 占位：待手绘} --- {\cjkfont 样本关系流程图}]}}\end{center}
-
 \subsection{4.2 Evaluation metrics}
 Basic field extraction is evaluated with exact-match accuracy per field, with administrative-suffix normalization for location fields. Causal coding is evaluated with per-dimension precision, recall, and F1 under the dimension-level match definition of Liu et al. (2025a); the six-strategy comparison additionally reports percentile bootstrap 95\% confidence intervals (1,000 resamples). Inter-annotator agreement uses Cohen's kappa with 95\% confidence intervals for categorical fields, ICC(2,1) for count fields, and year-month match rate for dates; these three statistics are reported under their proper names and are not summarized under a single label.
 
@@ -293,9 +301,11 @@ We term this observed pattern the \textbf{Lexical Gatekeeping Effect}: interroga
 
 The remedy replaced the gate with a two-step judgment: (1) explicit matching --- does the text support this code directly, under any paraphrase? (2) authorized inference --- given the accident's nature and construction-safety knowledge, is this cause necessarily present even without explicit phrasing? The conservative instruction was also replaced by a coverage preference. The combined v1$\rightarrow$v2 change raised F1 from 0.503 to 0.656, recall from 0.423 to 0.872, M1 recall from 0.141 to 0.988, and eliminated empty outputs (21\% $\rightarrow$ 0). Figure 5 visualizes the change.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig5_gatekeeping.png}
+\end{figure}
 \textbf{Figure 5.** The Lexical Gatekeeping observation and its remedy.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}5{\cjkfont 占位：待手绘} --- {\cjkfont 门控效应观察与补救双面板图}]}}\end{center}
-
 The v1$\rightarrow$v2 transition changed several prompt properties at once --- the question form, the addition of the two-step judgment, the explicit authorization of inference, and the output-policy instruction. We therefore ran a four-cell comparison on the same sample: v1 (conditional checks + conservative), v2a (two-step judgment + conservative), v2b (conditional checks + coverage), and v2 (two-step judgment + coverage). Table 8 reports the results. Holding the conservative instruction constant, the phrasing change alone (v1 $\rightarrow$ v2a) raises M1 recall from 0.141 to 0.941 --- 0.800 of the total 0.847 M1-recall recovery --- while holding phrasing constant, the policy change alone (v1 $\rightarrow$ v2b) raises it only to 0.329. At the aggregate level the two manipulations contribute comparably (F1 +0.161 vs. +0.150).
 
 Two scope boundaries follow. First, these are simple pairwise differences, not a formal factorial analysis with interaction estimates, and the four cells ran once each on a development sample shared with the prompt design process. Second, the results describe output behavior, not model-internal mechanisms: whether the interrogative phrasing affects attention, representation, or generation is beyond what this behavioral experiment can establish. The defensible reading is that, in the current model and CAICS task, prompt phrasing materially changes recall on implicit categories, and the two-step judgment is a practical remedy. We do not claim an isolated causal mechanism.
@@ -345,9 +355,11 @@ Date (year-month) & Match rate & 0.9965 & 99.7\% \\
 \end{table}
 Two further boundaries apply. First, agreement does not establish accuracy: both parties can share errors, and no independent arbitration labels exist for this sample. Second, the comparison spans six basic fields only; the causal codes --- the paper's core annotation object --- have no analogous large-sample agreement study, and the three-expert annotation covers only the 100-record strategy subset. The earlier draft cited an expert inter-rater range from a separate 100-record three-expert sample as an equivalence band; because that sample differs from the 289-record sample in composition and difficulty, we no longer present it as a bound and report the agreement values on their own terms. Figure 6 plots the kappa values with their confidence intervals.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.86\textheight,keepaspectratio]{/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures/fig6_kappa.png}
+\end{figure}
 \textbf{Figure 6.** Agreement between the LLM and one annotator on six fields.}
-\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}[{\cjkfont 图}6{\cjkfont 占位：待手绘} --- {\cjkfont 一致性森林图}]}}\end{center}
-
 \section{5. Discussion}
 \subsection{5.1 Implications}
 For data engineering practice, three implications follow from the measured results, each stated within its scope. First, the tiered evidence scheme offers a workable alternative to the all-or-nothing claim that every code must carry verbatim support: prior-inference codes are useful for downstream analysis provided they are stored, displayed, and reported separately, which is what the pipeline does. Second, the phrasing observation generalizes as a design caution: in this model and task, interrogative conditional-check phrasing suppressed paraphrastic evidence for implicit categories, and the two-step judgment phrasing recovered most of it (0.800 of the total 0.847 M1-recall recovery). Practitioners designing recall-critical extraction prompts should test phrasing variants rather than assume that listed keywords behave as illustrative cues. Third, the agreement results justify a limited claim: for six basic fields, one LLM configuration and one trained annotator reached high protocol agreement, which supports using the LLM to reduce --- not replace --- human labeling effort for those fields under human supervision.
@@ -484,6 +496,6 @@ The six prompting strategies are summarized below; verbatim prompts are included
 
 \textbf{A.6 S5 CAICS-CoT+}: five independent per-layer API calls with inter-layer summary injection, plus a final aggregation call.
 
-\textit{V2 {\cjkfont 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订}------①{\cjkfont 主线确定为}"{\cjkfont 探索性数据工程系统与数据资源}"{\cjkfont ，删除}"{\cjkfont 首次}/{\cjkfont 推翻}/{\cjkfont 证明模型依赖}/{\cjkfont 因果机制}/{\cjkfont 专家级}/{\cjkfont 替代人工}/{\cjkfont 全部编码有证据}"{\cjkfont 等结论；}②{\cjkfont 致因标注重构为} explicit/inferred/prior {\cjkfont 三层证据分级（对应数据库} evidence\_quality {\cjkfont 字段），全文统一分层统计口径；}③{\cjkfont 银标准构建方式如实描述并标注独立性边界；}④{\cjkfont 开发集与测试集重叠风险在} 4.1 {\cjkfont 显式声明；}⑤2$\times$2 {\cjkfont 消融降级为}"{\cjkfont 措辞敏感性观察}+{\cjkfont 实用补救}"{\cjkfont ，删除机制性归因与}"{\cjkfont 排除替代解释}"{\cjkfont 表述；}⑥{\cjkfont 人机一致性限定为}"{\cjkfont 一名标注者、六项字段、协议一致性}"{\cjkfont ，}$\kappa$/ICC/{\cjkfont 匹配率分列不再统称} Kappa{\cjkfont ；}⑦{\cjkfont 全部计数对账闭合（类型} 2,617+{\cjkfont 未标注}6{\cjkfont 、等级} 2,622+{\cjkfont 未标注}1{\cjkfont 、表}2 {\cjkfont 补非空分母列）；}⑧M1 {\cjkfont 数字全文统一为} 0.847/0.800{\cjkfont ；}⑨{\cjkfont 表引用勘误（}4.5 {\cjkfont 节表} 7$\rightarrow${\cjkfont 表} 8{\cjkfont ）、表} 6 {\cjkfont 脚注与数值矛盾修正；}⑩{\cjkfont 数据治理声明扩充（逐源许可}/{\cjkfont 撤回机制}/{\cjkfont 创伤影像访问控制）；}⑪{\cjkfont 局限性扩为} 8 {\cjkfont 项分级；}⑫{\cjkfont 新增} 3.2 {\cjkfont 节}"{\cjkfont 数据来源与语料构建}"{\cjkfont （含} 4 {\cjkfont 个子节与表} 1{\cjkfont ），端到端呈现采集、清洗、筛选与整合流程，原} 3.2--3.5 {\cjkfont 节顺延为} 3.3--3.6 {\cjkfont 节、表} 1--9 {\cjkfont 顺延为表} 2--10{\cjkfont ，并修正阶段} 2 {\cjkfont 的两处表述（文本类型实为六类而非三类；}895 {\cjkfont 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及} 5.3 {\cjkfont 节}(6){\cjkfont 枚举字段非空率上限（}52.3\%$\rightarrow$83.9\%{\cjkfont ）。图片为占位符，待作者手绘后替换。}}
+\textit{V2 {\cjkfont 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订}------①{\cjkfont 主线确定为}"{\cjkfont 探索性数据工程系统与数据资源}"{\cjkfont ，删除}"{\cjkfont 首次}/{\cjkfont 推翻}/{\cjkfont 证明模型依赖}/{\cjkfont 因果机制}/{\cjkfont 专家级}/{\cjkfont 替代人工}/{\cjkfont 全部编码有证据}"{\cjkfont 等结论；}②{\cjkfont 致因标注重构为} explicit/inferred/prior {\cjkfont 三层证据分级（对应数据库} evidence\_quality {\cjkfont 字段），全文统一分层统计口径；}③{\cjkfont 银标准构建方式如实描述并标注独立性边界；}④{\cjkfont 开发集与测试集重叠风险在} 4.1 {\cjkfont 显式声明；}⑤2$\times$2 {\cjkfont 消融降级为}"{\cjkfont 措辞敏感性观察}+{\cjkfont 实用补救}"{\cjkfont ，删除机制性归因与}"{\cjkfont 排除替代解释}"{\cjkfont 表述；}⑥{\cjkfont 人机一致性限定为}"{\cjkfont 一名标注者、六项字段、协议一致性}"{\cjkfont ，}$\kappa$/ICC/{\cjkfont 匹配率分列不再统称} Kappa{\cjkfont ；}⑦{\cjkfont 全部计数对账闭合（类型} 2,617+{\cjkfont 未标注}6{\cjkfont 、等级} 2,622+{\cjkfont 未标注}1{\cjkfont 、表}2 {\cjkfont 补非空分母列）；}⑧M1 {\cjkfont 数字全文统一为} 0.847/0.800{\cjkfont ；}⑨{\cjkfont 表引用勘误（}4.5 {\cjkfont 节表} 7$\rightarrow${\cjkfont 表} 8{\cjkfont ）、表} 6 {\cjkfont 脚注与数值矛盾修正；}⑩{\cjkfont 数据治理声明扩充（逐源许可}/{\cjkfont 撤回机制}/{\cjkfont 创伤影像访问控制）；}⑪{\cjkfont 局限性扩为} 8 {\cjkfont 项分级；}⑫{\cjkfont 新增} 3.2 {\cjkfont 节}"{\cjkfont 数据来源与语料构建}"{\cjkfont （含} 4 {\cjkfont 个子节与表} 1{\cjkfont ），端到端呈现采集、清洗、筛选与整合流程，原} 3.2--3.5 {\cjkfont 节顺延为} 3.3--3.6 {\cjkfont 节、表} 1--9 {\cjkfont 顺延为表} 2--10{\cjkfont ，并修正阶段} 2 {\cjkfont 的两处表述（文本类型实为六类而非三类；}895 {\cjkfont 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及} 5.3 {\cjkfont 节}(6){\cjkfont 枚举字段非空率上限（}52.3\%$\rightarrow$83.9\%{\cjkfont ）。六张插图已由} `scripts/gen\_paper\_figures.py` {\cjkfont 生成并插入（}Figure 1--6{\cjkfont ），图中分布数字随主库现读；表} 2 {\cjkfont 仍为占位，待补。}}
 
 \end{document}

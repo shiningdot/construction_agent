@@ -1,7 +1,7 @@
 # CAIEMS: An Exploratory LLM-Driven Pipeline for Structuring Construction Accident Narratives into a Queryable Database
 
 > V2 修订稿（英文主源）｜依据导师综合评阅意见修订 ｜ 2026-09-14
-> 图片位置为占位符（图X占位：待手绘），文字与数据已按评阅意见逐项对账
+> 六张插图已插入（Figure 1–6，见 `figures/`，由 `scripts/gen_paper_figures.py` 生成），文字与数据已按评阅意见逐项对账
 > V1 稿保存在 docs/paper/，本稿独立存放于 docs/paper_v2/
 
 ## Abstract
@@ -140,9 +140,9 @@ Two design features distinguish CAICS from aviation-derived HFACS adaptations (S
 
 Figure 1 shows the overall architecture. The pipeline consists of six processing stages followed by storage and access layers.
 
-**Figure 1.** CAIEMS system architecture.
+![](figures/fig1_architecture.png)
 
-[图1占位：待手绘 — 系统架构图]
+**Figure 1.** CAIEMS system architecture.
 
 **Stage 1: Multi-source collection.** Accident reports are acquired from public safety information portals (safehoo.com, esafety.cn), provincial and national emergency-management bureaus, and published case compilations, following the dual-track scheme and the collection, cleaning, and filtering procedures described in Section 3.2. Stage 1 yields the deduplicated working corpus of 2,623 records whose composition is reported in Table 1. Reports at overseas sites of Chinese contractors (22 records) are retained but excluded from provincial statistics.
 
@@ -152,9 +152,9 @@ Figure 1 shows the overall architecture. The pipeline consists of six processing
 
 **Stage 4: CAICS causal coding (Step 2).** The encoder applies the two-step judgment procedure — explicit matching followed by authorized inference — and records, per code, the evidence tier, the supporting text, and the inference chain (Section 3.1). Figure 2 illustrates the five-layer structure with an example from a real record.
 
-**Figure 2.** CAICS five-layer causal structure with an example evidence chain.
+![](figures/fig2_caics_tree.png)
 
-[图2占位：待手绘 — CAICS 五层结构与示例证据链]
+**Figure 2.** CAICS five-layer causal structure with an example evidence chain.
 
 **Stage 5: LLM-first MECE enum standardization.** Five free-text fields (work task, equipment, material, worker type, building structure) are normalized through an LLM-first procedure: the LLM reviews the value distribution across the corpus, designs a MECE framework, and maps every observed value. Table 3 reports the resulting enumerations with non-null denominators stated explicitly.
 
@@ -194,9 +194,9 @@ Table 4 summarizes the database with counts that close against the total.
 
 Figure 3 shows the distribution of the nineteen CAICS categories; the top codes (M1 deficient supervision, H1 procedure violation, H3 failed risk perception) partly reflect the production prompt's authorized prior inference, which is why the tier breakdown is reported alongside the totals.
 
-**Figure 3.** Distribution of causal annotations across the nineteen CAICS categories.
+![](figures/fig3_code_dist.png)
 
-[图3占位：待手绘 — CAICS 编码分布条形图]
+**Figure 3.** Distribution of causal annotations across the nineteen CAICS categories.
 
 ---
 
@@ -218,9 +218,9 @@ The evaluation addresses three questions with explicitly stated scopes: which ba
 
 Figure 4 summarizes the sample hierarchy.
 
-**Figure 4.** Dataset hierarchy and the three evaluation samples.
+![](figures/fig4_sampling.png)
 
-[图4占位：待手绘 — 样本关系流程图]
+**Figure 4.** Dataset hierarchy and the three evaluation samples.
 
 ### 4.2 Evaluation metrics
 
@@ -287,9 +287,9 @@ We term this observed pattern the **Lexical Gatekeeping Effect**: interrogative 
 
 The remedy replaced the gate with a two-step judgment: (1) explicit matching — does the text support this code directly, under any paraphrase? (2) authorized inference — given the accident's nature and construction-safety knowledge, is this cause necessarily present even without explicit phrasing? The conservative instruction was also replaced by a coverage preference. The combined v1→v2 change raised F1 from 0.503 to 0.656, recall from 0.423 to 0.872, M1 recall from 0.141 to 0.988, and eliminated empty outputs (21% → 0). Figure 5 visualizes the change.
 
-**Figure 5.** The Lexical Gatekeeping observation and its remedy.
+![](figures/fig5_gatekeeping.png)
 
-[图5占位：待手绘 — 门控效应观察与补救双面板图]
+**Figure 5.** The Lexical Gatekeeping observation and its remedy.
 
 #### 4.4.4 A constrained ablation of the phrasing change
 
@@ -331,9 +331,9 @@ On the agreement sample (n = 289), the LLM and the annotator labeled the six fie
 
 Two further boundaries apply. First, agreement does not establish accuracy: both parties can share errors, and no independent arbitration labels exist for this sample. Second, the comparison spans six basic fields only; the causal codes — the paper's core annotation object — have no analogous large-sample agreement study, and the three-expert annotation covers only the 100-record strategy subset. The earlier draft cited an expert inter-rater range from a separate 100-record three-expert sample as an equivalence band; because that sample differs from the 289-record sample in composition and difficulty, we no longer present it as a bound and report the agreement values on their own terms. Figure 6 plots the kappa values with their confidence intervals.
 
-**Figure 6.** Agreement between the LLM and one annotator on six fields.
+![](figures/fig6_kappa.png)
 
-[图6占位：待手绘 — 一致性森林图]
+**Figure 6.** Agreement between the LLM and one annotator on six fields.
 
 ---
 
@@ -478,4 +478,4 @@ The six prompting strategies are summarized below; verbatim prompts are included
 
 ---
 
-*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。图片为占位符，待作者手绘后替换。*
+*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。六张插图已由 `scripts/gen_paper_figures.py` 生成并插入（Figure 1–6），图中分布数字随主库现读；表 2 仍为占位，待补。*

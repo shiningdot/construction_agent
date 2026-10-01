@@ -19,6 +19,23 @@ SRC = {
     'zh': f'{BASE}/eswa_paper_v2_zh.md',
 }
 
+# 正文插图：![](figures/figN_xxx.png)，相对 BASE。旧的 [图N占位] 分支保留作兜底。
+IMG_RE = re.compile(r'^!\[[^\]]*\]\(([^)]+)\)\s*$')
+
+def img_abspath(rel):
+    return os.path.normpath(os.path.join(BASE, rel))
+
+def img_width_inches(path, max_w=6.0, max_h=7.4):
+    """按纵横比定宽，避免 fig1 这类竖长图（9.6×12）撑爆一页。"""
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            w, h = im.size
+    except Exception:
+        return max_w
+    ratio = h / max(1, w)
+    return max_h / ratio if max_w * ratio > max_h else max_w
+
 def clean(text):
     text = re.sub(r'<!--[\s\S]*?-->', '', text)
     text = re.sub(r'^> .*\n', '', text, flags=re.M)
@@ -88,6 +105,15 @@ def build_docx(src, out, is_zh):
             _add_runs(p, s[4:].strip(), is_zh)
             for run in p.runs:
                 run.font.color.rgb = RGBColor(0, 0, 0)
+            i += 1
+            continue
+        m = IMG_RE.match(s)
+        if m:
+            path = img_abspath(m.group(1))
+            if os.path.exists(path):
+                par = doc.add_paragraph()
+                par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                par.add_run().add_picture(path, width=Inches(img_width_inches(path)))
             i += 1
             continue
         if re.match(r'^\[图\d+占位', s):
@@ -223,6 +249,16 @@ def build_latex(src, out_tex, is_zh):
             out.append(r'\subsection{' + esc(s[4:].strip()) + '}')
             i += 1
             continue
+        m = IMG_RE.match(s)
+        if m:
+            path = img_abspath(m.group(1))
+            if os.path.exists(path):
+                out.append(r'\begin{figure}[htbp]' + '\n' + r'\centering' + '\n'
+                           + r'\includegraphics[width=0.92\textwidth,'
+                           + r'height=0.86\textheight,keepaspectratio]{' + path + r'}'
+                           + '\n' + r'\end{figure}')
+            i += 1
+            continue
         if re.match(r'^\[图\d+占位', s):
             out.append(r'\begin{center}\fbox{\parbox{0.8\textwidth}{\color{gray}' + esc(s) + r'}}\end{center}')
             out.append(r'\usepackage{xcolor}' if False else '')
@@ -246,7 +282,8 @@ def build_latex(src, out_tex, is_zh):
         para = []
         while i < len(lines) and lines[i].strip() not in ('', '---') \
                 and not lines[i].strip().startswith(('#', '|', '**Figure', '**图', '- ')) \
-                and not re.match(r'^\[图\d+占位', lines[i].strip()):
+                and not re.match(r'^\[图\d+占位', lines[i].strip()) \
+                and not IMG_RE.match(lines[i].strip()):
             para.append(lines[i])
             i += 1
         if para:

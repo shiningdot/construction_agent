@@ -52,6 +52,7 @@ python -m construction_agent.main
 - `docs/paper_v2/eswa_paper_v2_zh.md` — 中文镜像（**改英文后必须同步改中文**）
 - `docs/paper_v2/修订对账记录.md` — 导师 14 项意见→修订动作对照表、数字对账清单、待绘图片清单
 - `docs/paper_v2/eswa_paper_v2_{en,zh}.{docx,pdf}` — 四格式成品
+- `docs/paper_v2/figures/` — 论文插图 fig1–fig6（PNG + SVG），由 `scripts/gen_paper_figures.py` 生成，正文以 `![](figures/...)` 引用
 - `docs/paper_v2/v1_v2_对比.{html,docx}` — V1→V2 红绿对比（红=删除、绿=新增）
 - `docs/paper/eswa_paper.md` — V1 初稿：**存档，勿改**
 - `docs/paper/reviews/` — 模拟评审 5 份 + `00_editorial_decision.md`（大修结论）
@@ -89,7 +90,7 @@ python -m construction_agent.main
 6. **证据三级分层**：explicit / inferred / prior，对应数据库 `evidence_quality` 字段
 
 ## 当前待办
-- [ ] 6 张论文插图手绘（V2 中已留占位符，清单见对账记录）
+- [x] **2026-10-01 论文插图接入**：6 张图由 `scripts/gen_paper_figures.py` 生成（300 DPI PNG + SVG，输出 `docs/paper_v2/figures/`）并插入 V2 中英文正文（图在上、图注在下），四格式成品各内嵌 6 张。改前脚本里的分布数字停在孤儿外键清理前的 17,364，本次改为**从主库现读**（实测 16,323）；图 2 重画为「五层结构 + 一条真实记录的证据链」，图 1 多模态列溢出、图 5 标签重叠、图 6 图例压数据行一并修掉。**待决**：图 3 未采纳"按证据层级分层着色"（现按 CAICS 五层着色）；`[表2占位]` 仍未补。
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照

@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="628.2pt" height="380.304pt" viewBox="0 0 628.2 380.304" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-10-01T17:41:39.718407</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.0, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 380.304 
+L 628.2 380.304 
+L 628.2 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 57.42 90.697296 
+Q 57.42 94.240446 57.42 96.553759 
+" style="fill: none; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 59.42 92.553759 
+L 57.42 96.553759 
+L 55.42 92.553759 
+z
+" style="fill: #566573; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 57.42 137.266896 
+Q 57.42 140.810046 57.42 143.123359 
+" style="fill: none; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 59.42 139.123359 
+L 57.42 143.123359 
+L 55.42 139.123359 
+z
+" style="fill: #566573; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 57.42 183.836496 
+Q 57.42 187.379646 57.42 189.692959 
+" style="fill: none; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 59.42 185.692959 
+L 57.42 189.692959 
+L 55.42 185.692959 
+z
+" style="fill: #566573; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 57.42 245.929296 
+Q 57.42 249.472446 57.42 251.785759 
+" style="fill: none; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 59.42 247.785759 
+L 57.42 251.785759 
+L 55.42 247.785759 
+z
+" style="fill: #566573; stroke: #566573; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 23.94 90.9144 
+L 358.74 90.9144 
+Q 360.972 90.9144 360.972 88.6968 
+L 360.972 37.692 
+Q 360.972 35.4744 358.74 35.4744 
+L 23.94 35.4744 
+Q 21.708 35.4744 21.708 37.692 
+L 21.708 88.6968 
+Q 21.708 90.9144 23.94 90.9144 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #1b4f72; opacity: 0.13"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 23.94 137.484 
+L 358.74 137.484 
+Q 360.972 137.484 360.972 135.2664 
+L 360.972 99.7848 
+Q 360.972 97.5672 358.74 97.5672 
+L 23.94 97.5672 
+Q 21.708 97.5672 21.708 99.7848 
+L 21.708 135.2664 
+Q 21.708 137.484 23.94 137.484 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #117a65; opacity: 0.13"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 23.94 184.0536 
+L 358.74 184.0536 
+Q 360.972 184.0536 360.972 181.836 
+L 360.972 146.3544 
+Q 360.972 144.1368 358.74 144.1368 
+L 23.94 144.1368 
+Q 21.708 144.1368 21.708 146.3544 
+L 21.708 181.836 
+Q 21.708 184.0536 23.94 184.0536 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #d35400; opacity: 0.13"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 23.94 246.1464 
+L 358.74 246.1464 
+Q 360.972 246.1464 360.972 243.9288 
+L 360.972 192.924 
+Q 360.972 190.7064 358.74 190.7064 
+L 23.94 190.7064 
+Q 21.708 190.7064 21.708 192.924 
+L 21.708 243.9288 
+Q 21.708 246.1464 23.94 246.1464 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #7d3c98; opacity: 0.13"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 23.94 292.716 
+L 358.74 292.716 
+Q 360.972 292.716 360.972 290.4984 
+L 360.972 255.0168 
+Q 360.972 252.7992 358.74 252.7992 
+L 23.94 252.7992 
+Q 21.708 252.7992 21.708 255.0168 
+L 21.708 290.4984 
+Q 21.708 292.716 23.94 292.716 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #b03a2e; opacity: 0.13"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 378.27 277.7472 
+L 604.26 277.7472 
+Q 607.05 277.7472 607.05 274.9752 
+L 607.05 37.692 
+Q 607.05 34.92 604.26 34.92 
+L 378.27 34.92 
+Q 375.48 34.92 375.48 37.692 
+L 375.48 274.9752 
+Q 375.48 277.7472 378.27 277.7472 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #fafafa; opacity: 0.6; stroke: #566573; stroke-width: 0.8; stroke-linejoin: miter"/>
+   </g>
+   <g id="line2d_1">
+    <path d="M 28.404 84.816 
+L 28.404 41.5728 
+" clip-path="url(#p73b6cc41cc)" style="fill: none; stroke: #1b4f72; stroke-width: 3.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 28.404 131.3856 
+L 28.404 103.6656 
+" clip-path="url(#p73b6cc41cc)" style="fill: none; stroke: #117a65; stroke-width: 3.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 28.404 177.9552 
+L 28.404 150.2352 
+" clip-path="url(#p73b6cc41cc)" style="fill: none; stroke: #d35400; stroke-width: 3.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_4">
+    <path d="M 28.404 240.048 
+L 28.404 196.8048 
+" clip-path="url(#p73b6cc41cc)" style="fill: none; stroke: #7d3c98; stroke-width: 3.5; stroke-linecap: round"/>
+   </g>
+   <g id="line2d_5">
+    <path d="M 28.404 286.6176 
+L 28.404 258.8976 
+" clip-path="url(#p73b6cc41cc)" style="fill: none; stroke: #b03a2e; stroke-width: 3.5; stroke-linecap: round"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="23.94" y="24.868252" transform="rotate(-0 23.94 24.868252)">CAICS — five-layer causal framework</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1b4f72" x="38.448" y="50.434242" transform="rotate(-0 38.448 50.434242)">M — Management Foundation  (5)</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #2c3e50" transform="translate(38.448 68.0148)">M1 Deficient supervision   M2 Failed hazard inspection   M3 Insufficient training   M4 Procedural</text>
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #2c3e50" transform="translate(38.448 78.412613)">gaps   M5 Irregular market conduct</text>
+   </g>
+   <g id="text_4">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #117a65" x="38.448" y="112.527042" transform="rotate(-0 38.448 112.527042)">F — Protection Failure  (4)</text>
+   </g>
+   <g id="text_5">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="38.448" y="130.1076" transform="rotate(-0 38.448 130.1076)">F1 Edge/opening protection   F2 Support instability   F3 Disabled safety devices   F4 Unused PPE</text>
+   </g>
+   <g id="text_6">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #d35400" x="38.448" y="159.096642" transform="rotate(-0 38.448 159.096642)">T — Trigger Conditions  (4)</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="38.448" y="176.6772" transform="rotate(-0 38.448 176.6772)">T1 Equipment failure   T2 Material state   T3 Geological change   T4 Meteorological</text>
+   </g>
+   <g id="text_8">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #7d3c98" x="38.448" y="205.666242" transform="rotate(-0 38.448 205.666242)">H — Human Acts  (4)</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #2c3e50" transform="translate(38.448 223.242863)">H1 Procedure violation   H2 Improper command   H3 Failed risk perception   H4 Poor emergency</text>
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #2c3e50" transform="translate(38.448 233.151862)">response</text>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #b03a2e" x="38.448" y="267.759042" transform="rotate(-0 38.448 267.759042)">C — Consequence Amplification  (2)</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="38.448" y="285.335663" transform="rotate(-0 38.448 285.335663)">C1 Delayed rescue   C2 Concealed reporting</text>
+   </g>
+   <g id="text_12">
+    <text style="font-style: italic; font-size: 8.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #566573" x="191.34" y="307.27594" transform="rotate(-0 191.34 307.27594)">Causal leak model:  M → F → T → H → C</text>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 8.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="390.546" y="52.491881" transform="rotate(-0 390.546 52.491881)">Example — one evidence text, several layers</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 7.2px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="390.546" y="66.735394" transform="rotate(-0 390.546 66.735394)">Formwork-support collapse, Sichuan Langzhong (2023)</text>
+   </g>
+   <g id="text_15">
+    <text style="font-style: italic; font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #566573" transform="translate(390.546 87.0189)">"During concrete pouring for the gate beam between</text>
+    <text style="font-style: italic; font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #566573" transform="translate(390.546 97.8689)"> buildings 3 and 1, the formwork-support system</text>
+    <text style="font-style: italic; font-size: 7px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; fill: #566573" transform="translate(390.546 108.769759)"> collapsed."</text>
+   </g>
+   <g id="patch_12">
+    <path d="M 390.546 147.4632 
+L 393.894 147.4632 
+L 393.894 135.2664 
+L 390.546 135.2664 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #1b4f72; opacity: 0.9"/>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="144.872955" transform="rotate(-0 399.474 144.872955)">M2 Failed hazard inspection</text>
+   </g>
+   <g id="text_17">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="144.993072" transform="rotate(-0 591.984 144.993072)">explicit</text>
+   </g>
+   <g id="patch_13">
+    <path d="M 390.546 165.204 
+L 393.894 165.204 
+L 393.894 153.0072 
+L 390.546 153.0072 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #117a65; opacity: 0.9"/>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="162.613755" transform="rotate(-0 399.474 162.613755)">F2 Support instability</text>
+   </g>
+   <g id="text_19">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="162.733872" transform="rotate(-0 591.984 162.733872)">explicit</text>
+   </g>
+   <g id="patch_14">
+    <path d="M 390.546 182.9448 
+L 393.894 182.9448 
+L 393.894 170.748 
+L 390.546 170.748 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #7d3c98; opacity: 0.9"/>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="180.354555" transform="rotate(-0 399.474 180.354555)">H1 Procedure violation</text>
+   </g>
+   <g id="text_21">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="180.474672" transform="rotate(-0 591.984 180.474672)">explicit</text>
+   </g>
+   <g id="patch_15">
+    <path d="M 390.546 200.6856 
+L 393.894 200.6856 
+L 393.894 188.4888 
+L 390.546 188.4888 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #d35400; opacity: 0.9"/>
+   </g>
+   <g id="text_22">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="198.095355" transform="rotate(-0 399.474 198.095355)">T2 Material state</text>
+   </g>
+   <g id="text_23">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="198.215472" transform="rotate(-0 591.984 198.215472)">explicit</text>
+   </g>
+   <g id="patch_16">
+    <path d="M 390.546 218.4264 
+L 393.894 218.4264 
+L 393.894 206.2296 
+L 390.546 206.2296 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #1b4f72; opacity: 0.9"/>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="215.836155" transform="rotate(-0 399.474 215.836155)">M1 Deficient supervision</text>
+   </g>
+   <g id="text_25">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="215.956272" transform="rotate(-0 591.984 215.956272)">inferred</text>
+   </g>
+   <g id="patch_17">
+    <path d="M 390.546 236.1672 
+L 393.894 236.1672 
+L 393.894 223.9704 
+L 390.546 223.9704 
+z
+" clip-path="url(#p73b6cc41cc)" style="fill: #1b4f72; opacity: 0.9"/>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 7.4px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2c3e50" x="399.474" y="233.576955" transform="rotate(-0 399.474 233.576955)">M4 Procedural gaps</text>
+   </g>
+   <g id="text_27">
+    <text style="font-style: italic; font-size: 6.8px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: end; fill: #566573" x="591.984" y="233.697072" transform="rotate(-0 591.984 233.697072)">inferred</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 6.5px; font-family: 'WenQuanYi Zen Hei', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #566573" x="390.546" y="264.80353" transform="rotate(-0 390.546 264.80353)">explicit = stated in the text;  inferred = authorized inference</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p73b6cc41cc">
+   <rect x="7.2" y="7.2" width="613.8" height="365.904"/>
+  </clipPath>
+ </defs>
+</svg>

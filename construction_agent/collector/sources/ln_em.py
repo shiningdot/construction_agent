@@ -44,8 +44,8 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import (BaseCollector, CollectResult,
-                                               RawAccidentText)
+from construction_agent.collector.base import (PREVIEW_CHARS, BaseCollector,
+                                               CollectResult, RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -268,8 +268,11 @@ class LnEMCollector(BaseCollector):
             if is_pdf and pdf_url:
                 content_parts.append(f"PDF: {pdf_url}")
             if detail_text:
-                preview = detail_text[:3000]
-                if len(detail_text) > 3000:
+                # 截断长度收进共享常量（2026-10-01 第三十四轮），理由与实测
+                # 见 `base.PREVIEW_CHARS`。这里原是与另外三个源各写一份的
+                # `[:3000]`。
+                preview = detail_text[:PREVIEW_CHARS]
+                if len(detail_text) > PREVIEW_CHARS:
                     preview += f"\n... (共 {len(detail_text)} 字)"
                 content_parts.append(f"\n正文:\n{preview}")
 

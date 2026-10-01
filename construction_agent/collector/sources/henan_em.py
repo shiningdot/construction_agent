@@ -38,8 +38,8 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import (BaseCollector, CollectResult,
-                                               RawAccidentText)
+from construction_agent.collector.base import (PREVIEW_CHARS, BaseCollector,
+                                               CollectResult, RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -269,8 +269,12 @@ class HenanEMCollector(BaseCollector):
             if pdf_url:
                 parts.append(f"PDF: {pdf_url}")
             if combined_text:
-                preview = combined_text[:3000]
-                if len(combined_text) > 3000:
+                # 截断长度收进共享常量（2026-10-01 第三十四轮），理由与实测
+                # 见 `base.PREVIEW_CHARS`。这里原是与另外三个源各写一份的
+                # `[:3000]`——`gd_em` 那份第二十二轮已改成 40000 并在注释里
+                # 留了警告，那四处没跟着改。
+                preview = combined_text[:PREVIEW_CHARS]
+                if len(combined_text) > PREVIEW_CHARS:
                     preview += f"\n... (共 {len(combined_text)} 字)"
                 parts.append(f"\n正文:\n{preview}")
 

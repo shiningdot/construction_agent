@@ -66,8 +66,8 @@ from construction_agent.collector.attachments import kind_of_suffix, sort_into
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import (BaseCollector, CollectResult,
-                                               RawAccidentText)
+from construction_agent.collector.base import (PREVIEW_CHARS, BaseCollector,
+                                               CollectResult, RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -312,8 +312,13 @@ class HebeiEMCollector(BaseCollector):
             if image_urls:
                 parts.append("图片附件: " + " / ".join(image_urls))
             if detail_text:
-                preview = detail_text[:3000]
-                if len(detail_text) > 3000:
+                # 截断长度收进共享常量（2026-10-01 第三十四轮）。这里原是
+                # `[:3000]`——实测本源这条通路上的报告有 14,275 字，切到
+                # 3000 只到第 4 页，**七个一级章节切掉六个**（含「事故原因
+                # 分析」与「责任单位存在的主要问题」，前者是 CAICS 编码的
+                # 原始依据）。理由与实测表见 `base.PREVIEW_CHARS`。
+                preview = detail_text[:PREVIEW_CHARS]
+                if len(detail_text) > PREVIEW_CHARS:
                     preview += f"\n... (共 {len(detail_text)} 字)"
                 parts.append(f"\n正文:\n{preview}")
 

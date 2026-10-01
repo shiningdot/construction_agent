@@ -248,6 +248,64 @@ def test_一页多附件全部收下(tmp_path):
         "重复的 id 要去重，但后面的附件不能一起丢"
 
 
+def test_长正文不被截到三千字(tmp_path):
+    """**判据自检**：把 `PREVIEW_CHARS` 换回写死的 `3000`，这条就红。
+
+    改前这里是 `preview = detail_text[:3000]`。实测（2026-10-01 第三十四轮，
+    主库 f4a3957053fd）本源这条通路上的报告有 **14,275 字**，切到 3000
+    只到第 4 页，**七个一级章节切掉六个**：
+
+        一、事故基本情况                @ 2494   保住（只保到开头）
+        二、事故应急处置及评估情况       @ 4592   ← 切掉
+        三、事故原因分析                @ 5562   ← 切掉（含「（一）直接原因分析」@5674）
+        四、有关责任单位存在的主要问题     @ 7178   ← 切掉（管理因素的依据）
+        五、对有关责任人员和责任单位的处理建议 @ 7943  ← 切掉
+        六、事故主要教训                @ 11554  ← 切掉
+        七、事故整改和防范措施           @ 12921  ← 切掉
+
+    编码器读的是 `content`（→ 库里 `raw_text`），所以切掉的正是它要用的
+    那一半——留下的「事故基本情况」里只有项目概况与审批情况。
+
+    这里用一段 5,000 字的正文，尾部放一个标记词：标记在，说明正文进全了。
+    """
+    tail_mark = "【尾部标记_只有不截断才看得到】"
+    body = "三、事故原因分析\n" + "本起事故的直接原因是" * 600 + "\n" + tail_mark
+    assert len(body) > 5000
+
+    c = _collector(tmp_path, {}, enable_classify=False)
+    c._crawl_detail = lambda _u: {
+        "title": _TITLE, "date": "2025-07-10", "source": "河北省应急管理厅",
+        "text": body, "attach_urls": []}
+
+    item = _run(c)[0]
+
+    assert tail_mark in item["content"], \
+        f"正文只进到 {len(item['content'])} 字——被截断了"
+    # 没到上限就不该出现截断提示行
+    assert "... (共" not in item["content"]
+
+
+def test_超长正文仍受共享常量约束(tmp_path):
+    """截断本身留着（外层 item 还有 50000 的总上限），但线在共享常量上。
+
+    这条钉的是「提示行写的是**原始**长度」——`preview` 被切了，而提示行里
+    的 `{len(detail_text)}` 是切的**之前**量的，两者不能混。
+    """
+    from construction_agent.collector.base import PREVIEW_CHARS
+
+    body = "起" * (PREVIEW_CHARS + 500)
+    c = _collector(tmp_path, {}, enable_classify=False)
+    c._crawl_detail = lambda _u: {
+        "title": _TITLE, "date": "2025-07-10", "source": "河北省应急管理厅",
+        "text": body, "attach_urls": []}
+
+    item = _run(c)[0]
+
+    assert f"... (共 {len(body)} 字)" in item["content"], \
+        "提示行里的字数该是原始长度，不是截断后的"
+    assert item["content"].count("起") == PREVIEW_CHARS
+
+
 def test_404死链不登记但needs_ocr仍为真(tmp_path, caplog):
     """实测有这种：附件已从站点删掉，链接还挂着，`downloadFile?id=` 返回 404 空响应。
 

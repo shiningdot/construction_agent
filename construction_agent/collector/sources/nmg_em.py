@@ -29,8 +29,9 @@ from construction_agent.collector.classifier import classify_v2, is_construction
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 
-from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
-                                               CollectResult, RawAccidentText)
+from construction_agent.collector.base import (BODY_MIN_CHARS, PREVIEW_CHARS,
+                                               BaseCollector, CollectResult,
+                                               RawAccidentText)
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
 
@@ -214,8 +215,11 @@ class NmgEMCollector(BaseCollector):
             if image_urls and needs_ocr:
                 parts.append("[图片格式报告，需 OCR 提取文字]")
             if detail_text:
-                preview = detail_text[:3000]
-                if len(detail_text) > 3000:
+                # 截断长度收进共享常量（2026-10-01 第三十四轮），理由与实测
+                # 见 `base.PREVIEW_CHARS`。这里原是与另外三个源各写一份的
+                # `[:3000]`。
+                preview = detail_text[:PREVIEW_CHARS]
+                if len(detail_text) > PREVIEW_CHARS:
                     preview += f"\n... (共 {len(detail_text)} 字)"
                 parts.append(f"\n正文:\n{preview}")
 

@@ -38,8 +38,9 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
 from construction_agent.collector.attachments import attachment_kind, sort_into
-from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
-                                               CollectResult, RawAccidentText)
+from construction_agent.collector.base import (BODY_MIN_CHARS, PREVIEW_CHARS,
+                                               BaseCollector, CollectResult,
+                                               RawAccidentText)
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
 from construction_agent.collector.stores import RawAccidentStore
@@ -99,11 +100,12 @@ NON_ACCIDENT_KW = [
 # 所以 2026-10-01 第二十二轮把它提到了 `collector.base.BODY_MIN_CHARS`。
 _BODY_MIN = BODY_MIN_CHARS
 
-# `_build_content_summary` 正文预览的截断长度。外层 item 还会再截到
-# 50000，这里留出标题与附件列表的余量。**别再写回三位数**：实测这里的
-# 附件正文有 8,170 字，截到 3000 会丢掉三分之二，而修这条通路的全部
-# 意义就是让正文进来。
-_PREVIEW_CHARS = 40000
+# `_build_content_summary` 正文预览的截断长度。第二十二轮在这里定下 40000
+# 并写下「**别再写回三位数**」的警告（实测这里的附件正文 8,170 字，截到
+# 3000 会丢掉三分之二）——但**警告只保住了这一个源**：`hebei_em` / `ln_em` /
+# `nmg_em` / `henan_em` 各写了一份 3000，直到第三十四轮才收进共享常量。
+# 实测与切掉的六个章节见 `base.PREVIEW_CHARS`。外层 item 还会再截到 50000。
+_PREVIEW_CHARS = PREVIEW_CHARS
 
 
 class GdEMCollector(BaseCollector):

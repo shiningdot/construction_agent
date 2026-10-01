@@ -72,23 +72,26 @@ def _list_html() -> str:
     return f"<html><body><ul>{items}</ul></body></html>"
 
 
-def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 30,
+def _detail_html(title: str, with_pdf: bool = True, body: str = "页面正文。" * 60,
                  pdf_hrefs: list[str] | None = None,
-                 img_hrefs: list[str] | None = None) -> str:
+                 img_hrefs: list[str] | None = None,
+                 footer: str = "") -> str:
     hrefs = (pdf_hrefs if pdf_hrefs is not None
              else ([_PDF_HREF] if with_pdf else []))
     tags = "".join(f'<a href="{h}">附件：调查报告</a>' for h in hrefs)
     imgs = "".join(f'<img src="{h}">' for h in (img_hrefs or []))
     return (f"<html><head><title>{title}</title></head>"
-            f"<body><div class='con'>{body}</div>{tags}{imgs}</body></html>")
+            f"<body><div class='con'>{body}</div>{tags}{imgs}"
+            f"{footer}</body></html>")
 
 
 def _collector(tmp_path: Path, *, with_pdf: bool = True,
-               body: str = "页面正文。" * 30,
+               body: str = "页面正文。" * 60,
                pdf_hrefs: list[str] | None = None,
                pdf_max: int = 5,
                img_hrefs: list[str] | None = None,
-               image_max: int = 50) -> TrsCmsCollector:
+               image_max: int = 50,
+               footer: str = "") -> TrsCmsCollector:
     """五条条目的不联网采集器。
 
     五条是刻意的：`collect()` 在 `len(results) % 5 == 0` 时才批量写库，
@@ -103,17 +106,21 @@ def _collector(tmp_path: Path, *, with_pdf: bool = True,
         list_link_pattern=r"/\d{6}/t\d{8}_\d+\.html",
         construction_keywords=["事故"],
         enable_classify_v2=False,          # 走 pending_review 分支，不跑规则分类
-        min_text_length=30,
         detail_pdf_max=pdf_max,
         detail_image_max=image_max,
         delay=0,
     )
     c = TrsCmsCollector(cfg, data_dir=tmp_path / "src")
     c.raw_store = RawAccidentStore(filepath=tmp_path / "raw.json")
+    # **每条正文各不相同**（后缀带序号）。全都一样的话会被「跨页恒定行 =
+    # 模板文字」那条判据（`collector/boilerplate.py`）整段剥掉——判据没错，
+    # 是 fixture 不真实：五份不同的调查报告不会一字不差。
     details = {_detail_url(d, s): _detail_html(t, with_pdf=with_pdf,
-                                               body=body, pdf_hrefs=pdf_hrefs,
-                                               img_hrefs=img_hrefs)
-               for t, d, s in _LINKS}
+                                               body=f"{body}（第 {i} 条）",
+                                               pdf_hrefs=pdf_hrefs,
+                                               img_hrefs=img_hrefs,
+                                               footer=footer)
+               for i, (t, d, s) in enumerate(_LINKS)}
     c._fetch = lambda url: _list_html() if url == _LIST_URL else details.get(url, "")
     return c
 
@@ -122,6 +129,67 @@ def _close(c: TrsCmsCollector) -> None:
     client = getattr(c, "_client", None)
     if client is not None:
         client.close()
+
+
+# --------------------------------------------------------------------------
+# D 组：模板文字剥离（2026-10-01 第二十三轮，缺陷 G）
+# --------------------------------------------------------------------------
+#
+# 改前 `detail_text` 是 `body` 全文，导航与页脚全在里面。实测 `hain_em` 的
+# `body` 1,226 字里模板占 **1,128 字**，真正文只剩 98 字——而 98 这个数从来
+# 没有任何一道防线看到过，因为 `min_text_length` 量的是 1,226。
+
+_FOOTER = "".join(f"<p>页脚导航第{i}项。</p>" for i in range(40))
+
+
+def test_跨页恒定的页脚不进行正文(tmp_path):
+    c = _collector(tmp_path, footer=_FOOTER)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert "页脚导航" not in item["content"]
+        assert "页面正文" in item["content"]
+    finally:
+        _close(c)
+
+
+def test_真正文不足阈值时入审核队列(tmp_path):
+    """**缺陷 G 的回归测试。**
+
+    五页各挂一段 60 字正文加一段 40 行页脚。改前 `combined_text` 是 `body`
+    全文（约 500 字），稳过 `min_text_length(30)`，条目被判成「有正文」而
+    直接进库；剥掉页脚后只剩 60 余字，落进 `BODY_MIN_CHARS(200)` 之下，
+    才第一次被判成「无有效正文」。
+
+    实测形态：`hain_em` 真正文 98 字、`tj_em` 61 字、`sx_em` 140 字、
+    `gz_em` 103 字——而这四个源的 `body` 都在 300–1,230 字之间。
+    """
+    c = _collector(tmp_path, body="短正文。" * 15, footer=_FOOTER)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        items = c.raw_store.get_all()
+        assert len(items) == 5
+        for item in items:
+            assert item["classification_reason"] == "无有效正文"
+            # 正文本身还在产出里，只是长度不够——不是被丢掉了
+            assert "短正文" in item["content"]
+    finally:
+        _close(c)
+
+
+def test_正文够长时不受影响(tmp_path):
+    """剥模板不该把正常条目也推进审核队列。"""
+    c = _collector(tmp_path, body="页面正文。" * 120, footer=_FOOTER)
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+        assert item["classification_reason"] == "未启用分类"
+        assert "页脚导航" not in item["content"]
+    finally:
+        _close(c)
 
 
 # --------------------------------------------------------------------------

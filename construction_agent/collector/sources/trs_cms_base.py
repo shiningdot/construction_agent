@@ -28,7 +28,11 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
-from construction_agent.collector.base import BaseCollector, RawAccidentText
+from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
+                                               RawAccidentText)
+from construction_agent.collector.boilerplate import (
+    MIN_PAGES as BOILERPLATE_MIN_PAGES, page_lines, strip_template,
+    template_lines, text_lines)
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.images import extract_page_images
 from construction_agent.collector.pdf_text import extract_pdf_text
@@ -83,7 +87,11 @@ class TrsSiteConfig:
     # ── 筛选配置 ──
     construction_keywords: list[str] = field(default_factory=lambda: DEFAULT_CONSTRUCTION_KW)
     enable_classify_v2: bool = True       # 是否启用 classify_v2 二级文本分类
-    min_text_length: int = 30             # 最小正文长度（低于此值入审核队列）
+    # 原有一个 `min_text_length: int = 30`（最小正文长度，低于此值入审核队列），
+    # 2026-10-01 第二十三轮删掉：阈值改用共享常量 `BODY_MIN_CHARS`。留着这个
+    # 字段会是个死配置——**改了它不会生效**，比没有更糟。删前的实测见
+    # `collect()` 里那行注释（30 会把 `hain_em` 98 字 / `tj_em` 61 字 /
+    # `sx_em` 140 字 / `gz_em` 103 字这四条全部放行）。
 
     # ── 请求配置 ──
     delay: float = 1.0                    # 请求间隔（秒）
@@ -272,31 +280,68 @@ class TrsCmsCollector(BaseCollector):
         self._total_listed = len(all_links)
         logger.info(f"[{self.cfg.source_name}] 列表共 {self._total_listed} 篇文章")
 
-        # 3. 逐条爬取
-        results: list[RawAccidentText] = []
-        for i, link in enumerate(all_links):
-            title = link["title"]
-            url = link["url"]
-            list_date = link.get("date", "")
-
-            # 一级筛选：标题关键词
-            is_candidate, reason = is_construction_candidate(
-                title, keywords=self.cfg.construction_keywords
+        # 3. 一级筛选：标题关键词
+        #
+        # **先筛完再抓，不边筛边抓**（2026-10-01 第二十三轮改）——下面统计
+        # 模板文字要一次看到全部候选页。这一步不动请求数：抓到的 HTML 会在
+        # 主循环里复用。
+        candidates: list[dict] = []
+        for link in all_links:
+            is_candidate, _ = is_construction_candidate(
+                link["title"], keywords=self.cfg.construction_keywords
             )
             if not is_candidate:
                 self._filtered_title += 1
                 continue
+            candidates.append(link)
 
-            logger.info(f"[{self.cfg.source_name}] 候选({i+1}/{self._total_listed}): "
-                        f"[{title[:50]}] - {reason}")
-
+        # 3b. 抓一遍候选详情页，统计「跨页恒定行」= 模板文字（缺陷 G）
+        #
+        # 修之前 `combined_text` 是 `body` 全文，导航与页脚全在里面：实测
+        # `hain_em` 的 `body` 1,226 字里模板占 1,128 字，真正文只有 98 字——
+        # 而 98 这个数**从来没有任何一道防线看到过**，因为 `min_text_length`
+        # 量的是 1,226。判据与实测见 `collector/boilerplate.py`。
+        detail_html: dict[str, str] = {}
+        for link in candidates:
             time.sleep(self.cfg.delay)
+            h = self._fetch(link["url"])
+            if h:
+                detail_html[link["url"]] = h
+        tpl = template_lines(
+            [page_lines(h, self.cfg.detail_text_selector)
+             for h in detail_html.values()],
+            min_pages=BOILERPLATE_MIN_PAGES,
+        )
+        # 页数不够时 `tpl` 是空集，后面自动退化成「不剥」——**退化不无声**，
+        # 日志里说得出来。
+        if tpl:
+            logger.info(f"[{self.cfg.source_name}] 模板文字 {len(tpl)} 行 / "
+                        f"{sum(len(x) for x in tpl)} 字（取自 "
+                        f"{len(detail_html)} 页）")
+        elif detail_html:
+            logger.info(f"[{self.cfg.source_name}] 候选页只有 "
+                        f"{len(detail_html)} 页（<{BOILERPLATE_MIN_PAGES}），"
+                        f"本轮不剥模板文字")
 
-            # 爬取详情页
-            detail = self._crawl_detail(url)
+        # 4. 逐条爬取
+        results: list[RawAccidentText] = []
+        for i, link in enumerate(candidates):
+            title = link["title"]
+            url = link["url"]
+            list_date = link.get("date", "")
+
+            logger.info(f"[{self.cfg.source_name}] 候选({i+1}/{len(candidates)}): "
+                        f"[{title[:50]}]")
+
+            # 爬取详情页（HTML 已在 3b 抓过，复用）
+            detail = self._crawl_detail(url, detail_html.get(url))
             detail_title = (detail or {}).get("title") or title
             detail_date = (detail or {}).get("date") or list_date
             detail_text = (detail or {}).get("text") or ""
+            # 剥掉跨页恒定的模板行（导航、页脚、备案号）。`tpl` 是空集时
+            # `strip_template` 原样拼回，等价于旧行为。
+            if detail and tpl:
+                detail_text = strip_template(detail.get("text_lines") or [], tpl)
             pdf_urls = (detail or {}).get("pdf_urls") or []
             image_urls = (detail or {}).get("image_urls") or []
 
@@ -328,7 +373,17 @@ class TrsCmsCollector(BaseCollector):
 
             # 合并正文
             combined_text = pdf_text or detail_text
-            if not combined_text or len(combined_text) < self.cfg.min_text_length:
+            # 阈值改用共享常量 `BODY_MIN_CHARS`（2026-10-01 第二十三轮）。
+            #
+            # 原来是 `min_text_length(30)`。30 这个数是在「正文里混着 1,226 字
+            # 模板文字」的前提下定的——那时它相当于没定，因为任何一页都能过。
+            # 剥掉模板之后，真正文落回 **61–140 字**的那四条（`hain_em` 98 /
+            # `tj_em` 61 / `sx_em` 140 / `gz_em` 103）才第一次被量到，
+            # **它们全都该进审核队列**，而 30 会把它们全部放行。
+            #
+            # 与 `nmg_em` 用同一个常量，理由同 `base.py` 里那段：口径不一致
+            # 会出现「同一个页面在一个源上标了 `needs_ocr`、在另一个源上没标」。
+            if not combined_text or len(combined_text) < BODY_MIN_CHARS:
                 # 无有效正文 → 入审核队列
                 self._review += 1
                 classification = "pending_review"
@@ -582,9 +637,14 @@ class TrsCmsCollector(BaseCollector):
 
         return records
 
-    def _crawl_detail(self, url: str) -> Optional[dict]:
-        """爬取详情页，提取标题、日期、正文和 PDF 链接。"""
-        html = self._fetch(url)
+    def _crawl_detail(self, url: str,
+                      html: Optional[str] = None) -> Optional[dict]:
+        """爬取详情页，提取标题、日期、正文和 PDF 链接。
+
+        `html` 传了就不自己抓——`collect()` 为了统计模板文字会**先把候选页
+        全抓一遍**，主循环复用那一份，总请求数不变。
+        """
+        html = html if html is not None else self._fetch(url)
         if not html:
             return None
 
@@ -647,13 +707,23 @@ class TrsCmsCollector(BaseCollector):
                          f"{self.cfg.detail_image_max} 张: {url}")
 
         # 正文
-        text = ""
+        #
+        # **切成行，不取整块**（2026-10-01 第二十三轮改）。原先这里是
+        # `body.get_text()`——不带分隔符，相邻标签的文字直接粘成一整块，
+        # 「行」这个概念不存在，于是「跨页恒定行 = 模板文字」那条判据无从
+        # 落地（缺陷 G 的修法）。改法本身在 `collector/boilerplate.py`，
+        # 那里记着第十六/十七轮为什么「选容器」三条路全不通、改成「减模板」。
+        #
+        # **剥离不在这里做**：模板行是跨页统计出来的，单页视角看不见它。
+        # 这里只交出 `text_lines`，`collect()` 统一剥。
+        text_lines_: list[str] = []
         if self.cfg.detail_text_selector in ("body", "article"):
             body = soup.find(self.cfg.detail_text_selector)
             if body:
-                text = body.get_text()
+                text_lines_ = text_lines(body)
 
-        return {"title": title, "date": date, "text": text,
+        return {"title": title, "date": date,
+                "text": "\n".join(text_lines_), "text_lines": text_lines_,
                 "pdf_urls": pdf_urls, "image_urls": image_urls}
 
     def _download_and_extract_pdf(

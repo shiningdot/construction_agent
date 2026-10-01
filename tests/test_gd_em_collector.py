@@ -29,8 +29,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from construction_agent.collector.attachments import (  # noqa: E402
+    attachment_kind)
 from construction_agent.collector.sources.gd_em import (  # noqa: E402
-    GDEM_BASE, GDEM_LIST_URL, GdEMCollector, _attachment_kind)
+    GDEM_BASE, GDEM_LIST_URL, GdEMCollector)
 from construction_agent.collector.stores import RawAccidentStore  # noqa: E402
 
 _DETAIL_URL = f"{GDEM_BASE}/gk/zdlyxxgk/sgdcbg/content/post_1.html"
@@ -106,7 +108,10 @@ def test_附件后缀分拣(href, expected):
     `".pdf" in href` 尚可，但同源的 `".doc" in href` 会把任何含 `.doc`
     的路径（含 `showdoc` 之类）收进来，放宽了附件集合。
     """
-    assert _attachment_kind(href) == expected
+    # 判据 2026-10-01 第二十九轮收敛到 `collector/attachments.py`（`beijing_em`
+    # 当时一份都没有，Word 附件全被当 PDF 交给下游）。这条用例跟着改测共享模块
+    # ——它钉的是判据本身，不是哪个源。
+    assert attachment_kind(href) == expected
 
 
 # --------------------------------------------------------------------------

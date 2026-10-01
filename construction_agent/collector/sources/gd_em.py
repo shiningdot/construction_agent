@@ -37,6 +37,7 @@ import httpx
 from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 
+from construction_agent.collector.attachments import attachment_kind
 from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
                                                RawAccidentText)
 from construction_agent.collector.images import extract_page_images
@@ -103,23 +104,6 @@ _BODY_MIN = BODY_MIN_CHARS
 # 附件正文有 8,170 字，截到 3000 会丢掉三分之二，而修这条通路的全部
 # 意义就是让正文进来。
 _PREVIEW_CHARS = 40000
-
-
-def _attachment_kind(href: str) -> str:
-    """按后缀判断附件类型，返回 `"pdf"` / `"office"` / `""`（认不出）。
-
-    必须比后缀，不能比子串。原先这里写的是 `".doc" in href`——而
-    `".doc"` 是 `".docx"` 的子串，Word 附件全被当成 PDF 塞进了
-    `pdf_urls`（字段名说是 PDF），再经 `executor._ASSET_KEYS` 登记成
-    `asset_type="pdf"`。2026-10-01 查实：这条链上三处名实不符，
-    源头就是这一行。
-    """
-    path = href.lower().split("?")[0].split("#")[0]
-    if path.endswith(".pdf"):
-        return "pdf"
-    if path.endswith((".docx", ".doc")):
-        return "office"
-    return ""
 
 
 class GdEMCollector(BaseCollector):
@@ -540,7 +524,7 @@ class GdEMCollector(BaseCollector):
 
         def _sort_attachment(href: str) -> None:
             """按后缀把附件收进对应的列表。认不出就不收。"""
-            kind = _attachment_kind(href)
+            kind = attachment_kind(href)
             if not kind:
                 return
             full = href if href.startswith("http") else urljoin(GDEM_BASE, href)
@@ -563,7 +547,7 @@ class GdEMCollector(BaseCollector):
             # 清理多余空行
             content_text = re.sub(r"\n{3,}", "\n\n", content_text)
 
-            # 提取附件链接（PDF 与 Word 分开收，见 `_attachment_kind`）
+            # 提取附件链接（PDF 与 Word 分开收，判据见 `collector/attachments.py`）
             for a in article_div.find_all("a", href=True):
                 _sort_attachment(a["href"])
 

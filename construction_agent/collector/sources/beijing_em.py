@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 from construction_agent.collector.classifier import classify_v2, is_construction_candidate
 from construction_agent.collector.pdf_text import extract_pdf_text
 
+from construction_agent.collector.attachments import attachment_kind
 from construction_agent.collector.base import BaseCollector, RawAccidentText
 from construction_agent.collector.stores import RawAccidentStore
 from construction_agent.config import settings
@@ -38,7 +39,20 @@ logger = logging.getLogger(__name__)
 BJEM_BASE = "http://yjglj.beijing.gov.cn"
 BJEM_LIST_URL = "http://yjglj.beijing.gov.cn/col/col4520/index.html"
 
-# (分类器已迁移至 construction_agent.collector.classifier)
+
+def _placeholder(kind: str, title: str, unit: str, url: str) -> str:
+    """附件没提出正文时的占位行。
+
+    **按实际类型写**：本源附件里有 Word（2026-10-01 第二十九轮实测 84 条中
+    15 条），占位一律说「PDF」是在骗下游。
+    """
+    if kind == "office":
+        return f"[Office 报告] {title}\n发布单位: {unit}\n文档: {url}"
+    if kind == "pdf":
+        return f"[PDF 报告] {title}\n发布单位: {unit}\nPDF: {url}"
+    # 认不出、或压根没附件：只写标题与单位，不假装有附件
+    return f"{title}\n发布单位: {unit}"
+
 
 # (分类器已迁移至 construction_agent.collector.classifier)
 
@@ -188,8 +202,18 @@ class BeijingEMCollector(BaseCollector):
 
             logger.info(f"  候选: [{title[:60]}] - {reason}")
 
-            # 构建 PDF 完整 URL
-            pdf_url = self._build_pdf_url(pdf_path)
+            # 构建附件完整 URL，并按后缀判类型。**这个源的附件不全是 PDF**
+            # （2026-10-01 第二十九轮实测列表页 84 条 `xkrq[i]`：`.pdf` 69、
+            # `.docx` 10、`.doc` 5）。原先那 15 条 Word 原样写成
+            # `"pdf_urls": [...]`，经 `executor._ASSET_KEYS` 按键名登记成
+            # `asset_type='pdf'`，阶段② 会拿 PyMuPDF 去解 Word。
+            # 判据与 `gd_em` 共用 `collector/attachments.py`。
+            asset_url = self._build_pdf_url(pdf_path)
+            kind = attachment_kind(asset_url)
+            if asset_url and not kind:
+                # 认不出的一律不收（与 `_assets_from`「不认识的不猜」同向），
+                # 但**不静默**——站点改版新增了别的附件类型，得有人知道。
+                logger.warning(f"    附件类型认不出，不入产出: {asset_url}")
 
             # ── 二级筛选：PDF 全文分类（可选）──
             classification = "pending_review"
@@ -203,9 +227,9 @@ class BeijingEMCollector(BaseCollector):
             # beijing_em 记录的 raw_text 全是 106–206 字的占位，最长那条
             # （206 字）也只是把一长串承包单位名字塞进了标题。
             pdf_text = ""
-            if self._enable_pdf_classify and pdf_url:
-                # 下载 PDF
-                pdf_text = self._download_and_extract(pdf_url)
+            if self._enable_pdf_classify and asset_url:
+                # 下载附件（PDF 与 Word 都交给它，`fitz` 按内容嗅探）
+                pdf_text = self._download_and_extract(asset_url)
                 if pdf_text:
                     result = classify_v2(title, pdf_text)
                     logger.info(
@@ -245,13 +269,20 @@ class BeijingEMCollector(BaseCollector):
                 # 或压根没开下载）才退回占位——这时由 `needs_ocr` 标出来，
                 # 下游才知道该走 OCR 而不是以为正文已经拿到。
                 "content": (pdf_text or
-                            f"[PDF 报告] {title}\n发布单位: {unit}\nPDF: {pdf_url}"),
+                            _placeholder(kind, title, unit, asset_url)),
                 "source_url": article_url or BJEM_LIST_URL,
                 "source_name": "beijing_em",
                 "publish_date": "",
                 "status": item_status,
-                "pdf_urls": [pdf_url],
-                "needs_ocr": not pdf_text,
+                # 按判出来的类型分家：`executor._ASSET_KEYS` 按键名认类型，
+                # Word 放进 `pdf_urls` 就登记成 `asset_type='pdf'`。
+                # 认不出/为空时两个键都是空列表——不写空串进去。
+                "pdf_urls": [asset_url] if kind == "pdf" else [],
+                "office_urls": [asset_url] if kind == "office" else [],
+                # 「有附件 且 正文没提出来」——全项目约定（§2.5.13）。加
+                # `bool(kind)` 这一项：`xkrq` 数组比 `urls` 短时 `pdf_path`
+                # 为空，那是**压根没有附件**，标成「要去 OCR」是虚报。
+                "needs_ocr": bool(kind) and not pdf_text,
                 "issuing_authority": unit,
                 "pdf_path": pdf_path,
                 "classification": classification,
@@ -373,24 +404,32 @@ class BeijingEMCollector(BaseCollector):
 
         return records
 
-    def _download_and_extract(self, pdf_url: str) -> str:
-        """下载 PDF 并提取文本。"""
-        if not pdf_url:
+    def _download_and_extract(self, url: str) -> str:
+        """下载附件并提取文本。
+
+        交给 `extract_pdf_text` 就够——它背后的 `fitz` 同时认 PDF 与 OOXML。
+        这个源的附件里有 Word（第二十九轮实测 84 条中 15 条），`.docx` 提得出
+        正文，老 `.doc`（OLE2）提不出；这个差别不在这里判断，直接交给它试。
+        """
+        if not url:
             return ""
 
-        # 缓存到本地避免重复下载
-        url_hash = hashlib.md5(pdf_url.encode()).hexdigest()[:12]
-        cache_path = self.data_dir / f"{url_hash}.pdf"
+        # 缓存到本地避免重复下载。**后缀按 URL 取**，不再写死 `.pdf`：
+        # `fitz` 是按内容嗅探的，写死不影响提取，但缓存目录里一份 Word 顶着
+        # `.pdf` 的名字，人工排查时是误导（与 `gd_em` 对齐）。
+        suffix = Path(url.split("?")[0]).suffix.lower() or ".bin"
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
+        cache_path = self.data_dir / f"{url_hash}{suffix}"
 
         if not cache_path.exists():
             try:
-                resp = self._client.get(pdf_url)
+                resp = self._client.get(url)
                 if resp.status_code != 200 or len(resp.content) < 100:
-                    logger.debug(f"    PDF 下载失败: HTTP {resp.status_code}")
+                    logger.debug(f"    附件下载失败: HTTP {resp.status_code}")
                     return ""
                 cache_path.write_bytes(resp.content)
-            except Exception as e:
-                logger.debug(f"    PDF 下载异常: {e}")
+            except Exception as e:  # noqa: BLE001 —— 网络异常不该打断整轮采集
+                logger.debug(f"    附件下载异常: {e}")
                 return ""
 
         return extract_pdf_text(cache_path)
@@ -409,12 +448,16 @@ class BeijingEMCollector(BaseCollector):
         return ""
 
     def _build_pdf_url(self, pdf_path: str) -> str:
-        """构建 PDF 完整下载 URL。
+        """把列表页 JS 里那条附件路径补成完整 URL。
 
         支持格式:
         - /attach/0/xxx.pdf → http://yjglj.beijing.gov.cn/attach/0/xxx.pdf
         - http://... 绝对 URL → 原样返回
-        - .docx 文件也支持
+
+        这里**只补 URL，不判类型**——类型由 `collector/attachments.py` 的
+        `attachment_kind` 按后缀判（站上确实有 `.docx`/`.doc`，见 `collect()`）。
+        函数名里的 `pdf` 是历史包袱，改名会牵动调用方与 `pdf_path` 那个 extra
+        键，本轮不动。
         """
         if not pdf_path:
             return ""

@@ -36,23 +36,33 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from construction_agent.collector import registry  # noqa: E402
+from construction_agent.collector.executor import (  # noqa: E402
+    _row_from_sink_record)
 from construction_agent.collector.sources.beijing_em import (  # noqa: E402
-    BeijingEMCollector)
+    BJEM_BASE, BeijingEMCollector)
 from construction_agent.collector.stores import RawAccidentStore  # noqa: E402
 
 # 真实页面里这四个数组的**下标就是字面 `[i]`**（写 `[0]` 一条都解析不出来，
 # 排查时踩过一次）。标题挑主库里真有的那种，能过一级标题初筛。
-_LIST_PAGE = """<html><body><script>
-function showNews_12345(start_num) {
+#
+# `xkrq[i]` 抽成参数：2026-10-01 第二十九轮起，这个值**不保证是 PDF**——
+# 实测该站列表页 84 条附件里 `.pdf` 69、`.docx` 10、`.doc` 5。
+def _list_page(xkrq: str) -> str:
+    return f"""<html><body><script>
+function showNews_12345(start_num) {{
     urls[i] = '/art/2024/1/1/art_4520_1.html';
     headers[i] = "北京建工四建工程建设有限公司一般生产安全事故调查报告";
     xkxm[i] = '北京市应急管理局';
-    xkrq[i] = '/attach/0/W020240101.pdf';
-}
+    xkrq[i] = '{xkrq}';
+}}
 </script></body></html>"""
 
 
-def _collector(tmp_path: Path, **kwargs) -> BeijingEMCollector:
+_LIST_PAGE = _list_page('/attach/0/W020240101.pdf')
+
+
+def _collector(tmp_path: Path, list_page: str = _LIST_PAGE,
+               **kwargs) -> BeijingEMCollector:
     """造一个不联网的采集器。
 
     `raw_store` 必须显式改道：`BeijingEMCollector.__init__` 里是
@@ -62,7 +72,7 @@ def _collector(tmp_path: Path, **kwargs) -> BeijingEMCollector:
     """
     c = BeijingEMCollector(data_dir=tmp_path / "src", **kwargs)
     c.raw_store = RawAccidentStore(filepath=tmp_path / "raw.json")
-    c._fetch = lambda url: _LIST_PAGE
+    c._fetch = lambda url: list_page
     return c
 
 
@@ -153,6 +163,121 @@ def test_关掉开关就既不下PDF也不给正文(tmp_path):
         assert item["needs_ocr"] is True
     finally:
         _close(c)
+
+
+# --------------------------------------------------------------------------
+# 附件类型分拣（2026-10-01 第二十九轮）
+# --------------------------------------------------------------------------
+
+
+def test_Word附件登记到office_urls(tmp_path):
+    """**这个源的附件不全是 PDF。**
+
+    2026-10-01 实测它列表页一条 `xkrq[i]` 数组的取值分布：84 条里 `.pdf` 69、
+    `.docx` 10、`.doc` 5。改前那 15 条 Word 原样写成 `"pdf_urls": [pdf_url]`，
+    经 `executor._ASSET_KEYS` 按键名登记成 `asset_type='pdf'`——阶段② 会拿
+    PyMuPDF 去解 Word。与 `gd_em` 那个「`.doc` 是 `.docx` 子串」的老 bug、
+    以及上一轮 `esafety` 把图片塞进 `pdf_urls`，是**同一族：键名说了谎**。
+    """
+    url = f"{BJEM_BASE}/attach/0/W020240101.docx"
+    c = _collector(tmp_path, list_page=_list_page("/attach/0/W020240101.docx"))
+    c._download_and_extract = lambda _: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["pdf_urls"] == []
+    assert item["office_urls"] == [url]
+    # 占位行按实际类型写，不能一律说「PDF」
+    assert item["content"].startswith("[Office 报告] ")
+    assert "文档: " in item["content"]
+
+
+def test_通路A把office_urls登记成office(tmp_path):
+    """登记端：`executor._ASSET_KEYS` 里那条 `("office_urls", "office")`。
+
+    `beijing_em` 的 record 是 dict，走 `raw_store.add_batch()` → 通路 A
+    （`executor.py:132`）。
+    """
+    c = _collector(tmp_path, list_page=_list_page("/attach/0/W020240101.doc"))
+    c._download_and_extract = lambda _: ""
+    try:
+        c.collect()
+        row = _row_from_sink_record(c.raw_store.get_all()[0], "beijing_em", "t")
+    finally:
+        _close(c)
+
+    assert [a["asset_type"] for a in row["_assets"]] == ["office"]
+    assert row["_assets"][0]["url"].endswith(".doc")
+
+
+@pytest.mark.parametrize("path,expect", [
+    ("/attach/0/a.pdf", "pdf_urls"),
+    ("/attach/0/a.docx", "office_urls"),
+    ("/attach/0/a.doc", "office_urls"),
+    ("/attach/0/a.PDF", "pdf_urls"),                    # 大写
+    ("/attach/0/a.docx?download=1", "office_urls"),     # 带查询串
+])
+def test_判据自检_只换后缀两个键就互换(tmp_path, path, expect):
+    """同一条记录、同一段代码，**只有后缀不同**——两个键互换。
+
+    判据本身（含大小写与查询串）另有一组逐条的用例，见
+    `tests/test_gd_em_collector.py::test_附件后缀分拣`——那里测的是共享模块
+    `collector/attachments.py`，`gd_em` 与本源共用同一份。
+    """
+    other = "office_urls" if expect == "pdf_urls" else "pdf_urls"
+    c = _collector(tmp_path, list_page=_list_page(path))
+    c._download_and_extract = lambda _: ""
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item[expect], f"{path} 应进 {expect}"
+    assert item[other] == []
+
+
+def test_认不出的附件类型不入产出但留warning(tmp_path, caplog):
+    """`.xlsx` 这类认不出的：两个键都不收，但**不静默**。
+
+    与 `_assets_from`「键名不认识的不猜」同向——宁可少登记一条，也不要把
+    一个普通链接当附件去下载。代价是漏，所以拿一条 warning 换：站点改版
+    新增了别的附件类型，得有人知道。
+    """
+    c = _collector(tmp_path, list_page=_list_page("/attach/0/a.xlsx"))
+    try:
+        with caplog.at_level("WARNING"):
+            c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["pdf_urls"] == []
+    assert item["office_urls"] == []
+    assert "附件类型认不出" in caplog.text
+
+
+def test_没有附件时不假装有附件(tmp_path):
+    """`xkrq` 数组比 `urls` 短时 `pdf_path` 为空——那是**压根没有附件**。
+
+    改前 `content` 仍写 `[PDF 报告] 标题 … PDF: `（空地址）、`needs_ocr` 也
+    照样标 True，两者都在说「有一条 PDF 等你 OCR」，而其实没有。此处按
+    全项目约定回到「有附件 且 正文没提出来」。
+    """
+    c = _collector(tmp_path, list_page=_list_page(""))
+    try:
+        c.collect()
+        item = c.raw_store.get_all()[0]
+    finally:
+        _close(c)
+
+    assert item["pdf_urls"] == []
+    assert item["office_urls"] == []
+    assert "[PDF 报告]" not in item["content"]
+    assert item["needs_ocr"] is False
 
 
 # --------------------------------------------------------------------------

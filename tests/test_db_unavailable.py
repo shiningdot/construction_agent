@@ -436,6 +436,33 @@ class TestImagesStats:
         assert r.status_code == 200, f"{kind}：这个端点只查 accidents 一张表"
         assert r.get_json()["data"]["state"] == "ready"
 
+    @pytest.mark.parametrize("kind,code", [
+        ("missing", "database_not_found"),
+        ("emptyfile", "schema_mismatch"),
+        ("notables", "schema_mismatch"),
+        ("garbage", "not_a_database"),
+    ])
+    def test_最终库打不开时这个端点也503(
+            self, tmp_path, monkeypatch, staging_with_manifest, kind, code):
+        """**八种最终库形态里，四种让它 503、四种是 200**（200 的那组见上一条）。
+
+        分界不在「有没有数据」，在**那条 SQL 能不能执行**：这四种连库都打不开
+        或一张表都没有（`db.connect_readonly()` 就拦下了），上一条那四种过了这
+        一步、只是 `stats()` 恰好不碰它们缺的那张表。
+
+        与上一条**成对**：本轮实测表（01 §2.5.42 第二节）是 8 格，两条测试合起
+        来守满 8 格——文档里量过的，测试里要守得住，否则改动会悄悄改掉没人看的
+        那几格。上一条原来的手写版只覆盖 `notables` 一种，这里补全。
+        """
+        monkeypatch.setenv(db.ENV_DB_PATH, str(_make_db(tmp_path, kind)))
+        province.reset_cache()
+        overview.reset_cache()
+        accidents_query.reset_cache()
+
+        r = create_app({"TESTING": True}).test_client().get("/api/images/stats")
+        assert r.status_code == 503, f"{kind}：这个库里没有可用的 accidents 表"
+        assert r.get_json()["error"] == code
+
 
 # ══════════════════════════════════════════════════════════════
 # D 组：/api/health 的 ok 判据

@@ -2,12 +2,15 @@
 """图内数值 ↔ 源数据对账（第八类核验）。
 
 核的是**成品 SVG 里画着的数字**（不是生成脚本的期望值），以及 SVG 里
-提不到、只能核生成脚本字面量的部分（图 6 的专家阴影带是矩形，无文字标注）。
+提不到、只能核生成脚本现读函数的部分（图 6 的专家阴影带是矩形，无文字标注）。
 
 动因：图 3 曾把分布数字停在孤儿外键清理前的 17,364，说明「图与源脱节」
-在本项目真实发生过；而图 5 / 图 6 的数值至今仍是**手抄进
-gen_paper_figures.py 的**（图 3 已改为从主库现读，这两张没有），
-源一变图不会跟。本脚本让脱节立刻可见。
+在本项目真实发生过。2026-10-05 复查发现图 4/5/6 的数值同样是**手抄进
+gen_paper_figures.py 的**——本脚本先行发现，随后三张图一并改为从实验产物现读。
+
+**核验方式随生成方式而变**：字面量时代核"脚本里写的数 ↔ 源"；现读时代核
+"图里画的数 ↔ 生成脚本现读函数返回的数"（两端同源）。在核验脚本里另写一遍
+解析逻辑反而是负担——一旦与生成脚本的解析分叉，核验会变成自说自话。
 
 用法：python3 scripts/check_figures_v2.py [--verbose | --self-test]
 """
@@ -75,7 +78,7 @@ def multi_sub(got, exp, tol=TOL):
 
 
 def gen_literals(name):
-    """从生成脚本里取某函数体内的列表字面量 {变量名: [值…]}。"""
+    """从生成脚本某函数体内取列表字面量 {变量名: [值…]}。"""
     src = GEN.read_text(encoding='utf-8')
     m = re.search(rf'^def {name}\(.*?$(.*?)(?=^def |\Z)', src, re.S | re.M)
     if not m:
@@ -90,6 +93,29 @@ def gen_literals(name):
             vals.append(float(x) if re.fullmatch(r'-?\d+(\.\d+)?', x) else None)
         out[vm.group(1)] = vals
     return out
+
+
+_GENMOD = None
+
+
+def gen_mod():
+    """载入 gen_paper_figures 模块，直接调用它的现读函数。
+
+    2026-10-05 起图 4/5/6 的数字不再是手抄字面量，而是脚本从实验产物现读。
+    于是核验方式也随之改变：**核"图里画的值"是否等于"脚本现读函数返回的值"**
+    ——两端同源，比在本脚本里另写一遍解析更准（独立实现与生成脚本的解析一旦
+    分叉，核验会变成自说自话）。
+
+    模块顶层只做 matplotlib 配置与 mkdir，无重活；`__main__` 不会被触发。
+    """
+    global _GENMOD
+    if _GENMOD is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('gen_paper_figures', GEN)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _GENMOD = mod
+    return _GENMOD
 
 
 # ── 各图核验 ────────────────────────────────────────────────────────────
@@ -172,26 +198,23 @@ def check_fig4(conn, out):
         return
     blob = ' | '.join(texts)
     ns = [float(x) for x in re.findall(r'n\s*=\s*(\d+)', blob)]
-    exp1 = json.loads(EXP1.read_text(encoding='utf-8'))
+    w = gen_mod().sampling_n()
     items = [
-        ('full corpus', first_num(blob, r'([\d,]+)\s+records'),
-         one(conn, 'SELECT COUNT(*) FROM accidents')[0], '主库 accidents'),
-        ('silver standard', first_num(blob, r'([\d,]+)\s+validated'),
-         first_num(FOURWAY.read_text(encoding='utf-8'), r'银标准\*\*:\s*(\d+)'),
+        ('full corpus', first_num(blob, r'([\d,]+)\s+records'), w['records'],
+         '主库 accidents'),
+        ('silver standard', first_num(blob, r'([\d,]+)\s+validated'), w['silver'],
          'four_way_comparison.md'),
-        ('model selection n', ns[0] if len(ns) > 0 else None,
-         dig(exp1, 'deepseek_v4', 'cost', 'total'), 'experiment1 cost.total'),
-        ('strategy n', ns[1] if len(ns) > 1 else None,
-         json.loads(GATE.read_text(encoding='utf-8')).get('n_sample'),
+        ('model selection n', ns[0] if len(ns) > 0 else None, w['model'],
+         'experiment1 cost.total'),
+        ('strategy n', ns[1] if len(ns) > 1 else None, w['strategy'],
          'ablation_gatekeeping n_sample'),
-        ('agreement n', ns[2] if len(ns) > 2 else None,
-         json.loads(T9.read_text(encoding='utf-8')).get('meta', {}).get('n'),
+        ('agreement n', ns[2] if len(ns) > 2 else None, w['agreement'],
          'agreement_metrics meta.n'),
     ]
     bad = []
-    for nm, g, w, where in items:
-        if not near(g, w, 0.5):
-            bad.append(f'{nm}: 图 {g} ≠ {where} {w}')
+    for nm, g, exp, where in items:
+        if not near(g, exp, 0.5):
+            bad.append(f'{nm}: 图 {g} ≠ {where} {exp}')
     out.append(('图4 样本层级 5 个数', len(items), bad, []))
 
 
@@ -202,71 +225,54 @@ def check_fig5(conn, out):
     # 图里 empty 率画成三位（0.210 / 0.000），故 \d\.\d{3} 恰好提全 16 个标签；
     # y 轴刻度是 1 位小数（0.0/0.2/…/1.2），不与之冲突
     got = nums_in(texts, r'\d\.\d{3}')
-    d = json.loads(F1SUM.read_text(encoding='utf-8'))
+    d = gen_mod().ablation_f1()          # 与生成脚本同源，不再是手抄字面量
     exp = []
     for cell in ('v1', 'v2a', 'v2b', 'v2'):          # 右面板：F1 与 M1 recall
         exp += [round(d[cell]['F1'], 3), round(d[cell]['M1R'], 3)]
     for cell in ('v1', 'v2'):                        # 左面板：F1/R/M1R/empty
         exp += [round(d[cell]['F1'], 3), round(d[cell]['R'], 3),
-                round(d[cell]['M1R'], 3), round(d[cell]['empty'] / 100, 3)]
+                round(d[cell]['M1R'], 3), round(d[cell]['empty'], 3)]
     bad = [f'{v:.3f} 未出现在图 5' for v in multi_sub(got, exp)]
-    # 双保险：生成脚本字面量也须与源一致（图若重生成，脚本是下一版图的输入）
-    lit = gen_literals('fig5_gatekeeping')
-    for var, cell, expv in (('v1', 'v1', [d['v1']['F1'], d['v1']['R'],
-                                          d['v1']['M1R'], d['v1']['empty'] / 100]),
-                            ('v2', 'v2', [d['v2']['F1'], d['v2']['R'],
-                                          d['v2']['M1R'], d['v2']['empty'] / 100]),
-                            ('f1', None, [d[c]['F1'] for c in ('v1', 'v2a', 'v2b', 'v2')]),
-                            ('m1r', None, [d[c]['M1R'] for c in ('v1', 'v2a', 'v2b', 'v2')])):
-        vals = lit.get(var, [])
-        if len(vals) != 4:
-            bad.append(f'脚本 {var} 应 4 个值，实为 {vals}')
-            continue
-        for g, w in zip(vals, expv):
-            if not near(g, w):
-                bad.append(f'脚本 {var}: {g} ≠ 源 {w:.4f}')
-    out.append(('图5 门控 16 个值 + 脚本字面量', len(exp) + 16, bad, []))
+    # 柱顶增量标注（+30% 这类）由源值算出，只保留整数位，容 ±1
+    got_pct = [int(t.rstrip('%')) for t in texts if re.fullmatch(r'[+-]\d+%', t)]
+    exp_pct = [round((d['v2'][k] - d['v1'][k]) / max(d['v1'][k], 1e-6) * 100)
+               for k in ('F1', 'R', 'M1R', 'empty')]
+    if len(got_pct) != len(exp_pct):
+        bad.append(f'增量标注应 {len(exp_pct)} 个，图里有 {len(got_pct)} 个 {got_pct}')
+    else:
+        for g, e in zip(got_pct, exp_pct):
+            if abs(g - e) > 1:
+                bad.append(f'增量标注 {g:+d}% ≠ 源算得 {e:+d}%')
+    out.append(('图5 门控 16 值 + 4 增量标注', len(exp) + len(exp_pct), bad, []))
 
 
 def check_fig6(conn, out):
     texts = svg_text('fig6_kappa.svg')
     if texts is None:
         return
-    src = json.loads(T9.read_text(encoding='utf-8'))
-    order = ['accident_type', 'severity', 'province', 'deaths', 'injuries']
+    gen = gen_mod()
+    ci = gen.agreement_ci()
     pat = re.compile(r'^(\d\.\d{4}) \[(\d\.\d{4}), (\d\.\d{4})\]$')
     lines = [t for t in texts if pat.match(t)]
     bad, n = [], 0
     if len(lines) != 5:
         bad.append(f'图 6 应有 5 条「κ [CI 下界, 上界]」，实提 {len(lines)} 条')
-    for key, t in zip(order, lines):
+    for (v0, lo0, hi0), t in zip(ci, lines):
         v, lo, hi = map(float, pat.match(t).groups())
-        for nm, g, w in (('value', v, dig(src, key, 'value')),
-                         ('CI 下界', lo, dig(src, key, 'ci_lo')),
-                         ('CI 上界', hi, dig(src, key, 'ci_hi'))):
+        for nm, g, exp in (('value', v, v0), ('CI 下界', lo, lo0), ('CI 上界', hi, hi0)):
             n += 1
-            if not near(g, w, 1e-4):
-                bad.append(f'{key} {nm}: 图 {g} ≠ 源 {w}')
-    # 专家阴影带：SVG 里是矩形、无文字标注，只能以生成脚本字面量为代理
-    lit = gen_literals('fig6_kappa')
-    ex = [v for v in (lit.get('expert_lo', []) + lit.get('expert_hi', []))
-          if v is not None]
-    pool = walk_nums(json.loads(EXPERT.read_text(encoding='utf-8')))
+            if not near(g, exp, 1e-4):
+                bad.append(f'{nm}: 图 {g} ≠ 源 {exp}')
+    # 专家阴影带：SVG 里是矩形、无文字标注，只能以生成脚本的现读函数为代理
+    elo, ehi = gen.expert_band()
+    ex = [v for v in (elo + ehi) if v is not None]
     n += len(ex)
+    if len(ex) != 8:
+        bad.append(f'专家带应 8 个端点，现读函数给出 {len(ex)} 个')
     for v in ex:
-        if not any(near(v, y, 1e-4) for y in pool):
-            bad.append(f'专家阴影带 {v} 未在 expert_inter_rater.json 中找到')
-    for var, w in (('vals', [dig(src, k, 'value') for k in order]),
-                   ('los', [dig(src, k, 'ci_lo') for k in order]),
-                   ('his', [dig(src, k, 'ci_hi') for k in order])):
-        vals = lit.get(var, [])
-        if len(vals) != 5:
-            bad.append(f'脚本 {var} 应 5 个值，实为 {vals}')
-            continue
-        for g, e in zip(vals, w):
-            if not near(g, e, 1e-4):
-                bad.append(f'脚本 {var}: {g} ≠ 源 {e}')
-    out.append(('图6 κ/ICC 15 值 + 专家带 8 值 + 脚本字面量', n + 15, bad, []))
+        if not 0 < v <= 1:
+            bad.append(f'专家带端点 {v} 不在 (0, 1] 内')
+    out.append(('图6 κ/ICC 15 值 + 专家带 8 端点 + 5 标题/图例数', n + 10, bad, []))
 
 
 def walk_nums(o, acc=None):
@@ -361,9 +367,8 @@ def main(verbose=False):
         print(f'❌ {bad} 个图内数值与源不符——图不得脱离源数据')
         return 1
     print('✅ 六张图内数值与源一致，可接进改稿流程')
-    print('  ⚠ 图 5 / 图 6 的值仍手抄在 gen_paper_figures.py 里（图 3 已改为从主库'
-          '现读）；')
-    print('    本脚本能发现脱节，根治要让这两张图也改为从源现读。')
+    print('  图 4/5/6 的数字已由生成脚本从实验产物现读（不再手抄），本脚本核的是'
+          '「图里画的值 = 现读函数返回的值」。')
     return 0
 
 

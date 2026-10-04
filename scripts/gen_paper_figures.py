@@ -23,6 +23,9 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
 plt.rcParams['svg.fonttype'] = 'none'
 plt.rcParams['axes.unicode_minus'] = False
+# 固定 SVG 里的 clip-path id 盐值：不设的话每次重生成 id 全变，diff 里几百行
+# 噪声会把"到底哪张图真的变了"淹掉（实测改前改后 229 行全在变 id 与时间戳）
+plt.rcParams['svg.hashsalt'] = 'caiems'
 
 OUT = ('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod'
        '/docs/paper_v2/figures')
@@ -58,6 +61,109 @@ def load_code_counts():
 def code_total():
     return sum(n for _, n in load_code_counts())
 
+
+# ── 实验产物：图 4/5/6 的数字一律现读，不在函数体里留死数 ──────────────
+# 2026-10-05 之前，图 5 的 16 个值、图 6 的 15 个值、图 4 的 5 个值是**手抄**在
+# 函数体里的（只有图 3 从主库现读）。逐位核对当时全中，但这正是 fig3 那次漂移
+# 的同一类成因：源一变，图上数字不跟，而人不会每次都去对。
+WT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAIN = os.environ.get('CAIEMS_MAIN', '/home/suntianhao/construction_agent')
+F1_SUMMARY = f'{WT}/experiments/ablation_original/f1_summary.json'
+GATE_SUMMARY = f'{WT}/experiments/ablation_gatekeeping/summary.json'
+AGREE = f'{MAIN}/experiments/experiment_kappa/Basic/289/analysis/agreement_metrics.json'
+EXPERT = f'{MAIN}/experiments/experiment_kappa/kappa_old/expert_inter_rater.json'
+EXP1 = f'{MAIN}/experiments/experiment-models/experiment1_metrics_20260626_102135.json'
+FOURWAY = f'{MAIN}/experiments/four_way_comparison.md'
+
+# 图 6 的行序（须与图里的 features 顺序一致）
+K6_ORDER = ['accident_type', 'severity', 'province', 'deaths', 'injuries']
+
+
+def _jload(path):
+    import json
+    if not os.path.exists(path):
+        raise SystemExit(f'读不到实验产物：{path}')
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def ablation_f1():
+    """2×2 消融四格的 F1 / Recall / M1 recall / 空输出率，来自 f1_summary.json。
+
+    空输出率 = empty / n_sample（图里画成 0.21 这种两位小数，故 `.3f` 会补 0）。
+    """
+    d = _jload(F1_SUMMARY)
+    n = _jload(GATE_SUMMARY).get('n_sample')
+    if not n:
+        raise SystemExit(f'{GATE_SUMMARY} 里没有 n_sample，空输出率无法归一')
+    return {k: {'F1': v['F1'], 'R': v['R'], 'M1R': v['M1R'], 'empty': v['empty'] / n}
+            for k, v in d.items()}
+
+
+def agreement_ci():
+    """图 6 的五条 LLM-human 点估计与 95% CI，来自 agreement_metrics.json。"""
+    d = _jload(AGREE)
+    return [(d[k]['value'], d[k]['ci_lo'], d[k]['ci_hi']) for k in K6_ORDER]
+
+
+def expert_band():
+    """图 6 的专家带（每个指标三个两两配对的一致性 min/max），来自 expert_inter_rater.json。
+
+    province 在该文件里没有对应键（专家只标了 4 个字段），故为 None——
+    图里对 None 不画灰带，这是有意的空缺，不是漏读。
+    """
+    d = _jload(EXPERT)
+    lo, hi = [], []
+    for k in K6_ORDER:
+        if k not in d:
+            lo.append(None)
+            hi.append(None)
+            continue
+        vals = [p['kappa'] if 'kappa' in p else p['icc'] for p in d[k].values()]
+        lo.append(min(vals))
+        hi.append(max(vals))
+    return lo, hi
+
+
+def expert_n():
+    """专家标注集样本量：从 agreement 字段的 '97/100 (97%)' 取分母。"""
+    import re
+    for pairs in _jload(EXPERT).values():
+        for p in pairs.values():
+            m = re.search(r'/(\d+)', str(p.get('agreement', '')))
+            if m:
+                return int(m.group(1))
+    raise SystemExit(f'{EXPERT} 里找不到 agreement 计数，专家样本量无法确定')
+
+
+def sampling_n():
+    """图 4 的三层实验样本量：(模型选择, 策略对比, 一致性研究)。
+
+    模型选择取 experiment1 的 `cost.total`（键名在 cost 下，实为运行统计的
+    "共处理 N 条"）；策略对比取门控消融的 n_sample；一致性研究取 κ 分析的 meta.n。
+    """
+    import re
+    exp1 = _jload(EXP1)
+    n_agree = _jload(AGREE).get('meta', {}).get('n')
+    src = open(FOURWAY, encoding='utf-8').read() if os.path.exists(FOURWAY) else ''
+    m = re.search(r'银标准\*\*[:：]\s*(\d+)', src)
+    return {
+        'model': exp1['deepseek_v4']['cost']['total'],
+        'strategy': _jload(GATE_SUMMARY).get('n_sample'),
+        'agreement': n_agree,
+        'records': sqlite_scalar('SELECT COUNT(*) FROM accidents'),
+        'silver': int(m.group(1)) if m else None,
+    }
+
+
+def sqlite_scalar(sql):
+    import sqlite3
+    con = sqlite3.connect(f'file:{DB_PATH}?mode=ro', uri=True)
+    try:
+        return con.execute(sql).fetchone()[0]
+    finally:
+        con.close()
+
 C = {
     'blue':   '#1B4F72', 'midblue': '#2471A3', 'teal': '#117A65',
     'purple': '#7D3C98', 'green':  '#1E8449', 'orange': '#D35400',
@@ -69,7 +175,9 @@ C = {
 
 def save(fig, name):
     fig.savefig(f'{OUT}/{name}.png', dpi=300, bbox_inches='tight', facecolor='white')
-    fig.savefig(f'{OUT}/{name}.svg', bbox_inches='tight', facecolor='white')
+    # Date=None 去掉 SVG 里的 <dc:date>：内容没变时重生成不该产生 diff
+    fig.savefig(f'{OUT}/{name}.svg', bbox_inches='tight', facecolor='white',
+                metadata={'Date': None})
     plt.close(fig)
     print(f'  ✓ {name}')
 
@@ -253,6 +361,7 @@ def fig3_code_dist():
 # Fig. 4 样本层级
 # ============================================================
 def fig4_sampling():
+    n = sampling_n()
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
     ax.set_xlim(0, 7.5); ax.set_ylim(0, 4.5); ax.axis('off')
 
@@ -264,14 +373,17 @@ def fig4_sampling():
                 color=color, ha='center', va='center')
         ax.text(x + w / 2, y + 0.16, sub, fontsize=7, color=C['text'], ha='center', va='center')
 
-    box(2.9, 3.5, 1.7, 0.7, 'Full corpus', '2,623 records', C['gray'])
-    box(2.9, 2.3, 1.7, 0.7, 'Silver standard', '972 validated', C['blue'])
+    box(2.9, 3.5, 1.7, 0.7, 'Full corpus', f'{n["records"]:,} records', C['gray'])
+    box(2.9, 2.3, 1.7, 0.7, 'Silver standard', f'{n["silver"]} validated', C['blue'])
     ax.annotate('', xy=(3.75, 3.0), xytext=(3.75, 3.5),
                 arrowprops=dict(arrowstyle='->', color=C['gray'], lw=1.2))
 
-    box(0.3, 0.9, 1.9, 0.9, 'Model selection', 'n = 200\nstratified by type', C['teal'])
-    box(2.8, 0.9, 1.9, 0.9, 'Strategy comparison', 'n = 100\n3-expert majority vote', C['purple'])
-    box(5.3, 0.9, 1.9, 0.9, 'Agreement study', 'n = 289\n2-stage stratified', C['red'])
+    box(0.3, 0.9, 1.9, 0.9, 'Model selection',
+        f'n = {n["model"]}\nstratified by type', C['teal'])
+    box(2.8, 0.9, 1.9, 0.9, 'Strategy comparison',
+        f'n = {n["strategy"]}\n3-expert majority vote', C['purple'])
+    box(5.3, 0.9, 1.9, 0.9, 'Agreement study',
+        f'n = {n["agreement"]}\n2-stage stratified', C['red'])
     for cx in [1.25, 3.75, 6.25]:
         ax.annotate('', xy=(cx, 1.8), xytext=(3.75, 2.3),
                     arrowprops=dict(arrowstyle='->', color=C['gray'], lw=1.0))
@@ -283,13 +395,14 @@ def fig4_sampling():
 # Fig. 5 门控效应诊断（v1/v2 恢复 + 2×2 消融 F1 分解）
 # ============================================================
 def fig5_gatekeeping():
+    abl = ablation_f1()
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
     # 左面板: v1 → v2 恢复（多数投票 GT）
     ax = axes[0]
     metrics = ['F1', 'Recall', 'M1 recall', 'Empty output']
-    v1 = [0.503, 0.423, 0.141, 0.21]
-    v2 = [0.656, 0.872, 0.988, 0.00]
+    v1 = [abl['v1'][k] for k in ('F1', 'R', 'M1R', 'empty')]
+    v2 = [abl['v2'][k] for k in ('F1', 'R', 'M1R', 'empty')]
     x = np.arange(len(metrics))
     w = 0.35
     b1 = ax.bar(x - w / 2, v1, w, label='v1 conditional-check', color=C['v1'], alpha=0.85)
@@ -314,8 +427,9 @@ def fig5_gatekeeping():
     # 右面板: 2×2 消融 F1 与 M1 召回
     ax = axes[1]
     cells = ['v1\nchecks\nconserv.', 'v2a\ntwo-step\nconserv.', 'v2b\nchecks\ncoverage', 'v2\ntwo-step\ncoverage']
-    f1 = [0.503, 0.665, 0.653, 0.656]
-    m1r = [0.141, 0.941, 0.329, 0.988]
+    # 与 cells 同序：v1 / v2a / v2b / v2
+    f1 = [abl[k]['F1'] for k in ('v1', 'v2a', 'v2b', 'v2')]
+    m1r = [abl[k]['M1R'] for k in ('v1', 'v2a', 'v2b', 'v2')]
     colors = [C['v1'], C['midblue'], C['orange'], C['v2']]
     x = np.arange(4)
     ax.bar(x - 0.2, f1, 0.4, label='Ave+ F1', color=colors, alpha=0.75)
@@ -330,7 +444,8 @@ def fig5_gatekeeping():
     ax.set_ylim(0, 1.15)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
     ax.legend(fontsize=7.5, frameon=False, loc='upper left')
-    ax.set_title('(b) 2×2 ablation (n = 100, majority-vote GT)', fontsize=9)
+    ax.set_title(f'(b) 2×2 ablation (n = {_jload(GATE_SUMMARY)["n_sample"]}, '
+                 'majority-vote GT)', fontsize=9)
 
     save(fig, 'fig5_gatekeeping')
 
@@ -341,11 +456,13 @@ def fig5_gatekeeping():
 def fig6_kappa():
     features = ['Accident type\n(κ)', 'Severity\n(κ)', 'Province\n(κ)',
                 'Deaths\n(ICC)', 'Injuries\n(ICC)']
-    vals = [0.9136, 0.9477, 0.9746, 0.9849, 0.9853]
-    los = [0.8747, 0.9024, 0.9563, 0.9292, 0.9426]
-    his = [0.9466, 0.9841, 0.9927, 0.9991, 0.9995]
-    expert_lo = [0.8584, 0.8799, None, 0.9951, 0.9738]
-    expert_hi = [0.9642, 0.9822, None, 1.0, 1.0]
+    ci = agreement_ci()
+    vals = [v for v, _, _ in ci]
+    los = [lo for _, lo, _ in ci]
+    his = [hi for _, _, hi in ci]
+    expert_lo, expert_hi = expert_band()
+    n_agree = _jload(AGREE)['meta']['n']
+    n_expert = expert_n()
 
     fig, ax = plt.subplots(figsize=(7, 4.6))
     y = np.arange(len(features))[::-1]
@@ -366,9 +483,11 @@ def fig6_kappa():
     ax.set_ylim(-1.25, 4.85)   # 底部留白给图例，不再压在 Injuries 行上
     ax.set_xlabel('Agreement (κ / ICC)', fontsize=9)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-    ax.set_title('LLM-human agreement (n = 289) vs. expert inter-rater ranges (shaded)', fontsize=9)
+    ax.set_title(f'LLM-human agreement (n = {n_agree}) vs. expert inter-rater '
+                 'ranges (shaded)', fontsize=9)
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color='#F2D7D5', alpha=0.55, label='Expert range (n = 100, 3 experts)'),
+    ax.legend(handles=[Patch(color='#F2D7D5', alpha=0.55,
+                             label=f'Expert range (n = {n_expert}, 3 experts)'),
                        Patch(color=C['blue'], label='LLM-human (95% CI)')],
               fontsize=7.5, frameon=False, loc='lower left')
     save(fig, 'fig6_kappa')

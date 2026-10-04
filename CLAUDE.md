@@ -60,6 +60,18 @@ python -m construction_agent.main
 - `docs/paper/cover_letter.md` — 投稿信（导师姓名仍为占位符）
 
 ## 论文实验数据
+> ⚠️ **源数据分散三处**（核验前先定位，别只在本 worktree 找）：
+> | 论文位置 | 源文件 | 位置 |
+> |---|---|---|
+> | 表 5 / 表 6 | `experiments/experiment-models/experiment1_metrics_20260626_102135.json` | **主仓库** |
+> | 表 7 / §4.4.2 编码密度 | `experiments/experiment_6strategies/S{0..5}_result/S{0..5}_results.json` | **fix-collectors worktree** |
+> | 表 9 | `experiments/experiment_kappa/Basic/289/analysis/agreement_metrics.json` | **主仓库** |
+> | 表 8 | `experiments/ablation_original/f1_summary.json` | 本 worktree |
+> | §4.1 真值 | `experiments/ablation_gatekeeping/gt_recovered.json` | 本 worktree |
+>
+> `scripts/eval_with_gt.py` 的 `BASE` 仍硬编码指向主仓库下**已不存在**的 6 策略目录，
+> 重算前须改指 fix-collectors worktree；`experiment3.runner` 也只在那边有。
+
 - `experiments/ablation_gatekeeping/summary.json` — 2×2 消融（新样本 4×100）
 - `experiments/ablation_gatekeeping/gt_recovered.json` — 三专家多数投票真值
 - `experiments/ablation_original/f1_summary.json` — 原样本 F1 级四格
@@ -97,6 +109,7 @@ python -m construction_agent.main
 - [x] **2026-10-04 引用双向对账（V2 首次）**：既有 `check_citations.py` 硬编码指向 V1（27 条），新增 **`scripts/check_citations_v2.py`** 对 V2 做双向对账（文献→正文查孤立文献 ／ 正文→文献查悬空引用，退出码可接改稿流程）。首轮报 3 条疑似孤立文献，逐条复核实为 **1 条**：`Zhang (2025a)`/`Zhang (2025b)` 是假阳性（正文写作 `Zhang, Hou, et al. (2025a)`「姓氏+第二作者+et al.」形式，正则漏了这一种）；只剩 `Devlin (2019) BERT` 真孤立（正文 `Devlin` 0 次，`BERT` 5 次但仅作技术名词）。**处置：正文首次提及 BERT 处补 `(Devlin et al., 2019)`**（不删文献——它是 BERT 原始出处），中英同步。现两版均 28 条文献 / 24 个引用名 / 孤立 **0** / 悬空 **0**；补引用未引入新排版溢出（英文仍仅表 10 那 1 处 2.86pt）。见 `docs/paper_v2/修订对账记录.md` 第八节
 - [x] **2026-10-04 结构交叉引用对账**：新增 **`scripts/check_xref_v2.py`**，查三项（图表交叉引用 ／ 章节交叉引用 ／ 中英段落对等），退出码可接改稿流程。查出**唯一一处真缺陷**：`Table 7`/`表 7` 中英两版都只出现在表注、**正文从未引用**（而 §4.4.2 的编码密度 5.0 对 5.1、S0 3.6、S4 6.5 全部出自该表）——已在 §4.4.2 开头补引用。其余全绿：图 1–6 与表 1–10 定义齐全、编号连续、全部被正文引用、无悬空；中英引用次数完全对称（F1×2、F2–F6×1、T1×3、T2–T10×1）；章节引用各 15 个全部存在；37 个标题层级序列一致、无标题段落数出入 ≥2（不存在整段漏译）。见 `docs/paper_v2/修订对账记录.md` 第九节
 - [x] **2026-10-04 数字对账清单 ↔ 正文交叉核验（V2 首次）**：新增 **`scripts/check_numbers_v2.py`**，把改稿流程第 4 条（"正文任何数字须与数字对账清单一致"）从人工抽查固化为可复跑核验。三项：清单→正文（46 个统一值中英各出现几次，单版缺 = 漏写）、正文→清单（筛出"像实验数据但不在清单上"的数字供裁决）、邻近值扫描（抓 0.847 被写成 0.845 一类末位笔误）。**结论零缺陷**，本轮未动正文、四格式无需重出。两处"未命中"经查是分词假象：`45` 英文写作 `Forty-five`（拼写形式）、`2,622` 是计数闭合的推导中间值（正文只报各项与终值）。中英待裁决 token 差集（24 vs 5）全部定性为参考文献 DOI 片段与表格逗号粘连（中文 `(397,18.0%)` 被分词成 `39718.0`，英文 `(397, 18.0%)` 有空格）。**踩坑**：固化为脚本时曾静默漏登记 3 个清单项（`mem 3`／`未标注类型 6`／`未标注等级 1`），只覆盖 43 项而汇总行照常显示"全部合规"——清单转录型脚本必须核对**条目总数**，不能只看退出码。见 `docs/paper_v2/修订对账记录.md` 第十节
+- [x] **2026-10-04 实验源数据 ↔ 论文表格/正文核验（V2 首次）**：把对账链向上游推一环，把论文每个实验数字追到产出它的 json。**表 5/6/7/8/9 五张表逐格全中**（含表 7 六个 bootstrap CI 边界、表 8 两行差值、表 9 六行协议指标）；**查出唯一硬伤**——§4.4.2 编码密度三个数全错且系 V1 旧稿沿用（正文 5.0/3.6/6.5，实为 **4.2/2.8/9.2**，真值 5.05 一项本来就是对的不动）。已排除均值/中位/去重/非空四种口径（差值方向还不一致），中文镜像同步，措辞由"接近"改为可核验的"六策略中最接近"（S1 距真值 0.85，确为最小）。四格式与 V1→V2 对比已重出，三对账脚本退出码全 0，PDF 无文本越界。见 `docs/paper_v2/修订对账记录.md` 第十一节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照

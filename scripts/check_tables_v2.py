@@ -20,9 +20,11 @@
   表 9    experiments/experiment_kappa/Basic/289/analysis/agreement_metrics.json  主仓库
 
 表 7 的 F1/Recall/Precision/Type/Sev 六列是一次 `eval_with_gt.py` 的 stdout，
-而该脚本的量算函数所在 `construction_agent/evaluation/experiment3/runner.py`
-已不在主仓库生产路径（只剩 .pyc，且未进归档）。故本脚本内联一份**按索引
-对齐**的 compute_metrics，对着落盘批复现它。
+其量算函数 `construction_agent/evaluation/experiment3/runner.py` 已于 2026-10-05
+从 git `1c14cde` 回收到原位（此前主仓库工作副本只剩 `.pyc`；见对账记录第二十九
+节）。本脚本**仍内联**一份按索引对齐的 compute_metrics、不去 import 那个模块：
+它是论文实验对照物（已归档、勿用于生产），且封存版有 `index()` 反查缺陷——两版
+已并排跑过、差异量化（F1 抬高 +0.001~+0.004、Precision +0.002~+0.009，见 29.6）。
 
 内联版与被封存版的差别（实测）：runner.py 用 `list.index(pred)` 反查预测
 位置，预测列表里存在内容相同的重复条目时（各策略 3–13 条）恒返回首个匹配，

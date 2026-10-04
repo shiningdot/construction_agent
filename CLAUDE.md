@@ -73,12 +73,14 @@ python -m construction_agent.main
 >
 > `scripts/eval_with_gt.py` 的 `BASE` 仍硬编码指向主仓库下**已不存在**的 6 策略目录，
 > 重算前须改指本 worktree 的 `experiments/experiment_6strategies`（2026-10-05 之前只能
-> 指 fix-collectors worktree）；`experiment3.runner` 仍只在那边有（见下）。
+> 指 fix-collectors worktree）；`experiment3.runner` 已于同日从 git 回收进本仓库（见下）。
 >
 > ⚠️ **表 7 六列的复现**：F1/Recall/Precision/Type/Sev 出自 `eval_with_gt.py` 的 stdout，
 > `check_tables_v2.py` 因此内联了一份**按索引对齐**的 `compute_metrics` 复现它（被封存
-> 那版用 `list.index(pred)` 反查位置，遇到重复条目会错位，系统性抬高 F1/Precision
-> 0.001–0.007）。复现保真度：Recall 与两个 acc 六策略全中，F1 差 ≤0.003。
+> 那版用 `list.index(pred)` 反查位置，遇到重复条目会错位——**2026-10-05 源回收后
+> 实测**：六策略 F1 全部单向抬高 +0.001~+0.004、Precision +0.002~+0.009，而
+> Recall 与两个 acc **无差**（tp 两版同用索引对齐，错只错在 fp 的反查上）。复现
+> 保真度：Recall 与两个 acc 六策略全中，F1 差 ≤0.003。
 >
 > ⚠️ **表 7 的「有效输出率」「耗时」两列与同表其余六列不同源**（2026-10-05 查明）：
 > 定义在 V1 草稿方法节（Valid-output rate = 编码率，至少提取到一个编码的样本百分比；
@@ -86,11 +88,11 @@ python -m construction_agent.main
 > 全不符，均值/中位数/p75/截尾均值/仅有效案例均值五种统计量都不命中。脚本把两批对照
 > 动态打印，改用哪批须作者裁决。见对账记录第二十六节。
 >
-> ⚠️ **`construction_agent/evaluation/experiment1|2|3` 的源文件在主仓库工作副本缺失**
-> （只剩 `.pyc`，实测 8/3/1 个，零个 `.py`）：副本只在 fix-collectors worktree。它们
-> 已进 git（`1c14cde`）故数据不会丢，但主仓库读不到源——与蓝图第七节"论文实验资产
-> 不可封存"相矛盾。见对账记录第十六节 16.7。**六策略产物那一半已于 2026-10-05 收回
-> 本 worktree**（第二十八节），这三个 experiment 待处理。
+> ⚠️ **`construction_agent/evaluation/experiment1|2|3` 已归档在本仓库**（2026-10-05 从
+> git `1c14cde` 回收，17 个 `.py`；此前主仓库工作副本只剩 `.pyc`，源只在 fix-collectors
+> worktree）。它们是**论文实验对照物，勿用于生产**——生产编码链路是 `step1_basic_extractor`
+> + `step2_caics_encoder` 的 CAICS 五层。`scripts/eval_with_gt.py:5` 仍 import 其中的
+> `experiment3.runner.compute_metrics`，回收前那句 import 必失败。见对账记录第二十九节。
 
 - `experiments/ablation_gatekeeping/summary.json` — 2×2 消融（新样本 4×100）
 - `experiments/ablation_gatekeeping/gt_recovered.json` — 三专家多数投票真值
@@ -141,11 +143,11 @@ python -m construction_agent.main
 - [x] **2026-10-04 四类核验一键入口 + 表 10 溢出判据复测**：新增 **`scripts/check_v2_all.py`**（按序跑引用/结构/数字/措辞并汇总，改稿流程第 5 步改用它）。汇总行提取有个坑：**不能按 `✅/❌` 前缀找**——`check_xref_v2.py` 的结论行是"合计待处置：0"，反倒它的中间过程行带 ✅，按前缀会抓到中间结论；规则改为"末尾往前第一个非缩进非空行"。失败路径已自证（monkeypatch CHECKS 跑三场景：脚本不存在／退出码非 0／全通过 → 返回 1/1/0）。**表 10 末行 2.86pt 改判可接受并补上判据**：PyMuPDF 阈值降到 **1.5pt** 复测，中英双版**均无 span 越过纸张边界**——说明它是 Overfull hbox（超版心）而非超纸张，仅表现为表格右框线多伸约 1mm，**故不动已定稿的表格措辞**。见 `docs/paper_v2/修订对账记录.md` 第十三节
 - [x] **2026-10-04 ESWA 投稿要件完备性核查 + Highlights 起草**：前五类核验都查"论文自身对不对"，本轮补上"期刊要件齐不齐"。逐项核查：正文/声明/CRediT/Data availability/Funding/Ethics/Code availability/Use of AI tools 全部已备（§7 共 7 项声明），**唯一硬缺口是 Highlights**（Elsevier 必交独立文件，3–5 条 × ≤85 字符），另有 cover letter 仍需出 V2 版。已起草 `docs/paper_v2/highlights.md`（5 条，72/53/76/71/68 字符，附中文对照与逐条溯源表）；新增 **`scripts/check_highlights_v2.py`** 查四项（条数/字符数/禁用措辞/数字须在正文清单上，后两项是关键——Highlights 单独送到审稿人眼前，最容易出现没依据的漂亮话），失败路径自证 3/3。**待作者确认**：五条措辞的取舍。见 `docs/paper_v2/修订对账记录.md` 第十四节
 - [x] **2026-10-04 投稿信 V2 版重写 + 校验脚本**：V1 版（`docs/paper/cover_letter.md`）写于 V2 修订之前，**有 3 处论断在 V2 正文中已不存在**——①"反转了 Liu et al. 的排序"（V2 仅把 Liu 用作维度级匹配的指标定义与表 10 对比项，已删去"挑战已发表工作"）②"Fleiss' Kappa 0.859–1.000"（V2 通篇无 Fleiss）③"MECE other 类由 18.9% 降到 2.9%"（V2 的 2.9% 是 WT02 字段占比，无关）；另有 4 处禁用措辞（the first controlled decomposition／causally isolates／verified expert applicability ×2）。已重写 `docs/paper_v2/cover_letter_v2.md`（标题用 V2 标题、贡献按 V2 口径、范围声明随正文、8 个数字全部有正文依据）。新增 **`scripts/check_cover_letter_v2.py`**（数字有据／禁用措辞／标题一致），**用它跑 V1 报错、跑 V2 放行**；并据此扩展 `check_forbidden_v2.py` 覆盖三种"软"违规形态（自测 18→21 条，正文仍 0 违规命中总数不变）。见 `docs/paper_v2/修订对账记录.md` 第十五节
-- [x] **2026-10-04 表格数字 ↔ 源数据对账（第五类核验）**：新增 **`scripts/check_tables_v2.py`**，补上数字清单的盲区——清单只登记"全文统一值"，表 5/6/7/8/9 里几百个只出现一次的数从来不在清单上（故第十/十一节"零缺陷"并不覆盖它们）。**五张表中英各 194 格 = 388 格逐格对上，2.9s**。**表 7 是唯一没有落盘产物的一张**，顺藤查出三个连锁问题：①它的 F1/CI 只来自 `eval_with_gt.py` 的 stdout；②该脚本依赖的 `evaluation/experiment3/runner.py` **主仓库只剩 .pyc 且未进归档**（与蓝图"实验资产不可封存"矛盾，副本只在 fix-collectors）；③那份 runner.py 用 `predictions.index(pred)` 反查位置，遇重复条目（各策略 3–13 条）恒取首个匹配，**系统性抬高 F1/Precision 0.001–0.007**——正文用的是按索引对齐的口径，故脚本内联对齐版复现（Recall 与两个 acc 六策略全中，F1 差 ≤0.003，容差 0.005）。表中「有效输出率」「耗时」两列**无源可核**，脚本每次显式列出而非跳过。失败路径自证 5/5、`--self-test` 9/9；一键入口扩为**七项**。见 `docs/paper_v2/修订对账记录.md` 第十六节
+- [x] **2026-10-04 表格数字 ↔ 源数据对账（第五类核验）**：新增 **`scripts/check_tables_v2.py`**，补上数字清单的盲区——清单只登记"全文统一值"，表 5/6/7/8/9 里几百个只出现一次的数从来不在清单上（故第十/十一节"零缺陷"并不覆盖它们）。**五张表中英各 194 格 = 388 格逐格对上，2.9s**。**表 7 是唯一没有落盘产物的一张**，顺藤查出三个连锁问题：①它的 F1/CI 只来自 `eval_with_gt.py` 的 stdout；②该脚本依赖的 `evaluation/experiment3/runner.py` **主仓库只剩 .pyc 且未进归档**（与蓝图"实验资产不可封存"矛盾，副本只在 fix-collectors）；③那份 runner.py 用 `predictions.index(pred)` 反查位置，遇重复条目（各策略 3–13 条）恒取首个匹配，**系统性抬高 F1/Precision**（2026-10-05 源回收后实测：六策略 F1 全部单向 +0.001~+0.004、Precision +0.002~+0.009，而 Recall 与两个 acc 无差——tp 两版同用索引对齐，错只错在 fp 的反查上；见第二十九节）——正文用的是按索引对齐的口径，故脚本内联对齐版复现（Recall 与两个 acc 六策略全中，F1 差 ≤0.003，容差 0.005）。表中「有效输出率」「耗时」两列**无源可核**，脚本每次显式列出而非跳过。失败路径自证 5/5、`--self-test` 9/9；一键入口扩为**七项**。见 `docs/paper_v2/修订对账记录.md` 第十六节
 - [x] **2026-10-04 表 2 三方对账（论文 ↔ 生产提示词 ↔ 主库）**：表 2 是 CAICS 编码体系的操作定义表，是论文核心却从未自动核过。新增三方核验（英 38 格 / 中 114 格 = **152 格**）：①19 类 code 在主库 `caics_causes`、`step2_caics_encoder.py` 生产提示词、论文表 2 **三处集合完全一致**；②层归属（M/F/H/T/C 行标题 ↔ code 首字母）19/19；③中文类名 ↔ 主库落库类名 19/19；④关键词列 57 个逐词核「核心概念能否在该类证据里找到」。**结论零缺陷**，本轮未动正文、四格式无需重出。**一处"看着像缺陷、查完是合规"**：57 个关键词里 **31 个整词零命中**（如「监理未到场」「防坠器失效」「制动失灵」），一度疑似编造——放宽到 2-gram 复核后 **27 个的核心概念在该类语料里明确存在**（「监理」336 条、「隐患」575 条、「教育」454 条、「交底」195 条、「护栏」43 条），即该列确为**语料表述的规范化概括**，与表注「关键词为语料中中文表述的概括」一致。**判据的已知盲区已如实登记**：软判据只抓"整词与全部 2-gram 都零命中"的凭空概念，**抓不到用真词拼凑的伪词**（自证用例「外星人施工」被 F4 类高频的「施工」救活，退出码仍 0）——不收紧阈值来骗过自测，因为那会误伤「提升机故障」这类合法概括词、并制造"已强核验"的错觉。见 `docs/paper_v2/修订对账记录.md` 第十八节
 - [x] **2026-10-04 表格核验扩到主库侧 + 表 3 一处数值勘误**：`check_tables_v2.py` 的源从"实验产物文件"扩到**主库只读**，新增表 1（来源分布 18 格）、表 3（MECE 枚举 30 格）、表 4（数据库统计 17 格）× 中英 = **130 格**，总计 388→**518 格**。表 1 与表 4 **全中**；表 3 查出**唯一真缺陷**——工序行残余"其他"写 **2.9%，实为 2.8%**（WT99 62/2,202 = 2.816%；2.9% 对应 63–64 条，即写作时该字段比现在多 1–2 条）。口径已坐实：五字段各只有一个"其他"类，其余四行（1.9/11.1/6.3/3.6%）与其余 29 格全部与现库一致。已改正文（中英同步）、四格式重出、V1→V2 对比重出、七项核验 0。**两处无源可核**：①表 4「CLIP-filtered images 226」——`image_files` 1,108 行全为 downloaded，**无 clip_score / 过滤标记列**，分数从未落库，226 的源已不可考（§「62.4%」那句同用此数）；②表 1 年代列（表中 2005–2026 vs safehoo 实为 2008–2026），口径疑为采集计划声明，需作者定义。**→ ① 2026-10-05 查明源在文件系统、已转入核验（第二十五节）；② 2026-10-05 查明为时代区块、已接入弱判据（第二十七节）。****坑**：`len(row)<6` 把 5 列的表 3 整张滤掉、行首带括号须前缀匹配、`WT02` 会被数字正则当成 2、中文表用全角逗号与全角括号、表 4 一行多值须按数字集合判定。见 `docs/paper_v2/修订对账记录.md` 第十七节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
-- [ ] **实验框架源文件回归主仓库（六策略那半已结）**：`experiments/experiment_6strategies/`（六策略原始输出）**已于 2026-10-05 复制回本 worktree**（2.3 MB / 27 文件，`diff -rq` 无差异，见对账记录第二十八节）。仍待处理的是 `construction_agent/evaluation/experiment1|2|3`——主仓库工作副本只剩 `__pycache__`（实测 8/3/1 个 `.pyc`，零个 `.py`），源只在 fix-collectors worktree（**已进 git `1c14cde`，数据不会丢，但主仓库读不到源**）。落点需判断：`construction_agent/evaluation/` 属生产路径，而这三个 experiment 是**实验对照物**，须与第十六节"区分生产链路与实验对照物"的处置原则一致（见对账记录第十六节 16.7、第二十八节 28.6）
+- [x] **实验框架源文件回归主仓库（2026-10-05 全部结清）**：①`experiments/experiment_6strategies/`（六策略原始输出，2.3 MB / 27 文件）已复制回本 worktree 并提交——此前 `check_tables_v2.py` 读的是 fix-collectors 的**文件系统路径**，那个 worktree 一清理表 7 就核不了（见第二十八节）；②`construction_agent/evaluation/experiment1|2|3`（17 个 `.py`）已从 git `1c14cde` **回收到原位**——此前主仓库工作副本只剩 `__pycache__`（实测 8/3/1 个 `.pyc`，零个 `.py`）而源只在 fix-collectors worktree。回收后 `scripts/eval_with_gt.py:5` 那句 `from construction_agent.evaluation.experiment3.runner import compute_metrics` 恢复可用（回收前必 ImportError）。**属实验对照物、勿用于生产**（生产编码链路是 step1+step2 的 CAICS 五层）。见对账记录第二十八、二十九节
 - [ ] **表 7 的「Valid-output rate / Time」两列须作者裁决**（2026-10-05 查明，见对账记录第二十六节）：定义已明确——**Valid-output rate = 编码率（至少提取到一个编码的样本百分比）；Time (s) = 每样本平均推理秒数 × 100**（出自 V1 方法节 `archive_20260713/caiems_paper_draft_zh.md:167`，换算规律经 V1 表 3 六格验证）。**但这两列与同表其余六列不同源**：F1/Recall/Precision/Type/Sev 六列出自落盘的 `experiment_6strategies` 批（V2 重算过，S5 从 0.488→0.665），这两列出自**未落盘的 V1 批**。落盘批实测与之不符：编码率 90/100/85/87/100/100（论文 96/100/85/92/99/100）、耗时 1933/2043/2879/2823/2666/6050（论文 1382/1302/2401/1735/1843/5430），且均值/中位数/p75/截尾均值/仅有效案例均值**五种统计量全部不命中**——排除"统计量取错"，确系另一批 run。**建议用落盘批重算**（同表同源）；改动会牵动表注、§4.4.2 附近表述、四格式与数字清单。脚本已把两批对照动态打印在 C 段（`t7_unbacked_cols()`），每次核验都可见
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照

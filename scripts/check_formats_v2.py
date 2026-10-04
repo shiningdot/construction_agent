@@ -129,6 +129,30 @@ def unmark(s):
     return re.sub(r'[*`]', '', s)
 
 
+def refs_start(src):
+    """参考文献区的起点（正文与文献条目在成品的排版路径完全不同）。"""
+    m = re.search(r'^#+ *(References|REFERENCES|参考文献)\s*$', src, re.M)
+    return m.start() if m else len(src)
+
+
+def sec_refs(src):
+    """TeX 侧须豁免的编号：md 标题自带的编号 + 正文的章节交叉引用。
+
+    TeX 用 `\\section` 自动编号、用 `\\ref` 生成引用号，正文里没有字面编号
+    （DOCX 侧则由构建脚本写入字面编号，故 DOCX 端能命中）。不豁免的话，
+    会拿"TeX 不写死编号"这个正确设计当缺陷报——实测正文区 313 个 token
+    唯一缺的就是标题编号 `2.1`。
+
+    只豁免**编号性**的 token：作为数据出现的同一个数（如"3.2 天"）不豁免。
+    """
+    heads = {m.group(1)
+             for m in re.finditer(r'^#{1,6}\s+(\d+(?:\.\d+)*)\b', src, re.M)}
+    refs = {m.group(1) or m.group(2)
+            for m in re.finditer(r'(?:Section|Sect\.|Sec\.)\s*(\d+(?:\.\d+)*)'
+                                 r'|(\d+(?:\.\d+)*)\s*节', src)}
+    return heads | refs
+
+
 def escapes(text):
     """未展开的 TeX 残留：裸 $ 或 \\command（本项目正文不含 LaTeX 源码）。"""
     return {'$': text.count('$'),
@@ -195,6 +219,25 @@ def main(verbose=False):
     for tag, (md, dx, tx, pf) in PAPERS.items():
         src = (D / md).read_text(encoding='utf-8')
         toks = data_tokens(src)
+        # TeX 侧只核正文区、且只能核数字 token：中文在 LaTeX 里逐字断行，
+        # 段落首 24 字符几乎必然跨行（实测 ZH 129 段缺 101 段），比不得。
+        # 参考文献区一律不比——DOI 与卷期号在那里被 \allowbreak 断开
+        # （实测正文区 313 个 token 只缺 1 个，全量则缺 21 个，20 个是文献区）。
+        tex_note = ''
+        if (D / tx).exists():
+            tex = (D / tx).read_text(encoding='utf-8')
+            body = src[:refs_start(src)]
+            secs = sec_refs(src)
+            miss = sorted(t for t in data_tokens(body) if t not in tex)
+            real = [t for t in miss if not DOI_LIKE.match(t) and t not in secs]
+            if real:
+                problems.append(f'{tag} TeX: {len(real)} 个正文数字未出现在 .tex 里 '
+                                f'—— {real[:10]}')
+            tex_note = (f'，TeX 正文区缺 {len(real)}'
+                        + (f'（豁免章节号 {len([t for t in miss if t in secs])}）'
+                           if any(t in secs for t in miss) else ''))
+            print(f'  {"✅" if not real else "❌"} {tag} TeX: 正文区 '
+                  f'{len(data_tokens(body))} 个 token{tex_note}')
         if not (D / dx).exists() or not (D / pf).exists():
             continue
         for label, text in (('DOCX', docx_text(D / dx)), ('PDF', pdf_text(D / pf))):
@@ -398,12 +441,18 @@ def self_test():
     ck('Overfull 空基线', unregistered_overfull([0.4], []), [0.4])
     ck('Overfull 配对不重复用', unregistered_overfull([2.856, 2.856], [2.85558]),
        [2.856])
+    # TeX 豁免：标题编号与章节交叉引用须豁，作为数据的同一个数不得豁
+    ck('TeX 豁免编号', sorted(sec_refs('### 2.1 小节\n见 Section 3.2 与 4.4.2 节\n'
+                                        '共 3.2 万条')),
+       ['2.1', '3.2', '4.4.2'])
+    ck('参考文献区起点', refs_start('正文\n## References\n[1] x') > 0, True)
+    ck('无 References 时取全文', refs_start('正文只有这些'), 6)
 
     print('\n' + '=' * 72)
     if fails:
         print(f'❌ {fails} 条自测失败——判定逻辑有问题')
         return 1
-    print('✅ 自测全过：标题/数字/残留/豁免/日志五类判据都能报错')
+    print('✅ 自测全过：标题/数字/残留/豁免/日志/TeX豁免六类判据都能报错')
     return 0
 
 
@@ -412,7 +461,9 @@ def drift_test():
 
     往 DOCX 的 document.xml 里注入四类漂移（改数字 / 插 `$` / 动标题样式 /
     改正文文字），逐例跑主流程并断言退出码转 1。DOCX 是 zip，重打包即可，
-    成品不受影响（全程在临时目录）。
+    成品不受影响（全程在临时目录）。另两类走不同的注入面：B 段 TeX 行改
+    临时目录里的 `.tex`，G 段换日志目录（成品文件一个不动，A–F 照常全绿）
+    ——每一类都必须有一条"改了就该报"的失败路径，否则该判据等于没接。
     """
     import shutil
     import tempfile
@@ -476,6 +527,33 @@ def drift_test():
                   + (f'，报出 {line[:70]}' if caught else ' —— 没报出来！'))
             shutil.rmtree(tmp, ignore_errors=True)
 
+        # B 段 TeX 行用例：只动 .tex 里的一个数（DOCX / PDF 与日志都不动，
+        # 故 A–F 其余各行照常全绿），断言 B 段的 TeX 行能把这处"TeX 与源脱节"
+        # 单独抓出来——否则 TeX 行是只核了个必然为真的空集
+        D = orig
+        tmp = base / 'tex'
+        shutil.copytree(orig, tmp)
+        texp = tmp / 'eswa_paper_v2_en.tex'
+        if texp.exists() and '16,323' in texp.read_text(encoding='utf-8'):
+            texp.write_text(texp.read_text(encoding='utf-8')
+                            .replace('16,323', '16,333'), encoding='utf-8')
+            D = tmp
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = main()
+            out = buf.getvalue()
+            caught = rc == 1 and '个正文数字未出现在 .tex 里' in out
+            ok += caught
+            line = next((l.strip() for l in out.splitlines()
+                         if '个正文数字未出现在 .tex 里' in l), '')
+            print(f'{"✅" if caught else "❌"} B  TeX 数字脱节：退出码 {rc}'
+                  + (f'，报出 {line[:70]}' if caught else ' —— 没报出来！'))
+            shutil.rmtree(tmp, ignore_errors=True)
+        else:
+            print('❓ B  TeX 数字脱节：.tex 里没有 16,323，用例失效')
+
         # G 用例：只把日志目录换到注入过的副本（D 不动，A–F 段照常全绿），
         # 断言 G 段能把字形缺失抓出来——否则 G 段是唯一没有失败路径自证的判据
         D = orig        # 上一轮的 tmp 已删，须先摆回，否则 A–F 段读不到文件
@@ -510,10 +588,11 @@ def drift_test():
         shutil.rmtree(base, ignore_errors=True)
 
     print('\n' + '=' * 72)
-    if ok != 5:
-        print(f'❌ 失败路径 {ok}/5——有漂移抓不住')
+    if ok != 6:
+        print(f'❌ 失败路径 {ok}/6——有漂移抓不住')
         return 1
-    print('✅ 失败路径 5/5：数字 / 转义 / 结构 / 正文文字 / TeX 日志五类漂移都能抓住')
+    print('✅ 失败路径 6/6：数字 / 转义 / 结构 / 正文文字 / TeX 数字 / '
+          'TeX 日志六类漂移都能抓住')
     return 0
 
 

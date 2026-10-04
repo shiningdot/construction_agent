@@ -132,7 +132,29 @@ The Construction Accident Integrated Cause System (CAICS) is a 5-layer, 19-categ
 
 **Table 2.** The CAICS coding scheme: operational definitions.
 
-[表2占位：待手绘 — 5 层 19 类操作定义表]
+| Layer | Code | Category | Operational definition | Typical evidence keywords |
+|-------|------|----------|------------------------|---------------------------|
+| **M — Management foundation** | M1 | Deficient supervision | No competent supervisor present, or supervision failed to detect and halt an unsafe state | unsupervised work; supervisor absent; no on-site intervention |
+| | M2 | Hazard inspection failure | Hazards not inspected, not rectified, or allowed to persist over time | hazard left unrectified; perfunctory inspection; repeated reports ignored |
+| | M3 | Inadequate safety training | No induction training or an ineffective safety briefing; workers lacking required safety knowledge | no three-level education; no pre-shift briefing; procedure unknown to workers |
+| | M4 | Procedural and regulatory gaps | No safety plan, no emergency plan, or an incomplete site management system | no special construction scheme; emergency plan missing; rules not established |
+| | M5 | Irregular market conduct | Contracting without qualification, unlawful subcontracting, delegation, or compressed schedule | contractor unqualified; illegal subcontracting; schedule compressed |
+| **F — Protection failure** | F1 | Missing edge and opening protection | No guardrail, no safety net, an uncovered opening, or an unprotected edge | no guardrail at the shaft; safety net absent; opening left uncovered |
+| | F2 | Unstable support system | Formwork or scaffold instability, insufficient shoring, or temporary-structure failure | formwork support collapsed; scaffold unstable; shoring insufficient |
+| | F3 | Safety device failure | Limit switches defeated, fall arresters failed, or safety devices damaged or not fitted | limiter bypassed; arrester failed; device removed |
+| | F4 | Personal protective equipment unused | Safety harness, helmet, or other personal protective equipment not worn where required | harness not attached; helmet not worn; PPE absent |
+| **T — Trigger conditions** | T1 | Equipment and machinery failure | Equipment breakdown, wire-rope failure, mechanical fault, or brake failure | hoist failed; wire rope snapped; brake malfunction |
+| | T2 | Abnormal material state | Loading beyond design capacity, defective material, or material instability | stockpile over capacity; material defect; soaked material gained weight |
+| | T3 | Geological or ground change | Water ingress, slope instability, foundation settlement, or running sand | sudden water inflow; slope failure; foundation settlement |
+| | T4 | Meteorological or hydrological trigger | Heavy rain, high wind, ice and snow, lightning, or sustained rainfall | rainstorm; gale; sustained rainfall; lightning |
+| **H — Human acts** | H1 | Procedure violation | Work performed against the approved method, an unauthorized method change, or non-compliant erection | not built to the scheme; method changed without approval; erected off-code |
+| | H2 | Improper command or decision | Work ordered or continued despite a known, identified hazard | ordered to proceed; risk known and work continued |
+| | H3 | Risk-perception failure | Hazard not recognized, or recognized but misjudged | hazard not noticed; risk misjudged; inattention |
+| | H4 | Improper emergency behavior | Unprotected rescue attempts, delayed evacuation, or rescue methods that worsened the outcome | rescue rushed without protection; wrong rescue method; evacuation delayed |
+| **C — Consequence amplification** | C1 | Delayed rescue response | Rescue began late, no emergency plan was in force, or secondary collapse obstructed rescue | delayed rescue; secondary collapse; no emergency plan in force |
+| | C2 | Concealed or delayed reporting | Failure to report, under-reporting, or late reporting of the accident | accident unreported; casualty figure concealed; report filed late |
+
+*Keywords paraphrase the Chinese expressions that occur in the corpus. The share of codes resting on inference rather than direct quotation varies by layer — 12.0% in the management layer against 3.1% in the trigger layer — consistent with the three-tier evidence scheme of Section 3.1.*
 
 Two design features distinguish CAICS from aviation-derived HFACS adaptations (Shappell and Wiegmann, 2000; Liu et al., 2025a): the F layer captures physical protection failures endemic to construction, and the C layer records consequence-amplification factors such as delayed or concealed reporting. The scheme was derived through corpus-driven induction under the leak model: causal statements were extracted from the corpus, clustered into candidate categories, and consolidated into the five layers, with categories below a frequency floor merged or dropped; each retained category received an operational definition and corpus-derived evidence keywords. We emphasize the scope of this claim: the derivation protocol was an iterative engineering procedure rather than a formal content-validity study, and no comparative validation against 24Model (Xuecai et al., 2024), Accimap, or HFACS on independent data has yet been performed. CAICS is therefore positioned in this paper as an operational scheme for this database — a finite, LLM-oriented coding frame with explicit definitions — not as an established causal theory. Its usability evidence consists of the expert annotation agreement on the 100-record strategy sample (Fleiss' kappa 0.859–1.000 across layers, Section 4.1).
 
@@ -478,4 +500,4 @@ The six prompting strategies are summarized below; verbatim prompts are included
 
 ---
 
-*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。六张插图已由 `scripts/gen_paper_figures.py` 生成并插入（Figure 1–6），图中分布数字随主库现读；表 2 仍为占位，待补。*
+*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。六张插图已由 `scripts/gen_paper_figures.py` 生成并插入（Figure 1–6），图中分布数字随主库现读；表 2（5 层 19 类操作定义）已按生产提示词补全，定义与落库类名逐条核对一致，表注给出实测的各层推断占比。*

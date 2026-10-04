@@ -114,11 +114,32 @@ _FULL_LIST_MAX = 60
 _HARD_STOP = 200
 
 
-def _median(xs: list[int]) -> int:
+def _median(xs: list[int]) -> int | None:
+    """样本中位数；**一个样本都没有时返回 `None`，不是 `0`**。
+
+    `0` 在这张表里是一个**可能的真值**——抓到了详情页、正文确实是 0 字。
+    「一个样本都没量到」不是。两者此前长得一样（`_median([])` 返回 `0`），
+    于是 `hub_em`（压根没连上）、`jx_em`（列表页解析出 0 条）、`sc_em`（列表
+    4 条全被初筛排除、没抓过详情页）在「正文中位」一栏**都显示 `0`**，读起来
+    像三家都量到了 0 字——而这三种情况需要修的东西完全不同。
+
+    表格里 `—` 表示不适用，与同表的「列表」「耗时」两列一致；控制台那条路径
+    本来就有 `if res["count"]` 挡着，只有表格这条漏了。
+    """
     if not xs:
-        return 0
+        return None
     ys = sorted(xs)
     return ys[len(ys) // 2]
+
+
+def _median_cell(chars: list[int]) -> str:
+    """「正文中位」一格的渲染：**没有样本是 `—`（不适用），不是 `0`**。
+
+    抽成函数是为了让这条判据可测——它此前埋在 `main()` 的 print 里，和同表
+    另外两列（「列表」「耗时」）的处理分居两处，于是只有它漏了守卫。
+    """
+    med = _median(chars)
+    return "—" if med is None else str(med)
 
 
 # --------------------------------------------------------------------------
@@ -519,7 +540,8 @@ def _fmt_line(res: dict) -> str:
     chars = [r["chars"] for r in res["rows"]]
     med = _median(chars)
     listed = res.get("listed")
-    extra = f"正文中位 {med} 字" if res["count"] else (res.get("error") or "")[:60]
+    extra = (f"正文中位 {med} 字" if med is not None
+             else (res.get("error") or "")[:60])
     tail = "" if listed is None else f"列表 {listed}"
     clo = _closure_cell(res)
     clo = "" if clo == "—" else f"闭环 {clo}"
@@ -700,7 +722,7 @@ def main() -> int:
             print(f"| `{r['key']}` | {spec.group if spec else '?'} | {_status_of(r)} "
                   f"| {_count_cell(r)} | {'—' if listed is None else listed} "
                   f"| {_closure_cell(r)} "
-                  f"| {_median(chars)} | {el} | {r.get('note','')} |")
+                  f"| {_median_cell(chars)} | {el} | {r.get('note','')} |")
         print("\n> `条数` 带 `*` = 被早停截断，等于 `--limit`，**不是抓到了这么多**；"
               "不带 = 列表本就短，跑到底的真实候选数。两者不要横向比。")
 

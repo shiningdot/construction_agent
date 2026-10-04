@@ -153,7 +153,7 @@ def build_docx(src, out, is_zh):
     print(f'DOCX: {out}')
 
 def _add_runs(p, s, is_zh):
-    tokens = re.split(r'(\*\*.+?\*\*|\*[^*]+?\*)', s)
+    tokens = re.split(r'(\*\*.+?\*\*|\*[^*]+?\*|\$[^$]+\$)', s)
     for tok in tokens:
         if not tok:
             continue
@@ -165,11 +165,39 @@ def _add_runs(p, s, is_zh):
                 r = p.add_run(tok[2:-2]); r.bold = True
         elif tok.startswith('*') and tok.endswith('*') and len(tok) > 2:
             r = p.add_run(tok[1:-1]); r.italic = True
+        elif tok.startswith('$') and tok.endswith('$'):
+            _add_math(p, tok[1:-1])
         else:
             if is_zh:
                 cjk_runs(p, tok)
             else:
                 p.add_run(tok)
+
+
+# DOCX 路径不经过 esc()，此前 $T = \{t_1, \dots, t_N\}$ 是原样输出的——读者在 Word
+# 里看到的是美元号和反斜杠命令本身。Word 没有轻量的行内公式写入口（OMML 要手工拼
+# XML），退而用「斜体正文 + 真下标」，足以表达 t_i、x_ij 这类记号。
+_MATH_MAP = {'\\dots': '…', '\\in': '∈', '\\iota': 'ι', '\\{': '{', '\\}': '}'}
+
+
+def _add_math(p, tex):
+    s = tex
+    for k, v in _MATH_MAP.items():
+        s = s.replace(k, v)
+    s = re.sub(r'\\text\{([^}]*)\}', r'\1', s)   # \text{explicit} -> explicit
+    # 剩下的 \ 是没映射到的命令，去掉反斜杠总比原样露出好（现只有这几条，实际不会走到）
+    s = s.replace('\\', '')
+    # _ 之后跟 {...} 取整组作下标，否则取一个字符
+    for part in re.split(r'(_(?:\{[^}]*\}|.))', s):
+        if not part:
+            continue
+        if part.startswith('_'):
+            r = p.add_run(part[1:].strip('{}'))
+            r.italic = True
+            r.font.subscript = True
+        else:
+            r = p.add_run(part)
+            r.italic = True
 
 def cjk_sub(r, s, font_zh):
     r.text = s
@@ -183,6 +211,17 @@ NUMPFX = re.compile(r'^\d+(?:\.\d+)*\.?\s+')
 
 
 def esc(s):
+    # markdown 里已经写好的 $...$ 数学片段必须整段保护：下面的 replace 会把 _ 转义成
+    # \_，于是 $t_i$、$x_{ij}$ 变成 $t\_i$，渲染成字面下划线而不是下标（实测 §3.1 全段
+    # 如此）。先抽成占位符，所有转义做完再原样放回。全文 $ 配对已核（两版各 10 处，
+    # 无奇数行），不会误吞正文。
+    math = []
+
+    def _stash(m):
+        math.append(m.group(0))
+        return f'\x00{len(math) - 1}\x00'
+
+    s = re.sub(r'\$[^$\n]+\$', _stash, s)
     # 反引号代码片段（文件路径、字段名）是正文里最长的不可断串，实测把行推出页外
     # 41pt；先原样插断点，之后再轮到 _ % # 这些转义
     s = re.sub(r'`([^`]+)`',
@@ -208,7 +247,7 @@ def esc(s):
     # （\allowbreak{} 后面跟空组，免得 TeX 把紧跟的空格一并吃掉）
     s = re.sub(r'https?://[^\s]+',
                lambda m: re.sub(r'([/.-])', r'\1\\allowbreak{}', m.group(0)), s)
-    return s
+    return re.sub(r'\x00(\d+)\x00', lambda m: math[int(m.group(1))], s)
 
 def _disp_pt(s):
     """估算字符串宽度（pt）：11pt 字号下 CJK 约 1em(11pt)、ASCII 约 0.5em(5.5pt)。"""

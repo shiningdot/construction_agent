@@ -63,12 +63,12 @@ Kong and Ahn (2024) systematically reviewed knowledge graphs for construction sa
 
 \section{System}
 \subsection{Problem formulation and the evidence-tier annotation scheme}
-Let $T = \{t\_1, t\_2, \dots, t\_N\}$ denote a corpus of unstructured accident narratives (median 517 characters in our corpus). The pipeline transforms each $t\_i$ into a structured record $r\_i = (b\_i, c\_i)$: a basic information vector $b\_i$ covering 33 pre-defined fields, and a causal annotation set $c\_i = \{(x\_{ij}, e\_{ij}, \iota\_{ij}, q\_{ij})\}$, where $x\_{ij}$ is a causal code from the CAICS scheme, $e\_{ij}$ is the supporting text, $\iota\_{ij}$ is the inference chain, and $q\_{ij} \in \{\text{explicit}, \text{inferred}, \text{prior}\}$ is the evidence tier.
+Let $T = \{t_1, t_2, \dots, t_N\}$ denote a corpus of unstructured accident narratives (median 517 characters in our corpus). The pipeline transforms each $t_i$ into a structured record $r_i = (b_i, c_i)$: a basic information vector $b_i$ covering 33 pre-defined fields, and a causal annotation set $c_i = \{(x_{ij}, e_{ij}, \iota_{ij}, q_{ij})\}$, where $x_{ij}$ is a causal code from the CAICS scheme, $e_{ij}$ is the supporting text, $\iota_{ij}$ is the inference chain, and $q_{ij} \in \{\text{explicit}, \text{inferred}, \text{prior}\}$ is the evidence tier.
 
 The three tiers carry different epistemic commitments, and the database stores and reports them separately:
 
 \begin{itemize}
-\item \textbf{explicit}: the source text contains a passage that directly supports the code; $e\_{ij}$ is a verbatim quotation. Only explicit codes are presented as evidence-backed in the Web interface.
+\item \textbf{explicit}: the source text contains a passage that directly supports the code; $e_{ij}$ is a verbatim quotation. Only explicit codes are presented as evidence-backed in the Web interface.
 \item \textbf{inferred}: the code is induced from the narrative by semantic paraphrase (e.g., a text stating "safety management inadequate" supports M1 without quoting any fixed keyword). The inference chain is recorded.
 \item \textbf{prior}: the code follows from domain assumptions authorized in the prompt (e.g., a fatal accident is taken to imply deficient supervision even when the text is silent). These codes are displayed with a prior label and are excluded from evidence-backed statistics.
 \end{itemize}

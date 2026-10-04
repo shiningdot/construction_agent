@@ -33,6 +33,13 @@ fp/fn 统计错位，**系统性抬高 F1 与 Precision**；正文表 7 用的�
 的 elapsed_total_sec 与表中的 Time 不符），按"源未落盘"单列报告，不计入
 退出码——它们不可能被自动核验，写在这里是为了不让它们悄悄混进"全绿"。
 
+表 4 的「CLIP-filtered images 226」原先与表 7 那两列同待遇（"源未落盘"），
+2026-10-05 查明**源在文件系统而非库里**：CLIP 过滤的产物落在 imageV3/
+（`pipeline_image_v2.py` 的管线串「… → CLIP过滤(>0.5) → imageV3/」），
+故该行改为读目录文件数（`clip_images()`）。主库 `image_files` 只登记 211 条
+imageV3 记录、比磁盘少 15，**拿库去核会核出一个 15 的假差**——这是登记滞后
+的数据问题，不影响论文数字（论文的 226 指 CLIP 通过后落盘的图片数）。
+
 用法：python3 scripts/check_tables_v2.py [--verbose | --self-test]
 退出码 0 = 五表逐格与源一致；1 = 有格不符或源不可达。
 """
@@ -352,6 +359,24 @@ def got_t7(text, probe):
 
 # ── 表 1 / 表 3 / 表 4：主库侧（源 = data/caiems_v2.db 只读）────────────
 DB = MAIN / 'data' / 'caiems_v2.db'
+# CLIP 过滤的产地在文件系统、不在库里：pipeline_image_v2.py 的管线串
+# 「Step1提取 → 搜索增强 → 图片采集 → CLIP过滤(>0.5) → imageV3/」把
+# clip_filter.py 判为正类「施工现场事故现场照片」softmax 概率 > 0.5 的图片
+# 落进 imageV3/。故论文表 4 的「226 images above the 0.5 similarity threshold」
+# 的源就是**这个目录的文件数**。
+IMGV3 = MAIN / 'data' / 'imageV3'
+
+
+def clip_images():
+    """CLIP 过滤后保留的图片数（= imageV3/ 下的文件数）。
+
+    与 check_figures_v2.py 的图 1 核验同源（论文里是同一个数）。
+    **主库不是这个数的源**：image_files 只登记 211 条 imageV3 记录，比磁盘
+    少 15（登记滞后，见 C 段），拿库去核会核出一个 15 的假差。
+    """
+    if not IMGV3.exists():
+        return None
+    return sum(1 for f in IMGV3.rglob('*') if f.is_file())
 
 
 def conn():
@@ -504,8 +529,8 @@ T4_ROWS = [
     ('causes', 'Causal annotations', '致因标注'),
     ('search', 'Search-enriched', '搜索增强'),
     ('vlm', 'VLM analyses', 'VLM 分析'),
+    ('clip', 'CLIP-filtered', 'CLIP 过滤'),
 ]
-T4_CLIP = ('CLIP-filtered', 'CLIP 过滤')
 
 
 def spec_t4(c):
@@ -527,6 +552,9 @@ def spec_t4(c):
     out[('vlm', 'v')] = [one(c, 'SELECT COUNT(*) FROM image_analyses')[0],
                          one(c, 'SELECT COUNT(DISTINCT accident_id) '
                                 'FROM image_analyses')[0]]
+    n_clip = clip_images()
+    if n_clip is not None:
+        out[('clip', 'v')] = [n_clip]
     return out
 
 
@@ -724,6 +752,10 @@ def main(verbose=False):
             diff(spec7, got_t7(txt, probe), '表7 六策略（复现）', t, TOL_T7, results)
 
     # 表 1 / 3 / 4：源 = 主库（只读）
+    if not IMGV3.exists():
+        # 表 4 的 CLIP 行源在文件系统而非库里，缺目录时须报"源不可达"，
+        # 不能因为 spec 里少了这一格就静默降级（那一格会滑进 extra 不报错）
+        miss_src.append(('imageV3/（CLIP 图片数的源）', IMGV3))
     if DB.exists():
         c = conn()
         try:
@@ -769,9 +801,11 @@ def main(verbose=False):
     print('  表 7 有效输出率 / 耗时 两列：现有源（S*_results.json 的 summary）'
           '只有 elapsed_total_sec 与 success，')
     print('  与表中值不符，故无法自动核验；如需核验须补留产生该表的运行记录。')
-    print('  表 4 「CLIP-filtered images 226」：主库 image_files 1,108 行、'
-          'download_status 全为 downloaded，')
-    print('  且无 clip_score / 过滤标记列——CLIP 分数从未落库，226 的源已不可考。')
+    print('  （2026-10-05 已转入核验，不再属于本段）表 4 「CLIP-filtered images 226」：'
+          '源 = 磁盘 imageV3/ 目录的文件数（clip_images()）。')
+    print('   原先记「源已不可考」是因为只在主库找——主库 image_files 只登记 211 条'
+          ' imageV3 记录、比磁盘少 15（登记滞后），')
+    print('   拿库去核会核出一个 15 的假差；CLIP 的产地在文件系统，不在库里。')
     print('  表 1 事故年代列：表中为采集计划口径，与主库 date 的实测 min/max 不一致'
           '（如 safehoo 实为 2008–2026，表中写 2005–2026），口径不明故不自动判负。')
     print('  表 2 关键词列：判据只抓「整词与全部 2-gram 在该类语料里都零命中」的凭空概念，')
@@ -878,6 +912,14 @@ def self_test():
     ok &= bool(r2[4])
     fails += not ok
     print(f'{"✅" if ok else "❌"} t4_compare：命中不报错、错值必报错')
+
+    # CLIP 行：源在文件系统（main 库不是它的源），读得到且为正整数。
+    # 目录缺失时 clip_images() 返回 None，由主流程报"源不可达"——
+    # 这不算自测失败（自测不依赖数据盘在不在），故 None 也放行
+    n_clip = clip_images()
+    ok = n_clip is None or isinstance(n_clip, int) and n_clip > 0
+    fails += not ok
+    print(f'{"✅" if ok else "❌"} clip_images() 读磁盘 imageV3/ → {n_clip}')
 
     print('\n' + '=' * 70)
     if fails:

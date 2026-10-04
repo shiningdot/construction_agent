@@ -26,6 +26,10 @@ MAIN = Path('/home/suntianhao/construction_agent')
 FIG = WT / 'docs' / 'paper_v2' / 'figures'
 GEN = WT / 'scripts' / 'gen_paper_figures.py'
 DB = MAIN / 'data' / 'caiems_v2.db'
+# 图 1 汇总行第 3 个数（226 images）的源：CLIP 过滤的产物落在文件系统，
+# 不在库里（`pipeline_image_v2.py` 的「… → CLIP过滤(>0.5) → imageV3/」）。
+# 与 check_tables_v2.py 的表 4 CLIP 行同源、同一个数。
+IMGV3 = MAIN / 'data' / 'imageV3'
 
 T9 = (MAIN / 'experiments' / 'experiment_kappa' / 'Basic' / '289' /
       'analysis' / 'agreement_metrics.json')
@@ -126,18 +130,25 @@ def check_fig1(conn, out):
     line = next((t for t in texts if 'records' in t), None)
     n = nums_in([line]) if line else []
     # 汇总行顺序：2,623 records | 16,323 causal codes | 226 images | 282 VLM analyses
-    # 第 3 个（226 images）无源可核，见 C 段；其余三个核主库
+    # 第 3 个（images）的源在文件系统不在库里（磁盘 imageV3/ 目录数），
+    # 与 check_tables_v2.py 的表 4 CLIP 行同源——2026-10-05 起不再留白
     want = [('records', 0, one(conn, 'SELECT COUNT(*) FROM accidents')[0]),
             ('causal codes', 1, one(conn, 'SELECT COUNT(*) FROM caics_causes')[0]),
             ('VLM analyses', 3, one(conn, 'SELECT COUNT(*) FROM image_analyses')[0])]
-    bad = []
+    n_clip = clip_images()
+    if n_clip is None:
+        bad0 = [f'images: 源不可达（{IMGV3} 不存在）']
+    else:
+        want.insert(2, ('images', 2, n_clip))
+        bad0 = []
+    bad = list(bad0)
     if len(n) != 4:
-        bad.append(f'汇总行应含 4 个数（含无源可核的 images），实提 {len(n)} 个')
+        bad.append(f'汇总行应含 4 个数，实提 {len(n)} 个')
     for nm, i, w in want:
         g = n[i] if i < len(n) else None
         if not near(g, w):
-            bad.append(f'{nm}: 图 {g} ≠ 主库 {w}')
-    out.append(('图1 汇总行 3 个数（images 留白）', len(want), bad, []))
+            bad.append(f'{nm}: 图 {g} ≠ 源 {w}')
+    out.append(('图1 汇总行 4 个数（images 源 = 磁盘 imageV3/）', 4, bad, []))
 
 
 def check_fig2(conn, out):
@@ -306,6 +317,22 @@ def one(c, sql):
     return c.execute(sql).fetchone()
 
 
+def clip_images():
+    """CLIP 过滤后保留的图片数（= imageV3/ 下的文件数）。
+
+    与 check_tables_v2.py 的 `clip_images()` 是同一个源、同一个算法：
+    `pipeline_image_v2.py` 的管线串「Step1提取 → 搜索增强 → 图片采集 →
+    CLIP过滤(>0.5) → imageV3/」把 `clip_filter.py` 判为正类「施工现场
+    事故现场照片」softmax 概率 > 0.5 的图片落进 imageV3/。
+
+    **主库不是这个数的源**（image_files 只登记 211 条 imageV3 记录，
+    比磁盘少 15），目录不存在时返回 None 由调用方报"源不可达"。
+    """
+    if not IMGV3.exists():
+        return None
+    return sum(1 for f in IMGV3.rglob('*') if f.is_file())
+
+
 # ── 驱动 ────────────────────────────────────────────────────────────────
 FIGS = ('fig1_architecture.svg', 'fig2_caics_tree.svg', 'fig3_code_dist.svg',
         'fig4_sampling.svg', 'fig5_gatekeeping.svg', 'fig6_kappa.svg')
@@ -354,8 +381,10 @@ def main(verbose=False):
 
     print('\nC. 图内无源可核的数字（只提醒，不计入退出码）')
     print('-' * 70)
-    print('  图 1「226 images」：与表 4 同一个数。CLIP 分数与阈值过滤结果从未落库'
-          '（见 17.4），源已不可考。')
+    print('  （2026-10-05 已转入核验，不再属于本段）图 1「226 images」：与表 4 同一个数，'
+          '源 = 磁盘 imageV3/ 目录的文件数。')
+    print('  原先记「源已不可考」是只在主库找——主库 image_files 只登记 211 条 imageV3'
+          ' 记录、比磁盘少 15（登记滞后），拿库去核会核出假差。')
     print('  图 2 的示例证据链（四川阆中 2023 模板支撑坍塌）：语料中一条真实记录，'
           '非统计量，无法用聚合查询核。')
 
@@ -407,6 +436,12 @@ def self_test():
        [first_num(blob, r'([\d,]+)\s+records'),
         first_num(blob, r'([\d,]+)\s+validated')], [2623.0, 972.0])
 
+    # 图 1 的 images 格：源在文件系统（磁盘 imageV3/）而非主库。
+    # 目录缺失时返回 None，由调用方报"源不可达"，自测不依赖数据盘在不在
+    n_clip = clip_images()
+    ck('clip_images() 可读（磁盘 imageV3/）',
+       n_clip is None or isinstance(n_clip, int) and n_clip > 0, True)
+
     print('\n' + '=' * 70)
     if fails:
         print(f'❌ {fails} 条自测失败——判定逻辑有问题')
@@ -428,6 +463,9 @@ def drift_test():
     global FIG
     cases = [
         ('fig1_architecture.svg', '2,623 records', '2,600 records'),
+        # images 那一格 2026-10-05 才从"留白"转入核验，须有自己的失败路径：
+        # 它的源在文件系统（磁盘 imageV3/）而非主库，是四格里最特殊的一个
+        ('fig1_architecture.svg', '226 images', '240 images'),
         ('fig2_caics_tree.svg', '(5)', '(6)'),
         ('fig3_code_dist.svg', '2,208', '2,999'),
         ('fig4_sampling.svg', 'n = 200', 'n = 250'),
@@ -438,8 +476,10 @@ def drift_test():
     base = Path(tempfile.mkdtemp(prefix='figdrift_'))
     ok = 0
     try:
-        for name, old, new in cases:
-            d = base / name
+        for i, (name, old, new) in enumerate(cases):
+            # 用序号做临时目录名：fig1 有两例（records 与 images），
+            # 只用 name 会两次 copytree 到同一路径而报错
+            d = base / f'{i}_{name}'
             shutil.copytree(src, d)
             f = d / name
             txt = f.read_text(encoding='utf-8')

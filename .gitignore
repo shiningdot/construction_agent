@@ -32,6 +32,14 @@ data/*.db.bak*
 *.sqlite
 *.sqlite3
 
+# TeX 编译中间产物（.build/ 下是 tectonic --keep-logs 的日志，供成品核验读；
+# 每次编译都变且体积大，不入版本库）
+docs/paper_v2/.build/
+*.aux
+*.toc
+*.out
+*.synctex.gz
+
 # OS
 .DS_Store
 Thumbs.db

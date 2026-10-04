@@ -12,7 +12,7 @@
   check_forbidden_v2.py      导师要求删除的 7 类禁用措辞（含 --self-test 自证）
   check_tables_v2.py         九张表逐格 ↔ 源数据（含 --self-test 自证）
   check_figures_v2.py        六张图内数值 ↔ 源数据（含 --drift-test 自证）
-  check_formats_v2.py        四格式成品 ↔ md 源（含 --self-test / --drift-test 自证）
+  check_formats_v2.py        四格式成品 ↔ md 源 + TeX 排版缺陷（含 --self-test / --drift-test 自证）
   check_highlights_v2.py     Highlights：条数 / 字符数 / 措辞 / 数字有据
   check_cover_letter_v2.py   投稿信：数字有据 / 措辞 / 标题一致
 

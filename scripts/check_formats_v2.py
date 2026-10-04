@@ -6,7 +6,7 @@
 成品缺陷（纸张误为 US Letter、中文标题渲染成豆腐块、9 个四级标题整行丢失、
 `$t_i$` 被转义破坏成字面下划线、圈码无字形）**全是在成品里、全是人工发现的**。
 
-本脚本把"成品是否真的跟上了源"固化为可复跑核验。八个维度：
+本脚本把"成品是否真的跟上了源"固化为可复跑核验。九个维度：
   A 产物齐全（六个文件非空）
   B 数字无损：md 里的数字 token 须全部出现在 DOCX 与 PDF 里
   B2 正文文本无损：md 段落首 24 字符须在 DOCX 里（抓"改了文字忘了重跑"）
@@ -14,6 +14,11 @@
   D 结构对等：md 的 ##/###/#### ↔ DOCX 的 Heading1/2/3；表格数、内嵌图数、中英对称
   E 纸张：两版 PDF 均须 A4（Elsevier 要求，article 类默认 letterpaper 是坑）
   F 已登记的差异与提示（列出但不计错）：圈码表示法、DOI 断行、mtime 落差
+  G TeX 排版缺陷：tectonic 日志里的 Missing character / Overfull / LaTeX 错误
+
+G 段补的是前八段共同的盲区：A–F 全在比"文件内容对不对"，而**排版溢出与字形
+缺失只体现在编译日志里**——中文标题 232pt 的 `vbox too high`、圈码 12 处
+`Missing character`、表 10 末行 2.86pt 的 Overfull，都不可能从提取文本里看出来。
 
 **mtime 只作提示、不作判据**：实测本仓库的 md 曾被后续编辑刷新过 mtime（比成品
 晚 5 分钟）而内容分毫未变——"文件新旧"不可靠。真凭据是 B/B2/D 三段的内容比对。
@@ -41,6 +46,19 @@ FRESH_SLACK = 60.0      # git checkout 会让 mtime 齐平，故只报"明显更
 CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫'
 # PDF 文本层提不到的 token 只能是这种形态：DOI 前缀（排版时在 / . - 后插了断点）
 DOI_LIKE = re.compile(r'^10\.\d{4,9}$')
+
+# ── TeX 排版缺陷（G 段）────────────────────────────────────────────────
+# 日志由 build_v2_docs.py 以 tectonic --keep-logs 产出后移进 .build/。
+LOGD = D / '.build'
+LOG_FRESH_SLACK = 120.0     # 日志与 PDF 出自同一轮编译，mtime 应几乎同时
+# 已登记的 Overfull \hbox（pt）。EN 只有表 10 末行一处，作者已知并接受；
+# ZH 一处都没有。任何不在基线里的 Overfull 都是新回归——**不做"小于 Npt 就放过"
+# 的豁免**，否则 ZH 一旦出现溢出会被静默吞掉。
+OVERFULL_BASE = {'EN': [2.85558], 'ZH': []}
+OVERFULL_TOL = 0.05         # pt：同一处溢出在重新编译时末位会浮动
+# Underfull 只作提示（CJK 断行天然产生大片 Underfull，不影响可读性）
+UNDERFULL_BASE = {'EN': 7, 'ZH': 122}
+PAGES_BASE = {'EN': 24, 'ZH': 18}
 
 
 # ── 读取器 ──────────────────────────────────────────────────────────────
@@ -115,6 +133,40 @@ def escapes(text):
     """未展开的 TeX 残留：裸 $ 或 \\command（本项目正文不含 LaTeX 源码）。"""
     return {'$': text.count('$'),
             r'\command': len(re.findall(r'\\[a-zA-Z]+', text))}
+
+
+def tex_log_stats(text):
+    """从 tectonic 日志里数排版缺陷（纯函数，可自测）。
+
+    Overfull 的 pt 值一并取出——**只数条数不够**：同一个位置溢出量级从小变大
+    （比如 2.8pt → 30pt）条数不变，却已经是一眼可见的排版事故。
+    """
+    m = re.search(r'Output written on .*?\((\d+) pages', text)
+    return {
+        'missing': len(re.findall(r'Missing character', text)),
+        # 按行判、每行只记一次：`! LaTeX Error: ...` 同时含 `! ` 与 `LaTeX Error`，
+        # 用替代正则会在同一行上重复计数
+        'errors': sum(1 for ln in text.splitlines()
+                      if ln.startswith('! ') or 'LaTeX Error' in ln),
+        'vbox': len(re.findall(r'\\vbox .*too high', text)),
+        'overfull': [float(x) for x in re.findall(
+            r'Overfull \\[hv]box \(([\d.]+)pt too (?:wide|high)', text)],
+        'underfull': len(re.findall(r'Underfull \\[hv]box', text)),
+        'pages': int(m.group(1)) if m else None,
+    }
+
+
+def unregistered_overfull(overfull, base):
+    """返回既不在登记基线里、也容不进容差的 Overfull 值（多重集，逐个消解）。"""
+    rest, out = list(base), []
+    for v in overfull:
+        for i, b in enumerate(rest):
+            if abs(v - b) <= OVERFULL_TOL:
+                rest.pop(i)
+                break
+        else:
+            out.append(v)
+    return out
 
 
 # ── 核验 ────────────────────────────────────────────────────────────────
@@ -247,6 +299,44 @@ def main(verbose=False):
     for n in notes:
         print(f'  {n}')
 
+    print('\nG. TeX 排版缺陷（tectonic 日志）')
+    print('-' * 72)
+    for tag, (md, dx, tx, pf) in PAPERS.items():
+        logp = LOGD / (Path(tx).stem + '.log')
+        if not logp.exists():
+            problems.append(f'{tag}: 无编译日志 {logp.name} —— 重跑 build_v2_docs.py')
+            print(f'  ❌ {tag}: 无 {logp.name}（须重跑构建，日志才有）')
+            continue
+        st = tex_log_stats(logp.read_text(encoding='utf-8', errors='replace'))
+        # 日志与 PDF 应出自同一轮编译；差得远说明日志是上一轮的，判据会失真
+        pdf_p = D / pf
+        if pdf_p.exists():
+            gap = (pdf_p.stat().st_mtime - logp.stat().st_mtime) / 60
+            if abs(gap) > LOG_FRESH_SLACK / 60:
+                problems.append(f'{tag}: 编译日志与 PDF 相差 {gap:.0f} 分钟 —— 已过期')
+        bad = []
+        if st['missing']:
+            bad.append(f'Missing character ×{st["missing"]}（字形缺失，会成豆腐块）')
+        if st['errors']:
+            bad.append(f'LaTeX 错误 ×{st["errors"]}')
+        if st['vbox']:
+            bad.append(f'vbox too high ×{st["vbox"]}')
+        unreg = unregistered_overfull(st['overfull'], OVERFULL_BASE[tag])
+        if unreg:
+            bad.append('Overfull 未登记 ' + '、'.join(f'{v:.1f}pt' for v in unreg))
+        problems += [f'{tag}: {x}' for x in bad]
+        print(f'  {"❌" if bad else "✅"} {tag}: {st["pages"]} 页，'
+              f'Overfull {len(st["overfull"])}（登记基线 {len(OVERFULL_BASE[tag])}）、'
+              f'Missing {st["missing"]}、LaTeX 错误 {st["errors"]}、'
+              f'vbox 过高 {st["vbox"]}'
+              + ('  —— ' + '；'.join(bad) if bad else ''))
+        # Underfull 与页数只提示：不影响可读性，但数量级变化往往意味着排版回归
+        ub = UNDERFULL_BASE[tag]
+        if abs(st['underfull'] - ub) > max(3, ub * 0.5):
+            print(f'  ℹ️ {tag}: Underfull {st["underfull"]} 处（基线 {ub}）')
+        if st['pages'] and st['pages'] != PAGES_BASE[tag]:
+            print(f'  ℹ️ {tag}: PDF {st["pages"]} 页（基线 {PAGES_BASE[tag]} 页）')
+
     print('\n' + '=' * 72)
     if problems:
         print(f'❌ {len(problems)} 项待处置：')
@@ -289,12 +379,31 @@ def self_test():
     ck('正文段落条数', len(sn), 2)
     ck('数学段被标记', [m for _, m in sn], [False, True])
     ck('去 markdown 标记', unmark('**粗** 与 `码`'), '粗 与 码')
+    # TeX 日志：干净样本四类缺陷全 0 且能提页数；脏样本逐类都能数出来
+    clean = ('Output written on x.xdv (24 pages, 753352 bytes).\n'
+             'Underfull \\hbox (badness 10000) in paragraph at lines 1--2\n')
+    ck('日志·干净', {k: tex_log_stats(clean)[k]
+                     for k in ('missing', 'errors', 'vbox', 'overfull', 'pages')},
+       {'missing': 0, 'errors': 0, 'vbox': 0, 'overfull': [], 'pages': 24})
+    dirty = ('Missing character: There is no ① in font\n'
+             '! Undefined control sequence.\n'
+             'Overfull \\hbox (2.85558pt too wide) in paragraph at lines 4--4\n'
+             'Overfull \\vbox (232.0pt too high) has occurred while \\output is active\n'
+             '\\vbox(100.0pt) too high\n')
+    st = tex_log_stats(dirty)
+    ck('日志·脏样本计数', [st['missing'], st['errors'], st['overfull'], st['vbox']],
+       [1, 1, [2.85558, 232.0], 1])
+    # Overfull 基线：容差内算登记，超出即未登记；ZH 基线为空故任何溢出都报
+    ck('Overfull 基线', unregistered_overfull([2.856, 12.3], [2.85558]), [12.3])
+    ck('Overfull 空基线', unregistered_overfull([0.4], []), [0.4])
+    ck('Overfull 配对不重复用', unregistered_overfull([2.856, 2.856], [2.85558]),
+       [2.856])
 
     print('\n' + '=' * 72)
     if fails:
         print(f'❌ {fails} 条自测失败——判定逻辑有问题')
         return 1
-    print('✅ 自测全过：标题/数字/残留/豁免四类判据都能报错')
+    print('✅ 自测全过：标题/数字/残留/豁免/日志五类判据都能报错')
     return 0
 
 
@@ -308,7 +417,7 @@ def drift_test():
     import shutil
     import tempfile
 
-    global D
+    global D, LOGD
 
     def repack(src, dst, fn):
         with zipfile.ZipFile(src) as z:
@@ -366,15 +475,45 @@ def drift_test():
             print(f'{"✅" if caught else "❌"} {name}：退出码 {rc}'
                   + (f'，报出 {line[:70]}' if caught else ' —— 没报出来！'))
             shutil.rmtree(tmp, ignore_errors=True)
+
+        # G 用例：只把日志目录换到注入过的副本（D 不动，A–F 段照常全绿），
+        # 断言 G 段能把字形缺失抓出来——否则 G 段是唯一没有失败路径自证的判据
+        D = orig        # 上一轮的 tmp 已删，须先摆回，否则 A–F 段读不到文件
+        logdir = base / 'logs'
+        logdir.mkdir()
+        n_log = 0
+        for tag, (md, dx, tx, pf) in PAPERS.items():
+            src = orig / '.build' / (Path(tx).stem + '.log')
+            if src.exists():
+                (logdir / src.name).write_text(
+                    src.read_text(encoding='utf-8', errors='replace')
+                    + '\nMissing character: There is no ① in font\n',
+                    encoding='utf-8')
+                n_log += 1
+        if n_log == 2:
+            LOGD = logdir
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = main()
+            out = buf.getvalue()
+            caught = rc == 1 and 'Missing character' in out
+            ok += caught
+            print(f'{"✅" if caught else "❌"} G  TeX 日志字形缺失：退出码 {rc}'
+                  + ('' if caught else ' —— 没报出来！'))
+        else:
+            print(f'❓ G  日志副本只有 {n_log}/2 份，用例失效')
     finally:
         D = orig
+        LOGD = orig / '.build'
         shutil.rmtree(base, ignore_errors=True)
 
     print('\n' + '=' * 72)
-    if ok != 4:
-        print(f'❌ 失败路径 {ok}/4——有漂移抓不住')
+    if ok != 5:
+        print(f'❌ 失败路径 {ok}/5——有漂移抓不住')
         return 1
-    print('✅ 失败路径 4/4：数字 / 转义 / 结构 / 正文文字四类漂移都能抓住')
+    print('✅ 失败路径 5/5：数字 / 转义 / 结构 / 正文文字 / TeX 日志五类漂移都能抓住')
     return 0
 
 

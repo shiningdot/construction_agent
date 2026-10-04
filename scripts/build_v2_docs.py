@@ -12,7 +12,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 BASE = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2'
 TECTONIC = '/home/suntianhao/TEM/tectonic'
 FIGDIR = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures'
+LOGDIR = f'{BASE}/.build'      # TeX 编译日志，供 check_formats_v2.py 判排版缺陷
 os.makedirs(FIGDIR, exist_ok=True)
+os.makedirs(LOGDIR, exist_ok=True)
 
 SRC = {
     'en': f'{BASE}/eswa_paper_v2.md',
@@ -486,9 +488,14 @@ def build_latex(src, out_tex, is_zh):
     tex = tex.replace(r'\usepackage{fontspec}', r'\usepackage{fontspec}' + '\n' + r'\usepackage{xcolor}')
     open(out_tex, 'w', encoding='utf-8').write(tex)
     print(f'TeX: {out_tex}')
-    r = subprocess.run([TECTONIC, out_tex], capture_output=True, text=True,
+    r = subprocess.run([TECTONIC, '--keep-logs', out_tex], capture_output=True, text=True,
                        cwd='/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod')
     pdf = out_tex.replace('.tex', '.pdf')
+    # 编译日志随 .tex 落在同目录，移进 .build/ 免得污染成品目录；
+    # 它同时是 check_formats_v2.py 判 Overfull / Missing character 的唯一数据源。
+    log_src = out_tex[:-4] + '.log'
+    if os.path.exists(log_src):
+        os.replace(log_src, os.path.join(LOGDIR, os.path.basename(log_src)))
     ok = os.path.exists(pdf)
     if not ok:
         for ln in r.stderr.split('\n')[-8:]:

@@ -56,6 +56,11 @@ _PP_REL = "construction_agent/input/pdf_processor.py"
 GIT_VER_AT_RUN = "1c14cde"     # 产出那两批数据时的版本
 GIT_VER_LATEST = "0983599"     # git 里最新版（含锚点修复）
 
+#: §2.5.66 给 `Settings` 补回 `MINERU_API_TOKEN` 后，§2.5.61 那句
+#: 「`settings.MINERU_API_TOKEN` 没这个字段」就**过期了**。文档里挂的过期标注串，
+#: 判据靠它把「字段存在性」与「文档已更正」两半绑在一起（见 part_b 与 drift 用例 5/6）。
+EXPIRE_2566_MARK = "第一条现在也不成立了"
+
 
 def git_file(sha: str, rel: str) -> str:
     """从**本仓库**的 git 对象库取指定提交的文件内容；取不到返回空串。
@@ -412,14 +417,20 @@ def part_d(m: dict) -> None:
            "文档：三个脚本自己 os.getenv 取 token、不经 settings——"
            "「settings 里没这个字段」≠「项目没有 MinerU」",
            "" if src3 else "**源不在**")
-        # 「settings.MINERU_API_TOKEN 没这个字段」这半句须仍成立
-        try:
-            sys.path.insert(0, str(ROOT))
-            from construction_agent.config import settings as _st
-            ok(not hasattr(_st, "MINERU_API_TOKEN"),
-               "文档：settings.MINERU_API_TOKEN **确实**没这个字段（半对的那半）")
-        except Exception as e:  # noqa: BLE001
-            ok(False, "文档：能 import settings 以核 MINERU 字段", str(e)[:80])
+        # 「settings.MINERU_API_TOKEN 没这个字段」这半句 **已被 §2.5.66 推翻**——
+        # 修跨副本 config.py 分叉时把该字段补进了 `Settings`（连同另外 4 个）。
+        # 判据因此**改向**：核「字段存在性」与「文档上的过期标注」两半**是否一致**，
+        # 两边任一脱节都转红——字段消失而标注还在 ⇒ 标注该撤；标注没了而字段还在 ⇒
+        # 等于把过期结论当成现时结论（§2.5.62 处理过的同一种病）。
+        # ⚠️ 核**声明行文本**而不 `import`：`from construction_agent.config import
+        # settings` 会命中 `sys.modules` 缓存，注入后重读不到变化，用例会**静默失效**。
+        cfg = (ROOT / "construction_agent" / "config.py").read_text(encoding="utf-8")
+        has_field = bool(re.search(r"^\s*MINERU_API_TOKEN\s*:", cfg, re.M))
+        marked = DOC.read_text(encoding="utf-8").count(EXPIRE_2566_MARK) == 1
+        ok(has_field == marked,
+           "文档：`settings.MINERU_API_TOKEN` 的字段存在性与文档上的过期标注一致"
+           "（§2.5.66 已补字段 ⇒ §2.5.61 那半句须带过期标注）",
+           f"config.py 有声明={has_field} / 文档已标注={marked}")
         # §2.5.59 那段（`_handle_pdf` 死代码）的补注——**在 §2.5.62 之前**，
         # 故按全文找，不走 s62 切片。
         # ⚠️ 判据串必须与 **DRIFT 注入的串**逐字一致，且**不能跨 md 换行**——
@@ -518,7 +529,7 @@ def drift_test() -> int:
     return bad
 
 
-SRC_CASES = 4        # 源码面用例条数（与 drift_test_src 内逐一对应，末尾核对）
+SRC_CASES = 6        # 源码面用例条数（与 drift_test_src 内逐一对应，末尾核对）
 
 
 def drift_test_src() -> int:
@@ -604,14 +615,25 @@ def drift_test_src() -> int:
     finally:
         hidden.rename(_PP_LOCAL)
 
-    # --- 用例 4：归档未进分支（`HEAD~1` 就是这个状态，**不用伪造**）---
+    # --- 用例 4：归档未进分支（取**添加它的那次提交的父提交**，**不用 HEAD~1**）---
     # 「磁盘有、分支没有」不是假想状态：归档提交的那一次之前，工作区就已经有文件了。
     # 拿历史提交当对照，比人工构造可信。
+    # ⚠️ 首版写死 `HEAD~1`——它表达的是"归档提交之前"，但**会随提交前进而失效**：
+    #    本节、§2.5.76/77/78 的提交一落，`HEAD~1` 里就已经有这个文件了，用例**静默转红**
+    #    （§2.5.75 的老账：写死的"固定值"本身可能就是响应式的）。改取
+    #    `--diff-filter=A` 找出的**添加提交的父提交**——无论 HEAD 走到哪里，
+    #    那一版都仍然是"没有该路径"，而比较的内容（判据的失败路径）分毫未变。
     ran += 1
     import io
     import contextlib
     import subprocess
-    r = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "HEAD~1", _PP_REL],
+    r = subprocess.run(["git", "-C", str(ROOT), "log", "--reverse", "--diff-filter=A",
+                        "--format=%H", "--", _PP_REL], capture_output=True, text=True)
+    adds = [s for s in r.stdout.split() if s]
+    prev = f"{adds[0]}~1" if adds else "HEAD~1"
+    if not adds:
+        print("  ⚠️ git 找不到添加该路径的提交，退回 `HEAD~1`（用例可能失真）")
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-tree", prev, _PP_REL],
                        capture_output=True, text=True)
     prev_has = bool(r.stdout.strip())
     del fails[:]
@@ -623,10 +645,66 @@ def drift_test_src() -> int:
     hit = any("已进分支" in f for f in fails)
     rc = 1 if fails else 0
     print(f"  {'✅' if (not prev_has and rc == 1 and hit) else '❌'} "
-          f"归档未进分支（`HEAD~1` 实测无此路径 = {not prev_has}）"
+          f"归档未进分支（`{prev[:9]}` 实测无此路径 = {not prev_has}）"
           f" ⇒ 判据转红 → 退出码 {rc}，命中={hit}")
     if not (not prev_has and rc == 1 and hit):
         bad += 1
+
+    # --- 用例 5：字段声明被拿掉 —— 事实回退、文档标注还在 ⇒ 两半脱节应转红 ---
+    # ⚠️ 改**真实** `config.py`（备份 + `finally` 还原，与用例 1 同款）。判据刻意
+    # 核**声明行文本**而不 `import`，正是为了让这一注入能生效——若用 `hasattr`，
+    # `sys.modules` 缓存会让重读拿不到变化，本用例会**静默失效**。
+    cf = ROOT / "construction_agent" / "config.py"
+    cf_orig = cf.read_bytes()
+    try:
+        ran += 1
+        txt = cf_orig.decode("utf-8")
+        cut = re.sub(r"^(\s*)MINERU_API_TOKEN\s*:", r"\1# MINERU_API_TOKEN:", txt, count=1, flags=re.M)
+        if cut == txt:
+            print("  ❌ 注入锚点未命中（`MINERU_API_TOKEN:` 声明行）")
+            bad += 1
+        else:
+            cf.write_text(cut, encoding="utf-8")
+            del fails[:]
+            run()
+            hit = any("存在性与文档上的过期标注一致" in f for f in fails)
+            rc = 1 if fails else 0
+            print(f"  {'✅' if (rc == 1 and hit) else '❌'} config.py 的 "
+                  f"`MINERU_API_TOKEN` 声明被注释掉（事实回退、标注未撤）"
+                  f" ⇒ 判据转红 → 退出码 {rc}，命中={hit}")
+            if not (rc == 1 and hit):
+                bad += 1
+    finally:
+        cf.write_bytes(cf_orig)
+        if cf.read_bytes() != cf_orig:
+            print("  ❌ **config.py 还原不一致**")
+            bad += 1
+
+    # --- 用例 6：文档标注被拿掉 —— 字段还在、标注没了 ⇒ 等于把过期结论当现时结论 ---
+    # 另一面：只测用例 5 的话，「文档改了但忘了核事实」这一半没接过失败路径。
+    doc_orig = DOC.read_bytes()
+    try:
+        ran += 1
+        d = doc_orig.decode("utf-8")
+        cut = d.replace(EXPIRE_2566_MARK, "第一条**已被更正**", 1)
+        if cut == d:
+            print(f"  ❌ 注入锚点未命中（文档里的 `{EXPIRE_2566_MARK}`）")
+            bad += 1
+        else:
+            DOC.write_text(cut, encoding="utf-8")
+            del fails[:]
+            run()
+            hit = any("存在性与文档上的过期标注一致" in f for f in fails)
+            rc = 1 if fails else 0
+            print(f"  {'✅' if (rc == 1 and hit) else '❌'} 文档里的过期标注被抹掉"
+                  f"（字段仍在、标注已撤） ⇒ 判据转红 → 退出码 {rc}，命中={hit}")
+            if not (rc == 1 and hit):
+                bad += 1
+    finally:
+        DOC.write_bytes(doc_orig)
+        if DOC.read_bytes() != doc_orig:
+            print("  ❌ **01 号文档还原不一致**")
+            bad += 1
 
     total = SRC_CASES
     # ⚠️ 这里的 `bad` 才是返回值——`ok()` 只往 `fails` 里记，**不影响退出码**。

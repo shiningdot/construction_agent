@@ -73,6 +73,16 @@ python -m construction_agent.main
 >
 > `scripts/eval_with_gt.py` 的 `BASE` 仍硬编码指向主仓库下**已不存在**的 6 策略目录，
 > 重算前须改指 fix-collectors worktree；`experiment3.runner` 也只在那边有。
+>
+> ⚠️ **表 7 是五张实验表里唯一没有落盘产物的**：它的 F1 与 bootstrap CI 来自
+> `eval_with_gt.py` 的 stdout。`check_tables_v2.py` 因此内联了一份**按索引对齐**的
+> `compute_metrics` 复现它（被封存那版用 `list.index(pred)` 反查位置，遇到重复条目
+> 会错位，系统性抬高 F1/Precision 0.001–0.007）。复现保真度：Recall 与两个 acc
+> 六策略全中，F1 差 ≤0.003。表中「有效输出率」「耗时」两列**无源可核**。
+>
+> ⚠️ **`construction_agent/evaluation/experiment1|2|3` 的源文件在主仓库缺失且未进归档**
+> （只剩 `.pyc`）——这与蓝图第七节"论文实验资产不可封存"相矛盾，副本只在 fix-collectors
+> worktree（会被清理）。见对账记录第十六节 16.7。
 
 - `experiments/ablation_gatekeeping/summary.json` — 2×2 消融（新样本 4×100）
 - `experiments/ablation_gatekeeping/gt_recovered.json` — 三专家多数投票真值
@@ -88,7 +98,8 @@ python -m construction_agent.main
 - 结构：**`check_xref_v2.py`**（V2 图表交叉引用 + 章节交叉引用 + 中英段落对等，退出码 0 = 无待处置项）
 - 数字：**`check_numbers_v2.py`**（V2 数字对账清单 ↔ 正文，清单 **50 项**；退出码 0 = 中英对称且无缺失。**改动第二节清单后必须同步改脚本里的 `CHECKLIST`，并核对条目总数**）
 - 措辞：**`check_forbidden_v2.py`**（导师要求删除的 7 类禁用措辞 首次/推翻/证明/因果机制/专家级/替代人工/全部编码有证据；**不能裸搜**——只会命中"不声称因果机制"这类必须保留的否定式，故按窗口否定标记判定；`--self-test` 内建 21 条正反用例，覆盖三种"软"违规形态 `the first <noun>`／`causally <verb>`／`expert applicability`，退出码 0 = 正文无肯定句形式的禁用措辞）
-- **一键**：**`check_v2_all.py`**（按序跑上述四项并汇总，退出码 0 = 四类全绿；改稿流程第 5 步用它，漏跑分项会暴露在汇总行）
+- 表格：**`check_tables_v2.py`**（表 5/6/7/8/9 逐格 ↔ 源数据，中英各 194 格 = 388 格；**补的是数字清单的盲区**——清单只登记"全文统一值"，表格里那几百个只出现一次的数从来不在清单上；`--self-test` 9 条，失败路径自证 5/5，含 2.9s 内跑完六策略 1000 次 bootstrap）
+- **一键**：**`check_v2_all.py`**（按序跑**七项**：引用/结构/数字/措辞/表格/Highlights/投稿信，退出码 0 = 全绿；改稿流程第 5 步用它，漏跑分项会暴露在汇总行）
 - 投稿要件：**`check_highlights_v2.py`**（Elsevier 必交独立文件 Highlights：条数 3–5 ／ 每条 ≤85 字符 ／ 禁用措辞 ／ 数字须在正文清单上，退出码 0 = 四项全合规）
 - 投稿信：**`check_cover_letter_v2.py`**（数字须在正文有据 ／ 无禁用措辞 ／ Subject 标题与正文一致；**V1 版投稿信有 3 处正文没有的论断与 4 处禁用措辞，被本脚本全部抓出**）
 - 核验：`stage45_final_verify.py`、`stage25_data_verify.py`
@@ -120,7 +131,10 @@ python -m construction_agent.main
 - [x] **2026-10-04 四类核验一键入口 + 表 10 溢出判据复测**：新增 **`scripts/check_v2_all.py`**（按序跑引用/结构/数字/措辞并汇总，改稿流程第 5 步改用它）。汇总行提取有个坑：**不能按 `✅/❌` 前缀找**——`check_xref_v2.py` 的结论行是"合计待处置：0"，反倒它的中间过程行带 ✅，按前缀会抓到中间结论；规则改为"末尾往前第一个非缩进非空行"。失败路径已自证（monkeypatch CHECKS 跑三场景：脚本不存在／退出码非 0／全通过 → 返回 1/1/0）。**表 10 末行 2.86pt 改判可接受并补上判据**：PyMuPDF 阈值降到 **1.5pt** 复测，中英双版**均无 span 越过纸张边界**——说明它是 Overfull hbox（超版心）而非超纸张，仅表现为表格右框线多伸约 1mm，**故不动已定稿的表格措辞**。见 `docs/paper_v2/修订对账记录.md` 第十三节
 - [x] **2026-10-04 ESWA 投稿要件完备性核查 + Highlights 起草**：前五类核验都查"论文自身对不对"，本轮补上"期刊要件齐不齐"。逐项核查：正文/声明/CRediT/Data availability/Funding/Ethics/Code availability/Use of AI tools 全部已备（§7 共 7 项声明），**唯一硬缺口是 Highlights**（Elsevier 必交独立文件，3–5 条 × ≤85 字符），另有 cover letter 仍需出 V2 版。已起草 `docs/paper_v2/highlights.md`（5 条，72/53/76/71/68 字符，附中文对照与逐条溯源表）；新增 **`scripts/check_highlights_v2.py`** 查四项（条数/字符数/禁用措辞/数字须在正文清单上，后两项是关键——Highlights 单独送到审稿人眼前，最容易出现没依据的漂亮话），失败路径自证 3/3。**待作者确认**：五条措辞的取舍。见 `docs/paper_v2/修订对账记录.md` 第十四节
 - [x] **2026-10-04 投稿信 V2 版重写 + 校验脚本**：V1 版（`docs/paper/cover_letter.md`）写于 V2 修订之前，**有 3 处论断在 V2 正文中已不存在**——①"反转了 Liu et al. 的排序"（V2 仅把 Liu 用作维度级匹配的指标定义与表 10 对比项，已删去"挑战已发表工作"）②"Fleiss' Kappa 0.859–1.000"（V2 通篇无 Fleiss）③"MECE other 类由 18.9% 降到 2.9%"（V2 的 2.9% 是 WT02 字段占比，无关）；另有 4 处禁用措辞（the first controlled decomposition／causally isolates／verified expert applicability ×2）。已重写 `docs/paper_v2/cover_letter_v2.md`（标题用 V2 标题、贡献按 V2 口径、范围声明随正文、8 个数字全部有正文依据）。新增 **`scripts/check_cover_letter_v2.py`**（数字有据／禁用措辞／标题一致），**用它跑 V1 报错、跑 V2 放行**；并据此扩展 `check_forbidden_v2.py` 覆盖三种"软"违规形态（自测 18→21 条，正文仍 0 违规命中总数不变）。见 `docs/paper_v2/修订对账记录.md` 第十五节
+- [x] **2026-10-04 表格数字 ↔ 源数据对账（第五类核验）**：新增 **`scripts/check_tables_v2.py`**，补上数字清单的盲区——清单只登记"全文统一值"，表 5/6/7/8/9 里几百个只出现一次的数从来不在清单上（故第十/十一节"零缺陷"并不覆盖它们）。**五张表中英各 194 格 = 388 格逐格对上，2.9s**。**表 7 是唯一没有落盘产物的一张**，顺藤查出三个连锁问题：①它的 F1/CI 只来自 `eval_with_gt.py` 的 stdout；②该脚本依赖的 `evaluation/experiment3/runner.py` **主仓库只剩 .pyc 且未进归档**（与蓝图"实验资产不可封存"矛盾，副本只在 fix-collectors）；③那份 runner.py 用 `predictions.index(pred)` 反查位置，遇重复条目（各策略 3–13 条）恒取首个匹配，**系统性抬高 F1/Precision 0.001–0.007**——正文用的是按索引对齐的口径，故脚本内联对齐版复现（Recall 与两个 acc 六策略全中，F1 差 ≤0.003，容差 0.005）。表中「有效输出率」「耗时」两列**无源可核**，脚本每次显式列出而非跳过。失败路径自证 5/5、`--self-test` 9/9；一键入口扩为**七项**。见 `docs/paper_v2/修订对账记录.md` 第十六节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
+- [ ] **实验框架源文件回归主仓库**：`construction_agent/evaluation/experiment1|2|3` 只剩 `.pyc` 且未进归档，`experiments/experiment_6strategies/`（六策略原始输出）也只在 fix-collectors worktree——worktree 一旦清理，表 7 即无法核验（见对账记录第十六节 16.7）
+- [ ] **表 7 补留运行记录**：「有效输出率」「耗时」两列目前无源可核；顺带把六策略评测产物落盘（现为 stdout）
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照
 - [ ] 已知数据问题：`image_files` 旧登记与磁盘差 123 张图 / 83 个事故（原先记「imageV3 少注册 15 条」只算了 `imageV3/` 一个目录，见 `docs/web/08_图片资产复核与更正.md` 第八节）；约 17 条地址级错误
@@ -142,10 +156,11 @@ python -m construction_agent.main
 2. 重新生成四格式成品：`.venv/bin/python3 scripts/build_v2_docs.py`
 3. 重新生成 V1→V2 对比：`python3 scripts/gen_v1v2_diff.py`
 4. 正文任何数字必须与 `修订对账记录.md` 的"数字对账清单"一致
-5. **跑四类核验（一键）**：`.venv/bin/python3 scripts/check_v2_all.py`（引用/结构/数字/措辞，退出码须为 0）
-   分项单跑：`check_citations_v2.py` / `check_xref_v2.py` / `check_numbers_v2.py` / `check_forbidden_v2.py`
+5. **跑七项核验（一键）**：`.venv/bin/python3 scripts/check_v2_all.py`（引用/结构/数字/措辞/表格/Highlights/投稿信，退出码须为 0）
+   分项单跑：`check_citations_v2.py` / `check_xref_v2.py` / `check_numbers_v2.py` / `check_forbidden_v2.py` / `check_tables_v2.py` / `check_highlights_v2.py` / `check_cover_letter_v2.py`
    - 数字项在**改动数据后必跑**，动一个数会牵动摘要/正文/表格多处
-   - 措辞项在**改写结论句/摘要/讨论后必跑**
+   - **表格项在改动任何实验数字后必跑**——它查的是表格内部数字（数字清单覆盖不到的那几百个）
+   - 措辞项在**改写结论句/摘要/讨论后必跑**；Highlights 与投稿信改动后跑各自那项
 
 ## 环境与陷阱
 - **Python 解释器**：`/home/suntianhao/construction_agent/.venv/bin/python3`（系统 python 缺 dotenv/anthropic）

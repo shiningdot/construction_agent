@@ -210,7 +210,12 @@ for path in ("/api/extract/pending", "/api/extract/tasks", "/api/extract/results
           f"{st} {body.get('available')}")
 st, body = req("/api/extract/tasks", "POST", {"raw_ids": ["x"]})
 check("库没建时建任务 503 而不是 500", st == 503, st)
-check("503 里给出建库提示", "create_staging_db" in body.get("message", ""))
+# 契约变更（`ca41bc4` 引入 `dberr.py`）：`message` 只说「哪里不对」，
+# **下一步动作在 `hint` 里**。这条原先只查 message——那是 dberr 之前的口径
+# （当时 503 的 message 就是 BUILD_HINT 本身）。dberr 落地时没跑 e2e，
+# 断言静默失效，直到 2026-10-05 复跑才发现。两键合并查，不依赖动作放哪一栏。
+check("503 里给出建库提示",
+      "create_staging_db" in (body.get("message", "") + body.get("hint", "")))
 
 st, body = req("/api/extract/taxonomy")
 check("理论版本不依赖工作库（读最终库）", st == 200

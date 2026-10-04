@@ -350,7 +350,212 @@ def got_t7(text, probe):
     return got
 
 
+# ── 表 1 / 表 3 / 表 4：主库侧（源 = data/caiems_v2.db 只读）────────────
+DB = MAIN / 'data' / 'caiems_v2.db'
+
+
+def conn():
+    import sqlite3
+    return sqlite3.connect(f'file:{DB}?mode=ro', uri=True)
+
+
+def one(c, sql):
+    return c.execute(sql).fetchone()
+
+
+# 表 1：来源轨道的判据
+T1_SRC = [
+    ('safehoo', lambda s: s == 'safehoo'),
+    ('esafety', lambda s: s == 'esafety'),
+    ('provincial', lambda s: (s or '').endswith('_em')),
+    ('mem', lambda s: s == 'mem'),
+    ('fanxiren', lambda s: '樊锡仁' in (s or '')),
+    ('mohurd', lambda s: '住建部' in (s or '')),
+]
+
+
+def spec_t1(c):
+    rows = c.execute('SELECT source_name, COUNT(*) FROM accidents GROUP BY 1').fetchall()
+    n_all = one(c, 'SELECT COUNT(*) FROM accidents')[0]
+    out = {}
+    for key, pred in T1_SRC:
+        n = sum(v for s, v in rows if pred(s))
+        out[('rec', key)] = n
+        out[('share', key)] = round(n / n_all * 100, 1)
+    web = sum(out[('rec', k)] for k in ('safehoo', 'esafety', 'provincial', 'mem'))
+    doc = sum(out[('rec', k)] for k in ('fanxiren', 'mohurd'))
+    for nm, v in [('sub_web', web), ('sub_doc', doc), ('total', n_all)]:
+        out[('rec', nm)] = v
+        out[('share', nm)] = round(v / n_all * 100, 1)
+    return out
+
+
+def got_t1(text, probe):
+    got, subs = {}, []
+    for row in parse_table(text, probe):
+        if len(row) < 4:
+            continue
+        desc = ' '.join(row[:2])
+        low = desc.lower()
+        rec, share = first_num(row[2]), first_num(row[3])
+        if rec is None:
+            continue
+        key = None
+        for k, pats in [('safehoo', ('safehoo',)), ('esafety', ('esafety',)),
+                        ('provincial', ('provincial', '省级')),
+                        ('mem', ('ministry of emergency', '应急管理部')),
+                        ('fanxiren', ('fan xiren', '樊锡仁')),
+                        ('mohurd', ('mohurd', '住建部'))]:
+            if any(p in low for p in pats):
+                key = k
+                break
+        if key is None:
+            if 'subtotal' in low or '小计' in low:
+                subs.append((rec, share))
+            elif 'total' in low or '合计' in low:
+                key = 'total'
+            else:
+                continue
+        if key == 'total':
+            got[('rec', 'total')], got[('share', 'total')] = rec, share
+        elif key:
+            got[('rec', key)] = rec
+            if share is not None:
+                got[('share', key)] = share
+    for nm, (rec, share) in zip(('sub_web', 'sub_doc'), subs):
+        got[('rec', nm)] = rec
+        if share is not None:
+            got[('share', nm)] = share
+    return got
+
+
+# 表 3：五个枚举字段
+T3_FIELDS = [('工序', 'work_task'), ('涉事设备', 'equipment_involved'),
+             ('涉事材料', 'material_involved'), ('工种', 'worker_type'),
+             ('建筑结构', 'building_structure')]
+# 英文行首 → 与 T3_FIELDS 同一套 key（从 T3_FIELDS 派生，避免两处改名脱节）
+T3_ROW_ALIAS = dict(zip(
+    ['Work task', 'Equipment involved', 'Material involved',
+     'Worker type', 'Building structure'],
+    [z for z, _ in T3_FIELDS]))
+
+
+def spec_t3(c):
+    n_all = one(c, 'SELECT COUNT(*) FROM accidents')[0]
+    out = {}
+    for zh, col in T3_FIELDS:
+        nn = one(c, f'SELECT COUNT(*) FROM accidents WHERE {col} IS NOT NULL '
+                   f'AND {col}!=""')[0]
+        vals = c.execute(f'SELECT {col}, COUNT(*) n FROM accidents WHERE {col} IS '
+                         f'NOT NULL AND {col}!="" GROUP BY 1 ORDER BY n DESC').fetchall()
+        out[(zh, 'cats')] = len(vals)
+        out[(zh, 'nonnull')] = nn
+        out[(zh, 'nonnull_pct')] = round(nn / n_all * 100, 1)
+        top, topn = vals[0]
+        out[(zh, 'top_n')] = topn
+        out[(zh, 'top_pct')] = round(topn / nn * 100, 1)
+        others = c.execute(
+            f"SELECT code FROM enum_definitions WHERE enum_type='{col}' "
+            f"AND is_active=1 AND name LIKE '%其他%'").fetchall()
+        if others:
+            o = sum(n for v, n in vals if v in {x[0] for x in others})
+            out[(zh, 'other_pct')] = round(o / nn * 100, 1)
+    return out
+
+
+def got_t3(text, probe):
+    got = {}
+    for row in parse_table(text, probe):
+        if len(row) < 5:
+            continue
+        raw = row[0].replace('**', '').strip()
+        # 表 3 行首是「Work task (WT)」「工序（WT）」——按前缀认，精确键匹配不到
+        zh = next((z for en, z in T3_ROW_ALIAS.items() if raw.startswith(en)), None)
+        if zh is None:
+            zh = next((z for z, _ in T3_FIELDS if raw.startswith(z)), None)
+        if zh is None:
+            continue
+        v1 = first_num(row[1])
+        if v1 is not None:
+            got[(zh, 'cats')] = v1
+        v2 = nums(row[2])
+        if len(v2) >= 2:
+            got[(zh, 'nonnull')], got[(zh, 'nonnull_pct')] = v2[0], v2[1]
+        elif v2:
+            got[(zh, 'nonnull')] = v2[0]
+        # ⚠ 不能对整格取 nums：类名 'WT02' 会被当成数字 2。只取括号内的两个数
+        # ⚠ 中文版括号内用全角逗号「（397，18.0%）」，正则须一并接受
+        m = re.search(r'[(（]\s*([\d,，]+)\s*[,，]\s*([\d.]+)\s*%', row[3])
+        if m:
+            got[(zh, 'top_n')] = float(m.group(1).replace(',', '').replace('，', ''))
+            got[(zh, 'top_pct')] = float(m.group(2))
+        v4 = first_num(row[4])
+        if v4 is not None:
+            got[(zh, 'other_pct')] = v4
+    return got
+
+
+# 表 4：概览（逐行核数字集合）
+T4_ROWS = [
+    ('records', 'Records', '事故记录'),
+    ('types_n', 'Accident types', '事故类型'),
+    ('severity', 'Severity', '事故等级'),
+    ('casualties', 'Casualties', '伤亡'),
+    ('causes', 'Causal annotations', '致因标注'),
+    ('search', 'Search-enriched', '搜索增强'),
+    ('vlm', 'VLM analyses', 'VLM 分析'),
+]
+T4_CLIP = ('CLIP-filtered', 'CLIP 过滤')
+
+
+def spec_t4(c):
+    out = {}
+    out[('records', 'v')] = [one(c, 'SELECT COUNT(*) FROM accidents')[0]]
+    out[('types_n', 'v')] = [
+        one(c, 'SELECT COUNT(DISTINCT accident_type) FROM accidents '
+               'WHERE accident_type!=""')[0],
+        one(c, 'SELECT COUNT(*) FROM accidents WHERE accident_type!=""')[0]]
+    out[('severity', 'v')] = [n for _, n in c.execute(
+        'SELECT severity, COUNT(*) FROM accidents GROUP BY 1 ORDER BY 2 DESC')]
+    d, i = one(c, 'SELECT SUM(deaths), SUM(injuries) FROM accidents')
+    out[('casualties', 'v')] = [d, i]
+    out[('causes', 'v')] = [one(c, 'SELECT COUNT(*) FROM caics_causes')[0]] + [
+        n for _, n in c.execute('SELECT evidence_quality, COUNT(*) FROM caics_causes '
+                                'GROUP BY 1 ORDER BY 2 DESC')]
+    out[('search', 'v')] = [one(c, 'SELECT COUNT(*) FROM accidents '
+                                'WHERE search_performed=1')[0]]
+    out[('vlm', 'v')] = [one(c, 'SELECT COUNT(*) FROM image_analyses')[0],
+                         one(c, 'SELECT COUNT(DISTINCT accident_id) '
+                                'FROM image_analyses')[0]]
+    return out
+
+
+def got_t4(text, probe):
+    got = {}
+    for row in parse_table(text, probe):
+        if len(row) < 2:
+            continue
+        label = row[0].replace('**', '').strip()
+        v = nums(row[1])
+        for key, en, zh in T4_ROWS:
+            if label.startswith(en) or label.startswith(zh):
+                got[(key, 'v')] = v
+    return got
+
+
 # ── 对账驱动 ────────────────────────────────────────────────────────────
+def t4_compare(spec, got, lang):
+    """表 4 每行是多值，故按「源值是否出现在该行数字集合里」判定。"""
+    missing, mismatch, n = [], [], 0
+    for key, exp in spec.items():
+        have = got.get(key, [])
+        n += len(exp)
+        for v in exp:
+            if not any(cmp_val(h, v, TOL_EXACT) for h in have):
+                (missing if not have else mismatch).append(f'{key[0]}={v:g}')
+    return ('表4 数据库统计', lang, n, missing, mismatch, [])
+
+
 def diff(exp_spec, got_spec, label, lang, tol, out):
     """逐项比对，返回 (比对格数, 不符列表)。缺格也算不符。"""
     missing, mismatch = [], []
@@ -379,6 +584,7 @@ def main(verbose=False):
     for name, p in SRC.items():
         ok = Path(p).exists()
         print(f'  {"✅" if ok else "❌"} {name:<9} {p}')
+    print(f'  {"✅" if DB.exists() else "❌"} {"DB":<9} {DB}（表 1/3/4）')
 
     results = []
     if Path(SRC['T5T6']).exists():
@@ -427,6 +633,23 @@ def main(verbose=False):
             probe = '| Strategy |' if t == 'EN' else '| 策略 |'
             diff(spec7, got_t7(txt, probe), '表7 六策略（复现）', t, TOL_T7, results)
 
+    # 表 1 / 3 / 4：源 = 主库（只读）
+    if DB.exists():
+        c = conn()
+        try:
+            spec1 = spec_t1(c)
+            spec3 = spec_t3(c)
+            spec4 = spec_t4(c)
+        finally:
+            c.close()
+        for t, txt in texts.items():
+            p1 = '| Track | Source |' if t == 'EN' else '| 轨道 | 来源 |'
+            diff(spec1, got_t1(txt, p1), '表1 数据来源分布', t, TOL_EXACT, results)
+            p3 = '| Field | Categories |' if t == 'EN' else '| 字段 | 类别数 |'
+            diff(spec3, got_t3(txt, p3), '表3 枚举字段统计', t, TOL_EXACT, results)
+            p4 = '| Dimension | Value |' if t == 'EN' else '| 维度 | 数值 |'
+            results.append(t4_compare(spec4, got_t4(txt, p4), t))
+
     print('\nB. 逐表逐格对账')
     print('-' * 70)
     bad = 0
@@ -442,11 +665,16 @@ def main(verbose=False):
         if verbose and extra:
             print(f'      （正文多出 {len(extra)} 格，未在源中找到）')
 
-    print('\nC. 表中无源可核的数字（源未落盘，脚本只提醒）')
+    print('\nC. 表中无源可核的数字（源未落盘或口径不明，脚本只提醒、不计入退出码）')
     print('-' * 70)
     print('  表 7 有效输出率 / 耗时 两列：现有源（S*_results.json 的 summary）'
           '只有 elapsed_total_sec 与 success，')
     print('  与表中值不符，故无法自动核验；如需核验须补留产生该表的运行记录。')
+    print('  表 4 「CLIP-filtered images 226」：主库 image_files 1,108 行、'
+          'download_status 全为 downloaded，')
+    print('  且无 clip_score / 过滤标记列——CLIP 分数从未落库，226 的源已不可考。')
+    print('  表 1 事故年代列：表中为采集计划口径，与主库 date 的实测 min/max 不一致'
+          '（如 safehoo 实为 2008–2026，表中写 2005–2026），口径不明故不自动判负。')
 
     print('\n' + '=' * 70)
     if miss_src:
@@ -456,7 +684,7 @@ def main(verbose=False):
     if bad:
         print(f'❌ {bad} 格与源不符——表格数字不得脱离源数据')
         return 1
-    print('✅ 五张表逐格与源数据一致，可接进改稿流程')
+    print('✅ 八张表逐格与源数据一致，可接进改稿流程')
     return 0
 
 
@@ -495,6 +723,33 @@ def self_test():
     ok = rows == [['x', '1', '2']]
     fails += not ok
     print(f'{"✅" if ok else "❌"} parse_table 切表 → {rows}')
+
+    # 表 3 解析：英文行首带 (WT)、中文用全角逗号与（），两条都要能取到数
+    for lang, head, row, want in [
+        ('EN', '| Field | Categories | Non-null | Largest | Residual |',
+         '| Work task (WT) | 11 | 2,202 (83.9%) | WT02 main structure works (397, 18.0%) | 2.8% |',
+         {('工序', 'cats'): 11, ('工序', 'nonnull'): 2202,
+          ('工序', 'top_n'): 397, ('工序', 'top_pct'): 18.0,
+          ('工序', 'other_pct'): 2.8}),
+        ('ZH', '| 字段 | 类别数 | 非空 | 最大 | 残余 |',
+         '| 工序（WT） | 11 | 2,202（83.9%） | WT02 主体结构工程（397，18.0%） | 2.8% |',
+         {('工序', 'cats'): 11, ('工序', 'nonnull'): 2202,
+          ('工序', 'top_n'): 397, ('工序', 'top_pct'): 18.0,
+          ('工序', 'other_pct'): 2.8}),
+    ]:
+        g = got_t3(f'{head}\n|---|\n{row}\n', '| Field |' if lang == 'EN' else '| 字段 |')
+        bad = {k: (g.get(k), v) for k, v in want.items() if g.get(k) != v}
+        fails += bool(bad)
+        print(f'{"✅" if not bad else "❌"} [{lang}] got_t3 解析表 3 行'
+              + (f' → 偏差 {bad}' if bad else ''))
+
+    # 表 4 比对器：源值不在行内数字集合里必须报错
+    r = t4_compare({('records', 'v'): [2623]}, {('records', 'v'): [2623, 99]}, 'EN')
+    ok = not r[4]
+    r2 = t4_compare({('records', 'v'): [2624]}, {('records', 'v'): [2623, 99]}, 'EN')
+    ok &= bool(r2[4])
+    fails += not ok
+    print(f'{"✅" if ok else "❌"} t4_compare：命中不报错、错值必报错')
 
     print('\n' + '=' * 70)
     if fails:

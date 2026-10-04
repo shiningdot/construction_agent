@@ -461,9 +461,12 @@ def drift_test():
 
     往 DOCX 的 document.xml 里注入四类漂移（改数字 / 插 `$` / 动标题样式 /
     改正文文字），逐例跑主流程并断言退出码转 1。DOCX 是 zip，重打包即可，
-    成品不受影响（全程在临时目录）。另两类走不同的注入面：B 段 TeX 行改
-    临时目录里的 `.tex`，G 段换日志目录（成品文件一个不动，A–F 照常全绿）
-    ——每一类都必须有一条"改了就该报"的失败路径，否则该判据等于没接。
+    成品不受影响（全程在临时目录）。另三类走不同的注入面：B 段 TeX 行改
+    临时目录里的 `.tex`；B 段 PDF 行用 PyMuPDF 把 PDF 里目标数字的**全部**
+    出现处 redact 掉（只擦一处不够——判据是"token 出现过没有"，剩下几处
+    照样命中，用例会静默失效）；G 段换日志目录（成品文件一个不动，A–F
+    照常全绿）——每一类都必须有一条"改了就该报"的失败路径，否则该判据
+    等于没接。
     """
     import shutil
     import tempfile
@@ -554,6 +557,53 @@ def drift_test():
         else:
             print('❓ B  TeX 数字脱节：.tex 里没有 16,323，用例失效')
 
+        # B 段 PDF 行用例：PDF 是二进制的，无法像 DOCX 那样重打包，改用
+        # PyMuPDF 把 `16,323` 的**全部 5 处** redact 掉（只擦一处不够——
+        # 判据是"token 出现过没有"，剩下 4 处照样命中，用例会静默失效）。
+        # DOCX / TeX / 日志都不动，故 A–F 其余各行照常全绿
+        D = orig
+        tmp = base / 'pdf'
+        shutil.copytree(orig, tmp)
+        pdfp = tmp / 'eswa_paper_v2_en.pdf'
+        hits = 0
+        if pdfp.exists():
+            try:
+                import fitz
+                doc = fitz.open(str(pdfp))
+                for page in doc:
+                    rects = page.search_for('16,323')
+                    if not rects:
+                        continue
+                    hits += len(rects)
+                    for r in rects:
+                        page.add_redact_annot(r)
+                    page.apply_redactions()
+                tmp_pdf = tmp / '_r.pdf'
+                doc.save(str(tmp_pdf), garbage=4, clean=True)
+                doc.close()
+                tmp_pdf.replace(pdfp)
+            except ImportError:
+                pass          # 未装 PyMuPDF 时 hits 保持 0，由下面统一提示
+        if hits:
+            D = tmp
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = main()
+            out = buf.getvalue()
+            # 报出行须同时是 `EN PDF: ` 开头**且**含"个数字丢失"——只按前缀找会
+            # 命中 F 段的 `EN PDF: 1 个 DOI 前缀…已登记`（它排在 B 段报错行之前）
+            line = next((l.strip() for l in out.splitlines()
+                         if l.strip().startswith('EN PDF: ') and '个数字丢失' in l), '')
+            caught = rc == 1 and bool(line)
+            ok += caught
+            print(f'{"✅" if caught else "❌"} B  PDF 数字擦除（{hits} 处）：'
+                  f'退出码 {rc}' + (f'，报出 {line[:60]}' if caught else ' —— 没报出来！'))
+            shutil.rmtree(tmp, ignore_errors=True)
+        elif pdfp.exists():
+            print('❓ B  PDF 数字擦除：PDF 里搜不到 16,323，用例失效')
+
         # G 用例：只把日志目录换到注入过的副本（D 不动，A–F 段照常全绿），
         # 断言 G 段能把字形缺失抓出来——否则 G 段是唯一没有失败路径自证的判据
         D = orig        # 上一轮的 tmp 已删，须先摆回，否则 A–F 段读不到文件
@@ -588,11 +638,11 @@ def drift_test():
         shutil.rmtree(base, ignore_errors=True)
 
     print('\n' + '=' * 72)
-    if ok != 6:
-        print(f'❌ 失败路径 {ok}/6——有漂移抓不住')
+    if ok != 7:
+        print(f'❌ 失败路径 {ok}/7——有漂移抓不住')
         return 1
-    print('✅ 失败路径 6/6：数字 / 转义 / 结构 / 正文文字 / TeX 数字 / '
-          'TeX 日志六类漂移都能抓住')
+    print('✅ 失败路径 7/7：数字 / 转义 / 结构 / 正文文字 / TeX 数字 / '
+          'PDF 数字 / TeX 日志七类漂移都能抓住')
     return 0
 
 

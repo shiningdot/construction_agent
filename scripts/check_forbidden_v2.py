@@ -38,18 +38,30 @@ FILES = {'EN': BASE / 'eswa_paper_v2.md', 'ZH': BASE / 'eswa_paper_v2_zh.md'}
 # 中文禁用词 → 英文对应形态（正则）。英文一律带 \b，避免词内假阳性。
 FORBIDDEN = [
     # ⚠ "the first" 不能裸查——"The first gate operates on titles"（第一道闸门）
-    # 是流程描述，实测假阳性；只留宣称首创的几种句式。
+    # 是流程描述，实测假阳性。改用否定前瞻放行流程词，其余 "the first X"
+    # 仍视为宣称首创（V1 投稿信的 "the first controlled decomposition" 就是
+    # 这种形态，裸查放行版漏掉了它）。
     ('首次', [r'\bfirst-ever\b', r'\bfor the first time\b',
-              r'\bthe first to\b', r'\bfirst system\b']),
+              r'\bthe first to\b', r'\bfirst system\b',
+              r'\bthe first (?!gate\b|stage\b|step\b|phase\b|tier\b|layer\b'
+              r'|column\b|row\b|pass\b|version\b|iteration\b|experiment\b)\w+']),
     ('推翻', [r'\brefut\w*\b', r'\boverthrow\w*\b', r'\bdisprove\w*\b',
               r'\boverturn\w*\b']),
     # ⚠ 不能写 \bprov\w*\b——实测命中 provincial / province / provenance /
     # provider / provided 共 15 处假阳性；只认 prove 词族的屈折形式。
     ('证明', [r'\bprove\b', r'\bproves\b', r'\bproven\b',
               r'\bproof\b', r'\bproofs\b']),
-    ('因果机制', [r'\bcausal mechanism\w*\b', r'\bcausal mechanisms\b']),
+    # "causal" 单用是 CAICS 术语，但 causally + 动词是因果断言（V1 信的
+    # "causally isolates" 即此）。正文实测 0 次，不误报。
+    ('因果机制', [r'\bcausal mechanism\w*\b', r'\bcausal mechanisms\b',
+                  r'\bcausally\s+\w+']),
+    # expert 本身合法（expert annotator / three-expert majority vote 都在用），
+    # 违规的是"专家级"式搭配。正文实测 expert 后随 annotation / annotators /
+    # inter-rater / majority / majority-vote / sample / substitution /
+    # validation / experts，均合法。
     ('专家级', [r'\bexpert-level\b', r'\bexpert level\b',
-                r'\bhuman[- ]expert\b', r'\bexpert human\b']),
+                r'\bhuman[- ]expert\b', r'\bexpert human\b',
+                r'\bexpert (?:applic|perform)\w*']),
     ('替代人工', [r'\breplac\w+ human\w*\b', r'\breplac\w+ manual\w*\b',
                   r'\bsubstitut\w+ for human\w*\b', r'\breplac\w+ annotator\w*\b']),
     ('全部编码有证据', [r'\ball codes (are|have|were) (evidence\w*|evidenc\w*)',
@@ -109,6 +121,13 @@ SELF_TEST = [
     ('本文将事故报告转化率提升至专家级水平。', 'ZH', 'violation'),
     ('本文首次提出面向施工事故的多源采集框架，证明模型依赖。', 'ZH', 'violation'),
     ('CAICS 实现了全部编码有证据的自动标注。', 'ZH', 'violation'),
+    # 三种"软"违规形态：V1 投稿信里全部出现过，首版规则漏掉
+    ('This is the first controlled decomposition of the failure mode.',
+     'EN', 'violation'),
+    ('The experiment causally isolates the gatekeeping effect.',
+     'EN', 'violation'),
+    ('The taxonomy offers verified expert applicability across layers.',
+     'EN', 'violation'),
     # 合法否定式：报 legal，不得报 violation
     ('We report this as an observation, not as an isolated causal mechanism.',
      'EN', 'legal'),

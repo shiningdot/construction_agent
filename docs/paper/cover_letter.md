@@ -1,4 +1,10 @@
-# Cover Letter（投稿信草稿）
+# Cover Letter（V1 版，存档）
+
+> ⚠️ **存档，勿投。** 本版写于 V2 修订之前，**有 3 处论断在 V2 正文中已不存在**
+> （声称反转了 Liu et al. 的排序、引用 Fleiss' Kappa 0.859–1.000、称 MECE
+> other 类由 18.9% 降到 2.9%），另有 4 处禁用措辞。详见
+> `docs/paper_v2/修订对账记录.md` 第十五节。
+> **投稿请用 `docs/paper_v2/cover_letter_v2.md`**（校验：`scripts/check_cover_letter_v2.py`）。
 
 ---
 

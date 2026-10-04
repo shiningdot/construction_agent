@@ -58,7 +58,8 @@ python -m construction_agent.main
 - `docs/paper/eswa_paper.md` — V1 初稿：**存档，勿改**
 - `docs/paper/reviews/` — 模拟评审 5 份 + `00_editorial_decision.md`（大修结论）
 - `docs/superpowers/specs/2026-08-20-caiems-eswa-paper-design.md` — 论文设计蓝图（故事线/贡献点/图表规划）
-- `docs/paper/cover_letter.md` — 投稿信（导师姓名仍为占位符）
+- `docs/paper_v2/cover_letter_v2.md` — **投稿信 V2 版（以它为准）**；改后跑 `scripts/check_cover_letter_v2.py`
+- `docs/paper/cover_letter.md` — V1 版投稿信：**存档，勿投**（有 3 处正文没有的论断 + 4 处禁用措辞，见对账记录第十五节）
 
 ## 论文实验数据
 > ⚠️ **源数据分散三处**（核验前先定位，别只在本 worktree 找）：
@@ -86,9 +87,10 @@ python -m construction_agent.main
 - 引用：`convert_numbered_citations.py`、`check_citations.py`、**`check_citations_v2.py`**（V2 双向对账，退出码 0 = 无孤立文献/无悬空引用）、`verify_dois.py`
 - 结构：**`check_xref_v2.py`**（V2 图表交叉引用 + 章节交叉引用 + 中英段落对等，退出码 0 = 无待处置项）
 - 数字：**`check_numbers_v2.py`**（V2 数字对账清单 ↔ 正文，清单 **50 项**；退出码 0 = 中英对称且无缺失。**改动第二节清单后必须同步改脚本里的 `CHECKLIST`，并核对条目总数**）
-- 措辞：**`check_forbidden_v2.py`**（导师要求删除的 7 类禁用措辞 首次/推翻/证明/因果机制/专家级/替代人工/全部编码有证据；**不能裸搜**——只会命中"不声称因果机制"这类必须保留的否定式，故按窗口否定标记判定；`--self-test` 内建 18 条正反用例，退出码 0 = 正文无肯定句形式的禁用措辞）
+- 措辞：**`check_forbidden_v2.py`**（导师要求删除的 7 类禁用措辞 首次/推翻/证明/因果机制/专家级/替代人工/全部编码有证据；**不能裸搜**——只会命中"不声称因果机制"这类必须保留的否定式，故按窗口否定标记判定；`--self-test` 内建 21 条正反用例，覆盖三种"软"违规形态 `the first <noun>`／`causally <verb>`／`expert applicability`，退出码 0 = 正文无肯定句形式的禁用措辞）
 - **一键**：**`check_v2_all.py`**（按序跑上述四项并汇总，退出码 0 = 四类全绿；改稿流程第 5 步用它，漏跑分项会暴露在汇总行）
 - 投稿要件：**`check_highlights_v2.py`**（Elsevier 必交独立文件 Highlights：条数 3–5 ／ 每条 ≤85 字符 ／ 禁用措辞 ／ 数字须在正文清单上，退出码 0 = 四项全合规）
+- 投稿信：**`check_cover_letter_v2.py`**（数字须在正文有据 ／ 无禁用措辞 ／ Subject 标题与正文一致；**V1 版投稿信有 3 处正文没有的论断与 4 处禁用措辞，被本脚本全部抓出**）
 - 核验：`stage45_final_verify.py`、`stage25_data_verify.py`
 
 ## 核心代码（主仓库）
@@ -117,7 +119,7 @@ python -m construction_agent.main
 - [x] **2026-10-04 禁用措辞核查（V2 首次，第四类核验）**：新增 **`scripts/check_forbidden_v2.py`**，把导师第 5 条红线（首次/推翻/证明/因果机制/专家级/替代人工/全部编码有证据）固化为可复跑检查。**不能裸搜**——`causal` 是 CAICS 术语、`prove` 会被 improve/approved/provenance 词内命中（首版正则一次报 15 处假阳性）、`the first` 会中"第一道闸门"；更关键的是**多数命中是必须保留的否定式**（"not as an isolated causal mechanism"「而非已分离的因果机制」共 10 处），删掉反而违背"不得隐瞒局限"。故按命中前窗口（中 12 字/英 45 字符）的否定标记判定。**结论：正文违规 0**；命中 17 = 合法否定式 10 + 中文修订说明段 7（**该段投稿前必须整段删除**）。脚本内建 `--self-test`（18 条正反用例）自证判定逻辑——"退出码 0"只有在脚本有能力报 1 时才可信。见 `docs/paper_v2/修订对账记录.md` 第十二节
 - [x] **2026-10-04 四类核验一键入口 + 表 10 溢出判据复测**：新增 **`scripts/check_v2_all.py`**（按序跑引用/结构/数字/措辞并汇总，改稿流程第 5 步改用它）。汇总行提取有个坑：**不能按 `✅/❌` 前缀找**——`check_xref_v2.py` 的结论行是"合计待处置：0"，反倒它的中间过程行带 ✅，按前缀会抓到中间结论；规则改为"末尾往前第一个非缩进非空行"。失败路径已自证（monkeypatch CHECKS 跑三场景：脚本不存在／退出码非 0／全通过 → 返回 1/1/0）。**表 10 末行 2.86pt 改判可接受并补上判据**：PyMuPDF 阈值降到 **1.5pt** 复测，中英双版**均无 span 越过纸张边界**——说明它是 Overfull hbox（超版心）而非超纸张，仅表现为表格右框线多伸约 1mm，**故不动已定稿的表格措辞**。见 `docs/paper_v2/修订对账记录.md` 第十三节
 - [x] **2026-10-04 ESWA 投稿要件完备性核查 + Highlights 起草**：前五类核验都查"论文自身对不对"，本轮补上"期刊要件齐不齐"。逐项核查：正文/声明/CRediT/Data availability/Funding/Ethics/Code availability/Use of AI tools 全部已备（§7 共 7 项声明），**唯一硬缺口是 Highlights**（Elsevier 必交独立文件，3–5 条 × ≤85 字符），另有 cover letter 仍需出 V2 版。已起草 `docs/paper_v2/highlights.md`（5 条，72/53/76/71/68 字符，附中文对照与逐条溯源表）；新增 **`scripts/check_highlights_v2.py`** 查四项（条数/字符数/禁用措辞/数字须在正文清单上，后两项是关键——Highlights 单独送到审稿人眼前，最容易出现没依据的漂亮话），失败路径自证 3/3。**待作者确认**：五条措辞的取舍。见 `docs/paper_v2/修订对账记录.md` 第十四节
-- [ ] **Cover letter V2 版**（现有 `docs/paper/cover_letter.md` 是 V1 版）
+- [x] **2026-10-04 投稿信 V2 版重写 + 校验脚本**：V1 版（`docs/paper/cover_letter.md`）写于 V2 修订之前，**有 3 处论断在 V2 正文中已不存在**——①"反转了 Liu et al. 的排序"（V2 仅把 Liu 用作维度级匹配的指标定义与表 10 对比项，已删去"挑战已发表工作"）②"Fleiss' Kappa 0.859–1.000"（V2 通篇无 Fleiss）③"MECE other 类由 18.9% 降到 2.9%"（V2 的 2.9% 是 WT02 字段占比，无关）；另有 4 处禁用措辞（the first controlled decomposition／causally isolates／verified expert applicability ×2）。已重写 `docs/paper_v2/cover_letter_v2.md`（标题用 V2 标题、贡献按 V2 口径、范围声明随正文、8 个数字全部有正文依据）。新增 **`scripts/check_cover_letter_v2.py`**（数字有据／禁用措辞／标题一致），**用它跑 V1 报错、跑 V2 放行**；并据此扩展 `check_forbidden_v2.py` 覆盖三种"软"违规形态（自测 18→21 条，正文仍 0 违规命中总数不变）。见 `docs/paper_v2/修订对账记录.md` 第十五节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照

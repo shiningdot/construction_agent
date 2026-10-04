@@ -10,8 +10,16 @@
 - 而 `_handle_pdf_link` 的注释直说「不做正文提取，仅记录元数据供后续
   MinerU OCR」，`_crawl_detail_article` 抽到 PDF 链接也只记 `needs_ocr=True`，
   **从不下载**。
-- 那个 MinerU **不存在**：`settings.MINERU_API_TOKEN` 没这个字段，
-  `construction_agent.input.pdf_processor` 目录是空的。
+- ~~那个 MinerU **不存在**：`settings.MINERU_API_TOKEN` 没这个字段，
+  `construction_agent.input.pdf_processor` 目录是空的。~~
+  **⚠️ 2026-10-05 更正（§2.5.61 / §2.5.62）**，原句**半对半错**：
+  ①`settings.MINERU_API_TOKEN` **确实**没这个字段 —— 成立；
+  ②「MinerU 不存在」**不成立** —— 它存在，是 **MinerU 云端 API**；
+  ③「`input/` 目录是空的」**不成立** —— `pdf_processor.py` 已归档回原位（§2.5.62）。
+  准确说法：MinerU 存在，只是**不挂在 `settings` 上** —— `process_pdf.py` /
+  `process_pdf3.py` / `process_ebook800.py` 三个脚本都是自己
+  `os.getenv('MINERU_API_TOKEN')` 再经构造参数传入，不经过 `settings`。
+  **「`settings` 里没有这个字段」与「项目没有 MinerU」是两件事**，原句说成了一件事。
 - 实测：欣佳酒店调查报告 51 页提出 **37,618 字**、商洛桥梁 39 页提出
   **28,315 字**，都是文字版，本地 PyMuPDF 一次到位。
 

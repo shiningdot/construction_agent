@@ -41,10 +41,31 @@ SMALL = BOOK / ("建筑施工安全事故案例分析 (住房和城乡建设部�
                 "(z-library.sk, 1lib.sk, z-lib.sk).pdf")
 
 #: 那个唯一含 OCR 的文件。**本仓库优先**——§2.5.60 裁决 2 要求归档它，
-#: 归档后本仓库就有了；没有则回退 fix-collectors（它现在唯一在的地方）。
+#: §2.5.62 已执行归档（从 git `0983599` 取，**不是**从 fix-collectors 磁盘取，
+#: 磁盘那份是旧的 `1c14cde` 版）；没有则回退 fix-collectors。
 _PP_LOCAL = ROOT / "construction_agent" / "input" / "pdf_processor.py"
 _PP_FALLBACK = (MAIN / ".claude" / "worktrees" / "fix-collectors" /
                 "construction_agent" / "input" / "pdf_processor.py")
+_PP_REL = "construction_agent/input/pdf_processor.py"
+
+#: 该文件在 git 里的**两个版本**——§2.5.61 第七节的归因靠的就是这个差：
+#:   `1c14cde`（07-22）锚点只认中文数字 ⇒ 228 MB 那本走回退分支 ⇒ 95/97 粘连；
+#:   `0983599`（10-01）锚点补了阿拉伯数字分支，**但那批数据是 07-27 处理的，
+#:   没赶上这次修复**（库里仍是旧版产物）。两批数据的 `crawl_date` 分别为
+#:   07-25 / 07-27，都早于 10-01 —— 这是「用的是旧版」的时间证据。
+GIT_VER_AT_RUN = "1c14cde"     # 产出那两批数据时的版本
+GIT_VER_LATEST = "0983599"     # git 里最新版（含锚点修复）
+
+
+def git_file(sha: str, rel: str) -> str:
+    """从**本仓库**的 git 对象库取指定提交的文件内容；取不到返回空串。
+
+    不静默降级：调用方须把空串判为「源不可达」。
+    """
+    import subprocess
+    r = subprocess.run(["git", "-C", str(ROOT), "show", f"{sha}:{rel}"],
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
 
 SCAN = "建筑施工安全事故案例分析(住建部扫描版)"
 CASE = "建筑施工安全事故案例分析(住建部)"
@@ -176,7 +197,26 @@ def measure_src() -> dict:
     m["has_mineru"] = "MinerU" in src
     # ⚠️ 不能用 `^` 锚行首：这一句在源码里是**缩进的**（`re.match(r'^## 一、事故简介…`），
     # 正则的 `^` 配 `re.M` 只认行首，缩进后会落空（第一版就是这么假红的）。
+    #
+    # ⚠️⚠️ 但 `in` 这个判据**太弱**，分不出是哪一版——两版的锚点串**都含** `一、`
+    # 子串，于是「本节第七条归因依赖旧版锚点」这件事**核不到**（§2.5.62 归档后
+    # 实测：核的是新版文件、判据照样绿）。故改为核**两版各自的完整锚点行**。
     m["anchor"] = "## 一、事故简介" in src
+    m["anchor_line"] = next(
+        (l.strip() for l in lines if "事故简介" in l and "re.match" in l), "")
+    for tag, sha in (("old", GIT_VER_AT_RUN), ("new", GIT_VER_LATEST)):
+        g = git_file(sha, _PP_REL)
+        m[f"git_{tag}_ok"] = bool(g)
+        m[f"git_{tag}_anchor"] = next(
+            (l.strip() for l in g.splitlines()
+             if "事故简介" in l and "re.match" in l), "")
+        m[f"git_{tag}_lines"] = len(g.splitlines()) if g else 0
+        m[f"git_{tag}_bytes"] = len(g.encode("utf-8")) if g else 0
+    # 本分支的树里有没有这个路径（§2.5.62 第二节「可达性断」的直接判据）
+    import subprocess
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "HEAD", _PP_REL],
+                       capture_output=True, text=True)
+    m["head_tree_has_input"] = bool(r.stdout.strip())
     return m
 
 
@@ -190,6 +230,10 @@ def part_b(m: dict) -> None:
     local = _PP_LOCAL.exists()
     print(f"  路径：{m['pp_path']}"
           f"{'（本仓库）' if local else '（**回退 fix-collectors**——优先归档到本仓库）'}")
+    # ⚠️ 回退分支「不让脚本崩」≠「通过」：§2.5.62 的归档要求就是本仓库要有它。
+    # 没有这条判据，回退路径平时不执行、执行时又全绿 —— 归档哪天掉了都没人知道。
+    ok(local, "归档落在本仓库 `construction_agent/input/`（§2.5.62）",
+       "" if local else "**回退中：归档未落地本仓库**")
     ok(m["pp_lines"] == 466, "文件 466 行", f"实测 {m['pp_lines']}")
     ok(m["has_mineru"], "文件头写的是 MinerU PDF 处理器")
     ok(m["flash_extract"] and m["is_ocr"],
@@ -206,7 +250,28 @@ def part_b(m: dict) -> None:
        f"实测 L{m['split_book']}")
     ok(m["split_into"] == 404, "_split_into_accidents 在第 404 行",
        f"实测 L{m['split_into']}")
-    ok(m["anchor"], "专用切分锚点 = ^## 一、事故简介\\s*$（只匹配 SMALL 那本）")
+    # ---- 版本演化：第七节的归因依据（§2.5.62 起）----
+    # 归档版（本仓库现在的文件）应是 git 最新版；产出那批数据的是 `1c14cde` 旧版。
+    ok(m["anchor"], "归档版锚点行含 `一、`（它是 `0983599` 那版的血缘）")
+    # ⚠️ 上面那条 `in` 判据两版都为真，**核不到归档版落的是哪一版**。
+    # 归档的用途是「留给将来能跑的那一版」，落到旧版就白归档了 —— 故须逐字比。
+    ok(m["anchor_line"] == m["git_new_anchor"],
+       f"**归档版锚点与 git 最新版（{GIT_VER_LATEST}）逐字相同**"
+       "——归档须落最新版，落成旧版等于把那个 bug 一起归档",
+       f"归档={m['anchor_line'][:60]}…" if m["anchor_line"] != m["git_new_anchor"] else "")
+    ok(m["git_old_ok"] and m["git_new_ok"],
+       f"git 两版可达（{GIT_VER_AT_RUN} / {GIT_VER_LATEST}）",
+       f"{m['git_old_lines']} 行 / {m['git_new_lines']} 行")
+    ok("(?:" not in m["git_old_anchor"] and "[0-9]" not in m["git_old_anchor"],
+       f"**{GIT_VER_AT_RUN}（产出那批数据的版本）锚点只认中文数字**"
+       "——这是「228 MB 那本走回退分支 ⇒ 95/97 粘连」的唯一依据",
+       m["git_old_anchor"][:96])
+    ok("[0-9]+" in m["git_new_anchor"],
+       f"**{GIT_VER_LATEST}（git 最新版）锚点已补阿拉伯数字分支**"
+       "——修了上面那个 bug，但**那两批数据是 07-25/07-27 处理的，没赶上**",
+       m["git_new_anchor"][:96])
+    ok(m["git_old_anchor"] != m["git_new_anchor"],
+       "两版锚点**确实不同**（否则上面两条判据会同时为真而互相抵消）")
 
 
 # ------------------------------------------------------------ C. 主库形态
@@ -293,6 +358,73 @@ def part_d(m: dict) -> None:
     ok("MinerU 云端" in sec, "文档：点名 MinerU 云端 OCR")
     ok("互相掩盖" in sec, "文档：写下「两个结论互相掩盖」这条教训")
 
+    # ---- §2.5.62：归档取证那节的数字 ↔ 实测 ----
+    # 定位到该节（从标题到「## 三、目标架构」之前），再在**节内**找数字——
+    # 不能裸查全文，`2.5.61` 里也有 `466 行` 这类同名 token。
+    s62 = doc.split("### §2.5.62", 1)[-1].split("\n## 三、目标架构", 1)[0] \
+        if "### §2.5.62" in doc else ""
+
+    def find62(pat: str, want, label: str) -> None:
+        # ⚠️ 文档里的千分位逗号要去掉再转 int——`int("17,161")` 会炸。
+        mm = re.search(pat, s62)
+        if not mm:
+            got = None
+        else:
+            vals = tuple(int(x.replace(",", "")) for x in mm.groups())
+            got = vals[0] if len(vals) == 1 else vals
+        if isinstance(want, int) and not isinstance(got, int):
+            got = None
+        ok(got == want, label, f"文档 {got} / 实测 {want}")
+
+    ok(bool(s62), "文档：§2.5.62 小节存在")
+    if s62:
+        # 字节数只有这一处（三行并排表）；上一版另写了一条「`1c14cde` | 17,161 B」
+        # 的正则去核同一格——**文档里那格没有反引号包 sha**，永远匹配不上，
+        # 且与下面这条核的是同一个数字，纯冗余，删掉。
+        find62(r"\| \*\*([\d,]+) B\*\* \| ([\d,]+) B \| ([\d,]+) B \|",
+               (m["git_new_bytes"], m["git_old_bytes"], m["git_new_bytes"]),
+               "文档：三版字节表（新 / 磁盘旧 / 归档新）")
+        find62(r"`__init__\.py`（(\d+) B）与 `models\.py`（(\d+) B）",
+               (380, 624), "文档：另两个文件字节数")
+        # 日期：git 提交日期与主库 crawl_date 都要与文档一致
+        for pat, want, label in (
+            (r"`1c14cde`（旧版锚点） \| (2026-\d\d-\d\d)", "2026-07-22",
+             "文档：1c14cde 提交日"),
+            (r"（`0983599`） \| (2026-\d\d-\d\d)", "2026-10-01",
+             "文档：0983599 提交日"),
+            (r"`crawl_date` 07-25", "crawl_date 07-25", "文档：51 条处理日 = 07-25"),
+            (r"`crawl_date` 07-27", "crawl_date 07-27", "文档：97 条处理日 = 07-27"),
+        ):
+            hit = bool(re.search(pat, s62))
+            ok(hit, label, "" if hit else "**文档里找不到这句**")
+        # 临时拆分件（§2.5.62 第八节）
+        pp3 = MAIN / "scripts" / "process_pdf3.py"
+        src3 = pp3.read_text(encoding="utf-8") if pp3.exists() else ""
+        ok("/tmp/scan_part1.pdf" in src3 and "scan_part2.pdf" in src3,
+           "文档：处理那 97 条的输入是 /tmp/scan_part1.pdf + scan_part2.pdf",
+           "（`scripts/process_pdf3.py`，主仓库）" if src3 else "**process_pdf3.py 不在**")
+        ok('mode="precision"' in src3 and "os.getenv('MINERU_API_TOKEN'" in src3,
+           "文档：三个脚本自己 os.getenv 取 token、不经 settings——"
+           "「settings 里没这个字段」≠「项目没有 MinerU」",
+           "" if src3 else "**源不在**")
+        # 「settings.MINERU_API_TOKEN 没这个字段」这半句须仍成立
+        try:
+            sys.path.insert(0, str(ROOT))
+            from construction_agent.config import settings as _st
+            ok(not hasattr(_st, "MINERU_API_TOKEN"),
+               "文档：settings.MINERU_API_TOKEN **确实**没这个字段（半对的那半）")
+        except Exception as e:  # noqa: BLE001
+            ok(False, "文档：能 import settings 以核 MINERU 字段", str(e)[:80])
+        # §2.5.59 那段（`_handle_pdf` 死代码）的补注——**在 §2.5.62 之前**，
+        # 故按全文找，不走 s62 切片。
+        # ⚠️ 判据串必须与 **DRIFT 注入的串**逐字一致，且**不能跨 md 换行**——
+        # 文档里写的是「是两个\n> 独立的死因」，`两个独立的死因` 这个串**不存在**
+        # （第一版就是这么假红的）；drift 用宽串则替换落不了地、用例静默失效。
+        # 故两端都取 `独立的死因` 这一截。
+        ok("独立的死因" in doc,
+           "文档：§2.5.59 死代码段已补注（两条佐证是**两个独立死因**，"
+           "归档只解除了其中一条）")
+
 
 # ------------------------------------------------------------ E. 漂移自证
 def run() -> int:
@@ -334,6 +466,17 @@ DRIFT = [
     # `(差 )4\.5( 倍)`，替换落在 §2.5.60、被测段分毫未动，用例静默失效（退出码 0）。
     ("分辨率 4.5 倍 → 4.4 倍",
      r"(\*\*分辨率差 )4\.5( 倍。\*\*)", r"\g<1>4.4\g<2>"),
+    # ---- §2.5.62 起 ----
+    # 下面两条只出现在 §2.5.62，模式天然唯一；仍按上面的规矩核「替换是否落地」。
+    ("三版字节表 17,234 → 17,235",
+     r"(\| \*\*17,)234( B\*\* \| )", r"\g<1>235\g<2>"),
+    ("51 条处理日 07-25 → 07-26",
+     r"(`crawl_date` )07-25", r"\g<1>07-26"),
+    # ⚠️ 模式里**不能带 `**` 前缀**：文档里 `**` 在「是两个」之前，而「独立的死因」
+    # 那一行以 `> ` 开头——`(\*\*)独立的死因` 匹配不上，替换落不了地（上一版如此）。
+    # 只替关键词，判据串同样只取关键词。
+    ("§2.5.59 补注「独立死因」→「同一死因」",
+     r"独立的死因", r"同一的死因"),
 ]
 
 
@@ -370,6 +513,81 @@ def drift_test() -> int:
     return bad
 
 
+def drift_test_src() -> int:
+    """源码面注入——**文档面（DRIFT）覆盖不到的三条**，§2.5.62 新增。
+
+    为什么必须单独做：§2.5.62 新增的 B 段判据全部依赖「归档文件是哪一版」与
+    「git 里两版各是什么形态」，而 DRIFT 只改文档、**碰不到这两样**。
+    不注入就只是「报绿」，不是「报了也不会错」。
+    """
+    global GIT_VER_AT_RUN          # ⚠️ 必须在函数体**最前**——用例 1 里就要引用它
+    print("\nE2. 源码面漂移自证（归档落错版 / 版本常量指错 / 回退分支）")
+    print("=" * 74)
+    bad = 0
+    if not _PP_LOCAL.exists():
+        print(f"  ❌ 归档文件不在：{_PP_LOCAL}（§2.5.62 归档未落地，无法自证）")
+        return 1
+    orig = _PP_LOCAL.read_bytes()
+
+    # --- 用例 1：把归档文件换成旧版 —— 「归档版 == git 最新版」应转红 ---
+    try:
+        old = git_file(GIT_VER_AT_RUN, _PP_REL)
+        if not old:
+            print(f"  ❌ git 取不到 {GIT_VER_AT_RUN}:{_PP_REL}")
+            bad += 1
+        else:
+            _PP_LOCAL.write_text(old, encoding="utf-8")
+            rc = run()
+            print(f"  {'✅' if rc == 1 else '❌'} 归档版换成 {GIT_VER_AT_RUN} 旧版"
+                  f"（锚点那个 bug 一起归档） → 退出码 {rc}")
+            if rc != 1:
+                bad += 1
+    finally:
+        _PP_LOCAL.write_bytes(orig)
+        if _PP_LOCAL.read_bytes() != orig:
+            print("  ❌ **归档文件还原不一致**")
+            bad += 1
+
+    # --- 用例 2：版本常量指错 —— 「旧版只认中文数字」应转红 ---
+    saved = GIT_VER_AT_RUN
+    try:
+        GIT_VER_AT_RUN = GIT_VER_LATEST          # 两版都指最新 ⇒ 两版无差
+        rc = run()
+        print(f"  {'✅' if rc == 1 else '❌'} GIT_VER_AT_RUN 指成最新版"
+              f"（两版锚点差消失，第七节归因失去依据） → 退出码 {rc}")
+        if rc != 1:
+            bad += 1
+    finally:
+        GIT_VER_AT_RUN = saved
+
+    # --- 用例 3：回退分支 —— 归档文件改名 ⇒ 应恰好报「归档未落地本仓库」 ---
+    # ⚠️ 回退分支平时永不执行（`A if A.exists() else B` 的 B）。按 §2.5.28 的规矩
+    # （`t7_selfproof`），不测它就只是一句承诺。
+    hidden = _PP_LOCAL.with_suffix(".py.hidden")
+    try:
+        _PP_LOCAL.rename(hidden)
+        del fails[:]
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            b = measure_src()
+            part_b(b)
+        hit = any("归档落在本仓库" in f for f in fails)
+        rc = 1 if fails else 0
+        print(f"  {'✅' if (rc == 1 and hit) else '❌'} 归档文件改名 ⇒ 回退 fix-collectors"
+              f"，且**恰好**报「归档未落地」 → 退出码 {rc}，命中={hit}"
+              + ("" if hit else f"（实际不符项：{fails}）"))
+        if not (rc == 1 and hit):
+            bad += 1
+    finally:
+        hidden.rename(_PP_LOCAL)
+
+    total = 3
+    ok(bad == 0, f"源码面用例全部被捕获（{total - bad}/{total}）")
+    return bad
+
+
 def main() -> int:
     print("§2.5.61 那 97 条正文的来历：PDF 文字层取证 + MinerU 证据链 ↔ 文档")
     print("=" * 74)
@@ -403,5 +621,14 @@ def main() -> int:
 
 if __name__ == "__main__":
     if "--drift-test" in sys.argv:
-        sys.exit(drift_test())
+        rc_doc = drift_test()
+        rc_src = drift_test_src()
+        print("\n" + "=" * 74)
+        if rc_doc or rc_src:
+            print(f"❌ 漂移自证未全过：文档面 {len(DRIFT) - rc_doc}/{len(DRIFT)}，"
+                  f"源码面 {3 - rc_src}/3")
+            sys.exit(1)
+        print(f"✅ 漂移用例全部被捕获（文档面 {len(DRIFT)}/{len(DRIFT)} + 源码面 3/3 = "
+              f"{len(DRIFT) + 3} 条）")
+        sys.exit(0)
     sys.exit(main())

@@ -235,6 +235,12 @@ def part_d() -> None:
            f"{s} import PDFProcessor")
 
     # pdf_processor.py 在不在本仓库 / 主仓库
+    #
+    # ⚠️⚠️ 本节（§2.5.60）原来断言的是「**不在**本仓库 ⇒ 895 条不可复现」。
+    # §2.5.62 已把它归档回原位，**该断言不再成立**；但同样要更正的是它背后的推理——
+    # 当年只查了**磁盘**、没查 git：实测 git 的 `agent2.0` 分支上它一直有**两版**
+    # （`1c14cde` 07-22 / `0983599` 10-01），断的是**可达性**不是数据
+    # （与 §2.5.28 `experiment_6strategies` 那次同构）。
     here = list(ROOT.rglob("input/pdf_processor.py"))
     # ⚠️ 必须排除 `.claude/worktrees/`：fix-collectors 就在主仓库**内部**，
     # 不排除的话 `rglob` 会命中它，判据「主仓库工作副本里没有」直接假绿。
@@ -242,15 +248,49 @@ def part_d() -> None:
              # ⚠️ `p.parts` 是**逐层**分段的，`".claude/worktrees"` 永远不会是其中一段
              # （第一版这么写，判据假绿）。按路径字符串判。
              if ".claude/worktrees" not in str(p)]
-    ok(not here, "`pdf_processor.py` **不在本仓库**（故 895 条不可复现）",
-       f"本仓库命中 {len(here)} 处" if here else "")
-    ok(not mainc, "`pdf_processor.py` **不在主仓库工作副本**",
+    ok(bool(here), "`pdf_processor.py` **已回收到本仓库**（§2.5.62 归档）"
+       "——原判据「不在本仓库（故 895 条不可复现）」自本日起**已被更正**",
+       f"本仓库 {len(here)} 处：{[str(p.relative_to(ROOT)) for p in here]}"
+       if here else "**仍未落地，归档待做**")
+    ok(bool(here) and all(p.parent.name == "input"
+                          and p.parent.parent.name == "construction_agent" for p in here),
+       "回收位置是**原位** `construction_agent/input/`（不新建目录）")
+    ok(not mainc, "`pdf_processor.py` **不在主仓库工作副本**（§2.5.62 后仍然）",
        f"主仓库命中 {len(mainc)} 处" if mainc else "")
-    # 但须指出它在别处存在——否则这条判据会退化成「文件不存在」这种无意义的真
+
+    # 它在别处还有没有——§2.5.62 更正了这句：不是「只存在于 fix-collectors」，
+    # 而是「fix-collectors 磁盘那份 = `1c14cde` **旧版**，git 里还有更新的 `0983599` 版」。
+    import subprocess
+    rel = "construction_agent/input/pdf_processor.py"
+
+    def _git(sha: str) -> bytes:
+        r = subprocess.run(["git", "-C", str(ROOT), "show", f"{sha}:{rel}"],
+                           capture_output=True)
+        return r.stdout if r.returncode == 0 else b""
+
+    ver = {sha: _git(sha) for sha in ("1c14cde", "0983599")}
+    ok(all(ver.values()), "git 里两版都可达（1c14cde / 0983599）"
+       "——「数据不会丢、断的是可达性」这条更正的实证",
+       " / ".join(f"{s}={len(b)}B" for s, b in ver.items()))
+    ok(len(ver["1c14cde"]) != len(ver["0983599"]),
+       "两版**确实不同**（否则「取哪一版都一样」这句更正里的话不成立）")
     fc = Path("/home/suntianhao/construction_agent/.claude/worktrees/fix-collectors/"
               "construction_agent/input/pdf_processor.py")
-    ok(fc.exists(), "它只存在于 fix-collectors worktree（断链的具体位置）",
+    ok(fc.exists() and fc.read_bytes() == ver["1c14cde"],
+       "fix-collectors 磁盘那份 = `1c14cde` **旧版**（锚点只认中文数字）"
+       "——归档若从磁盘取，就把那个 bug 一起归档了",
        str(fc) if fc.exists() else "**也不在 fix-collectors，须重新定位**")
+    if here:
+        ok(here[0].read_bytes() == ver["0983599"],
+           "本仓库归档版 = git **最新版** `0983599`（锚点已补阿拉伯数字分支）")
+
+    # 「895 条不可复现」**仍成立，但因由换了**（§2.5.61 裁决 3）：不是处理代码丢了，
+    # 而是**云端服务本身**——MinerU 的 flash/precision 是外部 API，代码归档了，
+    # 模型版本仍不可固定，同一份 PDF 今天再跑未必得到同一份 markdown。
+    n_books = len(list((MAIN / "asset" / "ebook").glob("*.pdf")))
+    ok(bool(here) and n_books > 0,
+       "「不可复现」的因由已换：处理代码 ✓ 原始 PDF ✓ —— 唯一卡点是**云端模型版本**",
+       f"ebook/*.pdf {n_books} 份")
 
     # 全仓 OCR 实现为 0
     OCR = re.compile(r"^\s*(?:import|from)\s+(pytesseract|paddleocr|easyocr|cnocr|"
@@ -262,8 +302,15 @@ def part_d() -> None:
         for py in base.rglob("*.py"):
             if OCR.search(py.read_text(encoding="utf-8", errors="ignore")):
                 hits.append(str(py.relative_to(MAIN)))
-    ok(not hits, "全仓 OCR 实现 = 0（`needs_ocr` 只有标记、没有消费方）",
-       f"命中 {hits}" if hits else "")
+    # ⚠️⚠️ §2.5.61 更正：这条**是假绿**，别照字面读。
+    # 零命中的真实原因是**覆盖范围**——它只扫主仓库的 `construction_agent/` 与
+    # `scripts/`，而唯一含 OCR 的 `pdf_processor.py` 恰恰不在那两个目录里
+    # （§2.5.60 自己上一段刚写过「它不在主仓库」）。项目**有** OCR，走 **MinerU 云端 API**。
+    # 「扫遍全仓零命中」的前提是「全仓」真的包含那个文件；判据的强度不超过它的覆盖范围。
+    ok(not hits, "主仓库 `construction_agent/` + `scripts/` 内本地 OCR 库 import = 0",
+       (f"命中 {hits}" if hits else
+        "⚠️ 覆盖范围到此为止：唯一含 OCR 的 pdf_processor.py **不在被扫的目录里**，"
+        "故「零命中」≠「项目没有 OCR」（§2.5.61）"))
 
     # 文档里不许把推断写成已查明
     doc = DOC.read_text(encoding="utf-8")

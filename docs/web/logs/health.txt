@@ -1,0 +1,89 @@
+探测 24 个源，每源最多 5 条、上限 180s、并发 4
+口径：不写任何库；探测超时 ≠ 生产超时（生产 30 分钟，见 docstring）
+
+未配置认证 Token, 无法采集
+  [ 1/24] esafety              空      0 条    0.1s                        
+  [ 2/24] beijing_em           有数据   5* 条    3.8s       列表 84     闭环 早停  正文中位 2945 字
+  [ 3/24] gz_em                有数据    4 条    6.1s       列表 33      闭环 ✓  正文中位 6335 字
+  [ 4/24] gd_em                有数据    7 条   10.8s       列表 53      闭环 ✓  正文中位 191 字
+  [ 5/24] cq_em                有数据   13 条   13.3s       列表 42      闭环 ✓  正文中位 2632 字
+HTTP 412 (尝试 1): https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/
+未找到 div.zfxxgk_zdgkc
+HTTP 412 (尝试 2): https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/
+HTTP 412 (尝试 3): https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/
+  [ 6/24] hub_em               没连上    0 条    3.3s        列表 0     闭环 空表  
+请求失败 (尝试 1): https://yjglt.jl.gov.cn/zsjg/aqjg/xxgkmlqy/ - [Errno -2] Name or service not known
+请求失败 (尝试 2): https://yjglt.jl.gov.cn/zsjg/aqjg/xxgkmlqy/ - [Errno -2] Name or service not known
+请求失败 (尝试 3): https://yjglt.jl.gov.cn/zsjg/aqjg/xxgkmlqy/ - [Errno -2] Name or service not known
+  [ 7/24] jl_em                没连上    0 条    3.3s        列表 0     闭环 空表  
+  [ 8/24] hebei_em             有数据   5* 条   17.4s      列表 110     闭环 早停  正文中位 3279 字
+  [ 9/24] henan_em             有数据   5* 条   13.2s      列表 193     闭环 早停  正文中位 3279 字
+请求失败 (尝试 1): https://yjglt.jiangxi.gov.cn/jxsyjglt/col/251210dxsgal/ - [SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled (_ssl.c:1081)
+  [10/24] js_em                有数据    1 条    4.0s       列表 45      闭环 ✓  正文中位 2993 字
+请求失败 (尝试 2): https://yjglt.jiangxi.gov.cn/jxsyjglt/col/251210dxsgal/ - [SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled (_ssl.c:1081)
+请求失败 (尝试 3): https://yjglt.jiangxi.gov.cn/jxsyjglt/col/251210dxsgal/ - [SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled (_ssl.c:1081)
+  [11/24] jx_em                没连上    0 条    3.4s        列表 0     闭环 空表  
+  [12/24] ln_em                有数据    2 条    3.5s       列表 20      闭环 ✓  正文中位 3276 字
+  [13/24] hain_em              有数据   12 条   30.8s       列表 37      闭环 ✓  正文中位 4706 字
+  [14/24] nmg_em               有数据    3 条    3.9s        列表 8      闭环 ✓  正文中位 2368 字
+  [15/24] news_aggregator      空      0 条   21.8s                        
+  [16/24] open_gov             空      0 条   17.5s                        
+  [17/24] sc_em                空      0 条    0.4s        列表 4      闭环 ✓  
+  [18/24] safehoo              有数据   5* 条   13.3s                        正文中位 209 字
+  [19/24] mem                  有数据   5* 条   47.8s                        正文中位 28315 字
+  [20/24] sh_em                有数据   5* 条   16.9s       列表 94     闭环 早停  正文中位 4898 字
+  [21/24] tj_em                有数据    3 条    6.7s       列表 15      闭环 ✓  正文中位 11056 字
+  [22/24] sx_em                有数据   23 条   24.7s       列表 29      闭环 ✓  正文中位 11642 字
+HTTP 500 (尝试 1): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200605/t20060505_2544191.html
+HTTP 500 (尝试 2): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200605/t20060505_2544191.html
+HTTP 500 (尝试 3): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200605/t20060505_2544191.html
+HTTP 500 (尝试 1): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200604/t20060430_2544186.html
+HTTP 500 (尝试 2): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200604/t20060430_2544186.html
+HTTP 500 (尝试 3): https://yjt.shaanxi.gov.cn/gk/zwxxgk/sgdc/200604/t20060430_2544186.html
+  [23/24] shaanxi_em           有数据   5* 条   51.4s      列表 472     闭环 早停  正文中位 2658 字
+  [24/24] mohurd               有数据   5* 条  109.1s                        正文中位 708 字
+
+| 源 | 分组 | 结果 | 条数 | 列表 | 闭环 | 正文中位 | 耗时 | 通路 |
+|---|---|---|---|---|---|---|---|---|
+| `beijing_em` | province | 有数据 | 5* | 84 | 早停 | 2945 | 3.8s | 通路A+早停 |
+| `cq_em` | province | 有数据 | 13 | 42 | ✓ | 2632 | 13.3s | 通路A+通路B |
+| `esafety` | media | 空 | 0 | — | — | 0 | 0.1s | 通路A |
+| `gd_em` | province | 有数据 | 7 | 53 | ✓ | 191 | 10.8s | 通路A |
+| `gz_em` | province | 有数据 | 4 | 33 | ✓ | 6335 | 6.1s | 通路A+通路B |
+| `hain_em` | province | 有数据 | 12 | 37 | ✓ | 4706 | 30.8s | 通路A+通路B |
+| `hebei_em` | province | 有数据 | 5* | 110 | 早停 | 3279 | 17.4s | 通路A+早停 |
+| `henan_em` | province | 有数据 | 5* | 193 | 早停 | 3279 | 13.2s | 通路A+早停 |
+| `hub_em` | province | 没连上 | 0 | 0 | 空表 | 0 | 3.3s | 通路A+通路B |
+| `jl_em` | province | 没连上 | 0 | 0 | 空表 | 0 | 3.3s | 通路A+通路B |
+| `js_em` | province | 有数据 | 1 | 45 | ✓ | 2993 | 4.0s | 通路A+通路B |
+| `jx_em` | province | 没连上 | 0 | 0 | 空表 | 0 | 3.4s | 通路A+通路B |
+| `ln_em` | province | 有数据 | 2 | 20 | ✓ | 3276 | 3.5s | 通路A |
+| `mem` | national | 有数据 | 5* | — | — | 28315 | 47.8s | 通路A+早停 |
+| `mohurd` | national | 有数据 | 5* | — | — | 708 | 109.1s | 通路B+早停 |
+| `news_aggregator` | media | 空 | 0 | — | — | 0 | 21.8s | 通路B |
+| `nmg_em` | province | 有数据 | 3 | 8 | ✓ | 2368 | 3.9s | 通路A |
+| `open_gov` | open_data | 空 | 0 | — | — | 0 | 17.5s | 通路B |
+| `safehoo` | media | 有数据 | 5* | — | — | 209 | 13.3s | 通路A+max_items+早停 |
+| `sc_em` | province | 空 | 0 | 4 | ✓ | 0 | 0.4s | 通路A+通路B |
+| `sh_em` | province | 有数据 | 5* | 94 | 早停 | 4898 | 16.9s | 通路A+早停 |
+| `shaanxi_em` | province | 有数据 | 5* | 472 | 早停 | 2658 | 51.4s | 通路A+早停 |
+| `sx_em` | province | 有数据 | 23 | 29 | ✓ | 11642 | 24.7s | 通路A+通路B |
+| `tj_em` | province | 有数据 | 3 | 15 | ✓ | 11056 | 6.7s | 通路A+通路B |
+
+> `条数` 带 `*` = 被早停截断，等于 `--limit`，**不是抓到了这么多**；不带 = 列表本就短，跑到底的真实候选数。两者不要横向比。
+
+> 闭环：判定 10 个（`✓` 10、`差 N` 0）、早停未判定 5 个、空表未判定 3 个、无此判据 6 个。
+> 早停的是列表超过 60 条的源——**不适用，不是有问题**。
+> 空表的是列表解析出 0 条的源（`hub_em`、`jl_em`、`jx_em`）——`0 == 0 + 0 + 0` 恒真，这一栏对它们没有信息量。**它们的问题不在「账对不对」，在「为什么一条都没有」**，看「结果」栏的 `空` / `没连上`。
+> 无此判据的源没记这几个计数器，同样不是「闭环失败」。
+
+> 列表条目数在「一页量级」（≤25）的源：`ln_em`(20)、`nmg_em`(8)、`sc_em`(4)、`tj_em`(15)
+> 单页源落在这里属正常。**两个方向都值得看一眼**：
+> ① 配了 `list_page_pattern` 却仍只有一页量级 → 分页 URL 可能没拼对；
+> ② **没配** `list_page_pattern` → 「单页」可能只是一句没查过的注释。
+>    去页面源码里找分页线索：`index_N.html`、`pagenav_N`、
+>    `createPageHTML(总数, 页数, 当前索引, 文件名, 扩展名)`——最后这个
+>    直接把总页数写在参数里。判据里少一维，那一维就不会报警。
+
+小结：17/24 个源抓到了数据（出错 0、超时 0）
+报告：/home/suntianhao/.claude/jobs/97d9ded7/tmp/health.json

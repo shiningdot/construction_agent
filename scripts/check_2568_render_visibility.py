@@ -13,9 +13,13 @@
   B. **核查覆盖率的缺口量化**——六个页面各有几个 `<details>`、首屏可见多少字、
      全展开多少字。此前 `screenshot_web.py` 的"文字 ≥ 200 字"判据全跑在首屏上。
   C. **判据在位 + 基线跑通**——`screenshot_web.py` 里那几条新判据的源码在位，
-     且完整跑一遍退出码 0。
-  D. **注入式自证**——往真实的 `static/accident.js` 注入三种缺陷，逐个断言
-     `MARKS` 里**红的恰好是哪几条**（不是"见红就算过"）。
+     且完整跑一遍退出码 0。另加一条**行为性**判据：`--out` 的默认落点必须是
+     `docs/web/figures`（web 核查产物），不是 `docs/paper/figures`（V1 归档论文
+     插图目录）——见 §2.5.71。
+  D. **注入式自证**——往真实源码注入缺陷，逐个断言**红的恰好是哪几条**（不是
+     "见红就算过"）。三个面在 `static/accident.js`（跑真实截图读 `MARKS`），
+     一个面在 `screenshot_web.py` 自己（`--out` 默认值，**只重解析源码、不跑
+     脚本**——跑它就会真往那个目录写图，正是该判据要防的事）。
   E. 文档 ↔ 实测。
 
 口径：起本地服务 + 无头 Chromium；除 D 段注入（`try/finally` 恢复）外不写文件。
@@ -38,6 +42,7 @@ from _serve import point_at, serve                        # noqa: E402
 
 DOC = ROOT / "docs" / "web" / "01_在线采集.md"
 SHOT = ROOT / "scripts" / "screenshot_web.py"
+BUILD = ROOT / "scripts" / "build_v2_docs.py"
 JS = ROOT / "construction_agent" / "web" / "static" / "accident.js"
 PY = "/home/suntianhao/construction_agent/.venv/bin/python3"
 PORT = 5128
@@ -191,6 +196,46 @@ def parts_ab(main_db: str, staging: str) -> dict:
 
 
 # ────────────────────── C 段：判据在位 + 基线 ──────────────────────
+def default_out_expr() -> str:
+    """取 `--out` 那一条 `add_argument` 的 default 实参原文。
+
+    **不跑脚本**、只重解析源码——跑它就会真往那个目录写 8 张 PNG，而"别往那儿写"
+    正是这条判据要防的事。解析失败返回空串，判据因此报红而**不会静默通过**。
+    """
+    src = SHOT.read_text(encoding="utf-8")
+    m = re.search(r'ap\.add_argument\(\s*"--out"\s*,\s*default=([^,]+),', src)
+    return m.group(1).strip() if m else ""
+
+
+def default_out_is_web() -> bool:
+    """默认落点是 web 核查产物目录，不是论文插图目录。
+
+    两半都要：**出现 `web`** 且 **不出现 `paper`**。只查前者的话，把默认值改成
+    `docs/web/../paper/figures` 这种写法照样通过；只查后者的话，指到 `docs/x/figures`
+    也放行。判据收窄的是那条 `add_argument` 的参数（§2.5.66：收窄接收者）。
+    """
+    expr = default_out_expr()
+    return "web" in expr and "paper" not in expr
+
+
+def figdir_expr() -> str:
+    """取 `build_v2_docs.py` 里 `FIGDIR` 赋值的实参原文。"""
+    m = re.search(r"FIGDIR\s*=\s*str\(([^)]*)\)",
+                  BUILD.read_text(encoding="utf-8"))
+    return m.group(1).strip() if m else ""
+
+
+def figdir_is_v2() -> bool:
+    """论文构建链读的是 V2 插图目录（`docs/paper_v2/figures`）。
+
+    §2.5.71 整节的论证建立在这一点上——"往 `docs/paper/figures/` 写再多也进不了
+    V2 论文"。这格一旦变（`FIGDIR` 改指别处），那节的结论就要重新判。
+    核的是 `FIGDIR` 的**实参**，不是裸搜 `figures`（§2.5.63：裸子串在混合语料里
+    制造假阳性——那个文件里到处是 `figures`）。
+    """
+    return "'paper_v2'" in figdir_expr()
+
+
 def part_c() -> str:
     print("\n[C] `screenshot_web.py` 的判据在位 + 基线跑通")
     src = SHOT.read_text(encoding="utf-8")
@@ -204,6 +249,13 @@ def part_c() -> str:
     ]:
         ok(needle in src, f"源码在位：{label}")
 
+    # 默认输出目录：web 核查产物 ↔ 论文插图，两个类别不该共用落点。
+    # 判据是**行为性**的（解析 default 实参），不是"文件里出现过 web 这个词"。
+    ok(default_out_is_web(),
+       "`--out` 默认落在 `docs/web/figures`（web 核查产物），"
+       "不是 `docs/paper/figures`（V1 论文插图）",
+       f"实测 default={default_out_expr() or '锚点未命中'}")
+
     rc, out = _run_shot()
     ok(rc == 0, f"`screenshot_web.py` 基线退出码 0（实为 {rc}）", out[-300:])
     marks = _marks(out)
@@ -213,58 +265,89 @@ def part_c() -> str:
 
 
 # ────────────────────────── D 段：漂移自证 ──────────────────────────
-#: 三处注入面，每处只碰一格判据。
+#: 四个注入面，每例只碰一格判据。`live=True` 的跑一次真实截图、读 `MARKS` 的
+#: 红集合；`live=False` 的**只重解析源码**——跑它就会真往那个目录写 8 张 PNG，
+#: 而「别往那儿写」正是那一例要防的事。
 #: ⚠️ 用例 1 会**连带**让「折叠 1 个没内容」转红——`pre` 被 display:none 后，
 #: 它所在的那个折叠展开确实一字未增。这是判据算对了，不是归因不唯一，所以
 #: 期望的**红集合**写两条而不是一条（§2.5.62：断言要精确到集合）。
 DRIFT = [
-    ("原文不可见",
-     "    const body = el('div', { cls: 'raw-body' }, [pre]);",
-     "    pre.style.display = 'none';\n"
-     "    const body = el('div', { cls: 'raw-body' }, [pre]);"),
-    ("无 raw-text",
-     "    if (!d.raw_text || !String(d.raw_text).trim()) return null;",
-     "    return null;"),
+    dict(label="原文不可见", target=JS, live=True,
+         old="    const body = el('div', { cls: 'raw-body' }, [pre]);",
+         new="    pre.style.display = 'none';\n"
+             "    const body = el('div', { cls: 'raw-body' }, [pre]);",
+         expect={"折叠 1 个没内容", "原文不可见"}),
+    dict(label="无 raw-text", target=JS, live=True,
+         old="    if (!d.raw_text || !String(d.raw_text).trim()) return null;",
+         new="    return null;",
+         expect={"无 raw-text"}),
     # ⚠️ 缩进是 10 空格（`el` 在 `summary` 数组里）——按 Read 的行号看着像 8 空格，
     #    第一版这么写真就锚点未命中，用例静默失效。
-    ("折叠没内容",
-     "          el('span', { cls: 'tier-n', text: '来源 / 判定路径 / 模型耗时' }),\n"
-     "        ]),\n"
-     "        body,",
-     "          el('span', { cls: 'tier-n', text: '来源 / 判定路径 / 模型耗时' }),\n"
-     "        ]),"),
-]
-#: 每例期望的**红集合**（只列详情页的 marks）
-EXPECT = [
-    {"折叠 1 个没内容", "原文不可见"},
-    {"无 raw-text"},
-    {"折叠 1 个没内容"},
+    dict(label="折叠没内容", target=JS, live=True,
+         old="          el('span', { cls: 'tier-n', text: '来源 / 判定路径 / 模型耗时' }),\n"
+             "        ]),\n"
+             "        body,",
+         new="          el('span', { cls: 'tier-n', text: '来源 / 判定路径 / 模型耗时' }),\n"
+             "        ]),",
+         expect={"折叠 1 个没内容"}),
+    # ── 源码面（2026-10-05 §2.5.71 补）──
+    # 上面三例都拿 `accident.js` 当注入面，§2.5.71 那两条新判据于是**没接过
+    # 失败路径**——报绿只说明"没报错"，不说明"报了也不会错"（§2.5.70）。
+    # 这两例补的就是它们，注入面分别是各自**被测的那个文件**。
+    # `live=False`：只重解析源码。跑 `screenshot_web.py` 会真往目录里写 8 张 PNG，
+    # 而「别往那儿写」正是第一例要防的事——**验证手段不能制造它要防的损害**。
+    dict(label="截图默认落回论文插图目录", target=SHOT, live=False,
+         probe=default_out_is_web,
+         old='default=str(ROOT / "docs" / "web" / "figures")',
+         new='default=str(ROOT / "docs" / "paper" / "figures")'),
+    dict(label="V2 构建链改读论文插图目录", target=BUILD, live=False,
+         probe=figdir_is_v2,
+         old="'paper_v2' / 'figures'", new="'paper' / 'figures'"),
 ]
 
 
 def part_d() -> int:
-    print("\n[D] 注入式自证：改真实 `accident.js`，断言红的恰好是哪几条")
-    orig = JS.read_text(encoding="utf-8")
+    print("\n[D] 注入式自证：改真实源码，断言红的恰好是哪几条")
+    origs: dict[Path, str] = {}
+
+    def _orig(p: Path) -> str:
+        if p not in origs:
+            origs[p] = p.read_text(encoding="utf-8")
+        return origs[p]
+
     bad = 0
     try:
-        for i, (label, old, new) in enumerate(DRIFT, 1):
-            if old not in orig:
+        for i, c in enumerate(DRIFT, 1):
+            base, label = _orig(c["target"]), c["label"]
+            if c["old"] not in base:
                 print(f"    🔴 用例 {i}「{label}」锚点未命中——用例本身失效")
                 bad += 1
                 continue
-            JS.write_text(orig.replace(old, new, 1), encoding="utf-8")
-            rc, out = _run_shot()
-            red = {m for ms in _marks(out).values() for m in ms}
-            want = EXPECT[i - 1]
-            good = rc == 1 and red == want
-            print(f"    {'✅' if good else '🔴'} 用例 {i}「{label}」→ 退出码 {rc}，"
-                  f"红的 {sorted(red)}" + ("" if good else f"（期望 {sorted(want)}）"))
+            c["target"].write_text(base.replace(c["old"], c["new"]), encoding="utf-8")
+            if c["live"]:
+                rc, out = _run_shot()
+                red = {m for ms in _marks(out).values() for m in ms}
+                good = rc == 1 and red == c["expect"]
+                got = f"退出码 {rc}，红的 {sorted(red)}"
+                want = f"（期望 红的 {sorted(c['expect'])}）"
+            else:
+                # 静态面：被测判据必须**由绿转红**。不跑脚本——跑它会真往目录里
+                # 写 8 张 PNG，正是第一例要防的事。
+                probe = c["probe"]
+                still = probe()
+                good = not still
+                got = f"`{probe.__name__}()` = {still}"
+                want = "（期望注入后转假）"
+            print(f"    {'✅' if good else '🔴'} 用例 {i}「{label}」→ {got}"
+                  + ("" if good else f" {want}"))
             if not good:
                 bad += 1
-            JS.write_text(orig, encoding="utf-8")
+            c["target"].write_text(base, encoding="utf-8")
     finally:
-        JS.write_text(orig, encoding="utf-8")
-        ok(JS.read_text(encoding="utf-8") == orig, "`accident.js` 已逐字恢复")
+        for p, text in origs.items():
+            p.write_text(text, encoding="utf-8")
+        ok(all(p.read_text(encoding="utf-8") == t for p, t in origs.items()),
+           "注入面全部逐字恢复（" + "、".join(sorted(p.name for p in origs)) + "）")
     ok(bad == 0, f"注入用例全部按预期转红（{len(DRIFT)-bad}/{len(DRIFT)}）")
     return 0 if bad == 0 else 1
 
@@ -272,8 +355,11 @@ def part_d() -> int:
 def _run_shot() -> tuple[int, str]:
     """跑一遍 `screenshot_web.py`，只要退出码与 `MARKS`。
 
-    截图落到临时目录（跑完即删）——否则每次核验都会往 `docs/paper/figures/`
-    里塞六张 PNG，而本脚本只关心判据，不看图。
+    截图显式落到临时目录（跑完即删）——否则每次核验都会塞八张 PNG，而本脚本
+    只关心判据、不看图。`screenshot_web.py` 的默认落点已于 2026-10-05 由
+    `docs/paper/figures/`（V1 归档论文插图目录）改到 `docs/web/figures/`，
+    见 §2.5.71；这里仍显式传 `--out` 是为了**不依赖默认值**——核验脚本的产物
+    落点不该随被测脚本的默认值漂移。
     """
     with tempfile.TemporaryDirectory() as d:
         r = subprocess.run([PY, str(SHOT), "--out", d],
@@ -297,7 +383,7 @@ def grab(pat: str, label: str, expect: str) -> None:
 
 
 def part_e() -> None:
-    print("\n[E] 文档 §2.5.68 ↔ 实测")
+    print("\n[E] 文档 §2.5.68 / §2.5.71 ↔ 实测")
     # ⚠️ 锚点四坑，本段一次踩中三个（§2.5.64 立，§2.5.66/§2.5.67 各犯一次）：
     #    ①**千分位**：文档数字带逗号（3,038），`(\d+)` 会在逗号前停住 ⇒ `[\d,]+`；
     #    ②**`**` 的位置**：文档是 `**首屏可见文字 988 字**`（`**` 在整句最外），
@@ -309,6 +395,11 @@ def part_e() -> None:
     grab(r"\*\*全展开 ([\d,]+) 字\*\*", "正文：详情页全展开 3,038 字", "3,038")
     grab(r"折叠态\s*`clientHeight` 有 \*\*(\d+) px\*\*",
          "正文：折叠态 clientHeight 235", "235")
+
+    # §2.5.71 整节的论证建立在 `figdir_is_v2()` 上（判据与其边界见该函数）。
+    ok(figdir_is_v2(),
+       "§2.5.71：`build_v2_docs.py` 的 FIGDIR 仍指向 `docs/paper_v2/figures`",
+       f"实测 FIGDIR={figdir_expr() or '锚点未命中'}")
 
 
 def run() -> int:

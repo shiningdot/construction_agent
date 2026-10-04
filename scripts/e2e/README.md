@@ -65,7 +65,7 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 
 | 脚本 | 查什么 | 端口 |
 |---|---|---|
-| `scripts/screenshot_web.py` | 六个页面逐张截图，报破图 / 空白 / 控制台报错。详情页样本两级挑，工作库没建好也照样截 | 5099 |
+| `scripts/screenshot_web.py` | 六个页面逐张截图，报破图 / 空白 / 控制台报错。详情页样本两级挑，工作库没建好也照样截。截图默认落 `docs/web/figures/`（2026-10-05 前是 V1 归档论文的插图目录，见 `docs/web/01_在线采集.md` §2.5.71） | 5099 |
 | `scripts/check_web_interaction.py` | 真点击 **17** 条：概览/致因两页维度齐全 / 筛选 / 翻页 / 分享链接 / 过期链接自愈 / 搜索 / 重置（前 11 条在列表页），外加**详情页四条**——12 个折叠逐个真点 / 「展开全文」按钮 / 图片灯箱 / 列表↔详情往返（2026-10-05 起，见 `docs/web/01_在线采集.md` §2.5.69），再加**键盘两条**——Tab 真实遍历可达缩略图与折叠 + Enter/Space 真开合 / 灯箱焦点陷阱与 Esc 后焦点归还（§2.5.70） | 5100 |
 | `scripts/check_field_alignment.py` | 前端读的名字 ↔ 后端返回的字段；**反向**：`accidents` 的列 ↔ 详情页四档 | 不起服务（`app.test_client()`） |
 | `scripts/check_blueprint_alignment.py` | 蓝图规定的接口 ↔ 代码注册的路由 | 不起服务（纯静态分析） |

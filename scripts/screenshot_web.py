@@ -50,6 +50,22 @@ CAICS 编码」的，字段齐、编码齐、图多，覆盖面最大；工作�
 但文字区、致因树、四档折叠都照常渲染，仍是有效核查。**详情页不许因为工作库没建好
 就从核查里消失**：2026-10-01 实测就是这种情况，而当时详情页刚改过三列展示。
 
+## 截图落在哪（2026-10-05 改）
+
+默认输出目录是 **`docs/web/figures/`**，**不再是 `docs/paper/figures/`**。后者是
+V1 归档论文（`docs/paper/eswa_paper.md`）的插图目录，装的是论文正文
+`![](figures/…)` 直接引用的 `figN_*`；截图是 web 核查产物、不是论文插图，默认落
+进去等于把两类产物混在一处——而且**每无参数跑一次就多写 8 张 PNG**（6 张首屏 +
+2 张 `_全展开`，实测约 3 MB），往一个已归档的交付物目录里持续增量。
+
+`check_2568_render_visibility.py` 早就为此显式传 `--out` 到临时目录、并在注释里
+写明「否则每次核验都会往 `docs/paper/figures/` 里塞六张 PNG」——那是对这个默认值
+的**一次性绕行**；这次改的是默认值本身，绕行也就不再必要（它仍可传 `--out`）。
+
+这不是纯偏好：`build_v2_docs.py` 的 `FIGDIR` 指向 `docs/paper_v2/figures`、插图按
+正文里的 `![](figures/figN_xxx.png)` 解析，所以往 `docs/paper/figures/` 写再多也
+**不会**进 V2 论文——伤害不在论文，在这个目录被当成"什么都往里丢"的公共落点。
+
 用法：
     .venv/bin/python3 scripts/screenshot_web.py
     .venv/bin/python3 scripts/screenshot_web.py --out /tmp/shots
@@ -235,7 +251,11 @@ def _raw_text_state(page) -> dict | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--out", default=str(ROOT / "docs" / "paper" / "figures"),
+    # ⚠️ 默认落点是 `docs/web/figures/`，**刻意不是 `docs/paper/figures/`**：
+    # 那是 V1 归档论文的插图目录（`figN_*` 被正文 `![]()` 引用）。截图是 web
+    # 核查产物，默认落进去会让每次无参数运行都往归档目录多写 8 张 PNG。
+    # 改动这条会让 `check_2568_render_visibility.py` 的 C 段判据转红——那是设计。
+    ap.add_argument("--out", default=str(ROOT / "docs" / "web" / "figures"),
                     help="截图输出目录")
     ap.add_argument("--port", type=int, default=5099)
     ap.add_argument("--main-db", default=None, help="最终库（默认取主仓库的）")

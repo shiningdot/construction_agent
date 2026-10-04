@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""V2 核验一键入口：正文四类 + 表格 + 两份投稿要件。
+"""V2 核验一键入口：正文四类 + 表格 + 图 + 两份投稿要件。
 
 改稿流程第 5 步要依次跑多个脚本，容易漏跑一两个——尤其只改了一句话、
-觉得"跟数字无关"的时候。这个入口按序执行全部七项并汇总，漏跑一处不会
+觉得"跟数字无关"的时候。这个入口按序执行全部八项并汇总，漏跑一处不会
 静默通过。
 
 分项各自的判据见其文件头：
@@ -10,16 +10,18 @@
   check_xref_v2.py           图表与章节交叉引用 + 中英段落对等
   check_numbers_v2.py        数字对账清单 ↔ 正文（50 项统一值）
   check_forbidden_v2.py      导师要求删除的 7 类禁用措辞（含 --self-test 自证）
-  check_tables_v2.py         表 5/6/7/8/9 逐格 ↔ 源数据（含 --self-test 自证）
+  check_tables_v2.py         九张表逐格 ↔ 源数据（含 --self-test 自证）
+  check_figures_v2.py        六张图内数值 ↔ 源数据（含 --drift-test 自证）
   check_highlights_v2.py     Highlights：条数 / 字符数 / 措辞 / 数字有据
   check_cover_letter_v2.py   投稿信：数字有据 / 措辞 / 标题一致
 
-前四项管"正文与自己的另一份记录对不对"，表格项管"正文与源数据对不对"，
+前四项管"正文与自己的另一份记录对不对"，表与图两项管"正文与源数据对不对"，
 末两项管"投稿要件与正文对不对"。**检查不到的部分不会被这行绿盖住**：
-表格项会把表 7 无源可核的两列显式列出来，而不是跳过。
+表格项会把表 7 无源可核的两列显式列出来，图项会把图 1 的 226 列出来，
+而不是跳过。
 
 用法：python3 scripts/check_v2_all.py [--quiet]
-退出码 0 = 七项全绿；非 0 = 有分项未通过（汇总行列出）。
+退出码 0 = 八项全绿；非 0 = 有分项未通过（汇总行列出）。
 """
 import subprocess
 import sys
@@ -33,6 +35,7 @@ CHECKS = [
     ('数字', 'check_numbers_v2.py'),
     ('措辞', 'check_forbidden_v2.py'),
     ('表格', 'check_tables_v2.py'),
+    ('图', 'check_figures_v2.py'),
     ('Highlights', 'check_highlights_v2.py'),
     ('投稿信', 'check_cover_letter_v2.py'),
 ]

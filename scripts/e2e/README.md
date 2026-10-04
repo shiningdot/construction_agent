@@ -66,7 +66,7 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | 脚本 | 查什么 | 端口 |
 |---|---|---|
 | `scripts/screenshot_web.py` | 六个页面逐张截图，报破图 / 空白 / 控制台报错。详情页样本两级挑，工作库没建好也照样截 | 5099 |
-| `scripts/check_web_interaction.py` | 概览页真点击十一条（两页维度齐全 / 筛选 / 翻页 / 分享链接 / 过期链接自愈 / 搜索 / 重置） | 5100 |
+| `scripts/check_web_interaction.py` | 真点击 **15** 条：概览/致因两页维度齐全 / 筛选 / 翻页 / 分享链接 / 过期链接自愈 / 搜索 / 重置（前 11 条在列表页），外加**详情页四条**——12 个折叠逐个真点 / 「展开全文」按钮 / 图片灯箱 / 列表↔详情往返（2026-10-05 起，见 `docs/web/01_在线采集.md` §2.5.69） | 5100 |
 | `scripts/check_field_alignment.py` | 前端读的名字 ↔ 后端返回的字段；**反向**：`accidents` 的列 ↔ 详情页四档 | 不起服务（`app.test_client()`） |
 | `scripts/check_blueprint_alignment.py` | 蓝图规定的接口 ↔ 代码注册的路由 | 不起服务（纯静态分析） |
 | `scripts/check_api_contract.py` | 蓝图画的响应样例 ↔ 真实响应的**字段** | 不起服务（`app.test_client()`） |
@@ -91,7 +91,10 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 ## 两个约定
 
 - **端口各占一个**，别改重复：采集 5091 · 采集点击 5092 · 提取 5093 · 提取点击 5094 ·
-  审核 5095 · 审核点击 5096 · 全链路 5097 · 主库对账 5098 · 截图 5099 · 交互核查 5100。
+  审核 5095 · 审核点击 5096 · 全链路 5097 · 主库对账 5098 · 截图 5099 · 交互核查 5100 ·
+  交互自检 5133 / 5134（`scripts/check_2569_interaction_click.py`：5134 是它 A 段自己起的
+  服务，5133 转给 `check_web_interaction.py`——**不传的话对方默认 5100，与本脚本自检
+  同时跑会撞**）。往上是各阶段的审计探针，同样各占一个（5128 是 §2.5.68 的自检）。
   （踩过：交互核查第一版默认 5098，正好是主库对账的端口，两套同时跑会撞。）
   （两个 `e2e_restart_*.py` 都不起 HTTP 服务——它们用 `app.test_client()` 打开页面，
   所以**不占端口**。它们要的「重启」是**进程**语义，端口上分不出来。）

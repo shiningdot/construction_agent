@@ -77,18 +77,21 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | `scripts/check_value_domain.py` | 验 `step1_basic_extractor.py` 的 tool schema 声明的 `enum` ↔ 主库 `accidents` 的**实际落库值**（`check_enum_alignment.py` 查的是工作库与前端标签，**不含**这份）。首查出一条真缺陷：`report_type` 声明 `教材/案例` 而库里 895 条（34.1%）是 `教材案例`——改声明对齐数据（§2.5.74）。另查清缺失的四**种**表示（NULL/空串/字符串哨兵/数值哨兵 `0`）并登记 12+4 条哨兵 | 不起服务（纯 SQL + 文本解析），约 3 秒 |
 | `scripts/check_2575_focus_obscured.py` | **WCAG 2.4.11 Focus Not Obscured (AA)**：键盘用户 Tab 走过页面时，拿到焦点的元素不得被吸顶顶栏 / 吸顶表头 / 底部批量条**完全遮住**。查出两处硬违规（滚动进视口的元素压在表头下 8 个组合、批量条盖住采集页底部 5/5），修 `scroll-padding-top: 94px` + `scroll-padding-bottom: 74px`（§2.5.75）。**改 `app.css` 的 `position`/`top`/`bottom`/`z-index`/`--topbar-h`/`--thead-h`/`--bulkbar-*` 都要重跑** | 5150，**约 4 分钟**（五视口 × 五页完整 Tab 往返） |
 | `scripts/check_2576_column_exit.py` | **主库 133 列的出口面**：用代理包住唯一读入口 `db.connect_readonly`，跑遍全部 GET 路由，按 `cursor.description` 判每一列有没有真进过结果集。结论：read 26 / 仅由 `SELECT *` 带回 32 / 只做筛选 4 / **零出口 67** / 值全空 4；`web/db.py:41-48` 那句"五张表一次都没查过"测得**方向对、措辞不准**（只被 `/api/health` 的通用计数模板查过）（§2.5.76）。**改任何一条 SELECT、或改 `detail.py:_SQL_ACCIDENT` 的 `SELECT *` 都要重跑** | 不起服务（`app.test_client()`），约 0.6 秒 |
+| `scripts/check_2577_response_face.py` | **结果集 → HTTP 响应**：上一条查到"进没进结果集"就停住，这条补中间那一格——**进了结果集不等于发给了前端**。判据是**结果集里的列名有没有作为键进过响应 JSON**（递归收嵌套 dict/list 的键，**不看值**：值面会假绿——`work_task` 与 `work_task_enum` 同命名空间值互撞；会假红——`pipeline_metadata.value` 是 JSON 串、解析后只取 `version`）。结论：**58** 对业务列进过结果集、**56** 对名字面直接出口，失守 **2** 对且性质相反（`pipeline_metadata.value` 走**源码面**出口；`accidents.work_task_enum` **两层都不成立**，是 `accidents_query.py:111-125` 已裁决的「有意不下发」）（§2.5.77）。**改任何一条 SELECT、或改 `detail.py:_SQL_ACCIDENT` 的 `SELECT *` 都要重跑** | 不起服务（`app.test_client()`），约 3 秒 |
 
-十二条都只读不写，跑几次都行。（2026-10-05 核对三处计数：加 `check_color_source.py`
+十三条都只读不写，跑几次都行。（2026-10-05 核对三处计数：加 `check_color_source.py`
 之前本表实为**八行**却写着"九条"——§2.5.72 那次加 `check_contrast_a11y.py` 时改了计数
 没补行；加 `check_value_domain.py` 后同步改为"十条"、加
 `check_2575_focus_obscured.py` 后改为"十一条"、加
-`check_2576_column_exit.py` 后改为"十二条"。）它们的结论与判据记在
+`check_2576_column_exit.py` 后改为"十二条"、加 `check_2577_response_face.py` 后改为
+"十三条"。）它们的结论与判据记在
 `docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互
 〔含 §8.6 对比度、§8.7 配色来源与非文本对比度〕、§九 蓝图↔实现、§十 响应契约、
 §十一 枚举取值、§十二 编码列的中文名、§十三 查询计划；**取值域**这一维见
 `docs/web/01_在线采集.md` §2.5.74 与 09 号 §十五 里的**第十六个**；**焦点遮挡**这一维
 见 §2.5.75 与 09 号 §十五 里的**第十七个**；**列出口面**这一维
-见 §2.5.76 与 09 号 §十五 里的**第十八个**）。
+见 §2.5.76 与 09 号 §十五 里的**第十八个**；**响应面**这一维见 §2.5.77 与 09 号 §十五
+里的**第十九个**）。
 
 `check_api_contract.py` 跟上面四个各管一头：字段核查问「前端有没有人读它」，
 蓝图核查问「路由在不在」，**中间空着「文档写了这个字段、实现给没给」**——这一格

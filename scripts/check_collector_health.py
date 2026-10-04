@@ -18,7 +18,7 @@
 
 默认跑全部 24 个源，每个源最多收 3 条，单源 120 秒。
 
-## 四条口径，先看这里
+## 七条口径，先看这里
 
 1. **不写任何库。** 只读探测：`registry.build(key, data_dir=<tmp>)` 之后挂一个
    只记账的 sink，不碰 `raw_accidents`，也不碰 `data/<源名>/`。探测完临时目录
@@ -63,6 +63,19 @@
    两者都要人去看页面；这一格至少把「压根没取到页面」排除了。
    **只覆盖 12 个 TRS 源**，其余源仍只有 `空` 一种。
 
+7. **每个源的输出都带着自己的源名，归属不用猜。** 四个源并发跑，子进程的
+   warning 实时穿插——**旧输出里不带前缀的行只能按「挨着哪条 `[N/24]`」来
+   猜，而那是错的**（`[N/24]` 是完成顺序，不是排列顺序）。2026-10-05 就
+   栽在这上面：把 `百度搜索「…」返回的是拦截页` 归给了 `open_gov`，
+   而 `open_gov.py` 里 `baidu` 一处都没有。现在子进程的输出先落进
+   `<key>.stdout`，父进程在汇总行之后整块打印、逐行补 `[key]` 前缀，
+   并缩进 10 格——**从「挨着谁」变成「它自己写着是谁」**。详见
+   `docs/web/01_在线采集.md` §2.5.57。
+
+   ⚠️ **这条修的是「读日志的人会归错」，不是「日志里没有归属信息」**：
+   `[hub_em] HTTP 412…` 这类采集器自己打的 warning 一直带前缀，从不误判；
+   出事的是搜索层与 TRS 基类打的无前缀行。
+
 ## 退出码
 
 - `0` —— 探测跑完，**且至少有一个源抓到了数据**（结论已产出）
@@ -81,6 +94,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import multiprocessing as mp
 import shutil
 import sys
@@ -278,7 +292,74 @@ def _closure_of(collector) -> dict | None:
             "filtered": filt, "sum": col + rev + filt}
 
 
+class _CaptureStreams:
+    """把子进程的输出改道到 `cap`：`sys.stdout` / `sys.stderr`，**以及 root 上
+    已有的 `StreamHandler`**。
+
+    只改 `sys.stdout/stderr` 会漏掉一类 handler——`logging.StreamHandler()`
+    在**构造时**就把当时的 `sys.stderr` 存进了 `self.stream`，之后改
+    `sys.stdout` 与它无关。实测（2026-10-05，零请求）：空 handler 的进程里
+    重定向抓得住，装了 `StreamHandler` 之后抓到的是**空串**——沉默地漏。
+
+    `logging.lastResort` 是例外，不用管它：它的 `stream` 是 property，每次
+    emit 现读 `sys.stderr`，所以改动天然生效。
+
+    **改不到谁**：挂在**非 root** logger 上的 handler（某个库自己
+    `addHandler`）。当前导入链里没有这样的库（`grep -rn "addHandler|
+    basicConfig" construction_agent/collector/` 只命中 `run_collect.py`
+    这个 CLI，不在链上）；真出现了就会照旧漏到终端，
+    `tests/test_probe_child_output.py` 里那条断言会先炸。
+    """
+
+    def __init__(self, cap) -> None:
+        self.cap = cap
+        self._saved: list = []
+
+    def __enter__(self) -> "_CaptureStreams":
+        for attr in ("stdout", "stderr"):
+            self._saved.append((sys, attr, getattr(sys, attr)))
+        sys.stdout = sys.stderr = self.cap       # type: ignore[assignment]
+        for h in logging.getLogger().handlers:
+            if isinstance(h, logging.StreamHandler):
+                self._saved.append((h, "stream", h.stream))
+                h.stream = self.cap              # type: ignore[assignment]
+        return self
+
+    def __exit__(self, *_exc) -> bool:
+        for obj, attr, val in reversed(self._saved):
+            setattr(obj, attr, val)
+        self._saved.clear()
+        return False                             # 不吞异常
+
+
 def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
+    """在子进程里探一个源。结果写 `<work>/<key>.jsonl`，异常写 `<key>.err`。
+
+    本函数只做一件事：**把子进程的输出关进自己的文件**，再调
+    `_probe_child_inner` 干正事。为什么必须关——见 `_attr_line`。
+
+    用**行缓冲的文件**而不是 `io.StringIO`：被父进程 `terminate()` 掉的源
+    （超时那一路）也能留住已经写出来的行，而 `StringIO` 在 SIGTERM 下
+    一行都带不走——**恰恰是最需要日志的那次探测最拿不到日志**。
+    """
+    work = Path(work)
+    try:
+        cap = open(work / f"{key}.stdout", "w",
+                   encoding="utf-8", buffering=1)
+    except OSError:
+        # 落不了盘就照旧直通终端。**不因为「记不上日志」而放弃探测**——
+        # 那会把一个日志设施问题升级成「这个源没数据」。
+        _probe_child_inner(key, work, limit, tmp_root)
+        return
+    try:
+        with _CaptureStreams(cap):
+            _probe_child_inner(key, work, limit, tmp_root)
+    finally:
+        cap.close()
+
+
+def _probe_child_inner(key: str, work: Path, limit: int,
+                       tmp_root: Path) -> None:
     """在子进程里探一个源。结果写 `<work>/<key>.jsonl`，异常写 `<key>.err`。
 
     **全程不写库**：只 `build` + 挂 sink，`executor` 那条写 `raw_accidents`
@@ -416,6 +497,58 @@ def _read_result(key: str, work: Path) -> dict:
     return out
 
 
+def _read_captured(key: str, work: Path) -> list:
+    """读子进程关进 `<key>.stdout` 的那些行（见 `_probe_child`）。"""
+    p = work / f"{key}.stdout"
+    if not p.exists():
+        return []
+    # `errors="replace"`：站点返回的乱码字节不该让整份日志读不出来。
+    return [ln for ln in p.read_text(encoding="utf-8", errors="replace")
+            .splitlines() if ln.strip()]
+
+
+# 子进程输出块相对 `[N/24]` 汇总行的缩进。纯排版：让「谁说的」一眼可见。
+_BLOCK_INDENT = " " * 10
+
+
+def _attr_line(key: str, line: str) -> str:
+    """给子进程的一行输出补上源名前缀，**归属不再靠位置**。
+
+    这修的是一个把我骗了两次的读数陷阱（§2.5.56）。四个源并发跑
+    （`CONCURRENCY = 4`）、子进程 stdout 直通终端，于是：
+
+      · `[N/24]` 是**完成顺序**，不是源的排列顺序
+      · 子进程的 warning 实时穿插，谁挨着谁纯属巧合
+
+    日志里一屏长这样（真实发生过）：
+
+        百度搜索「建筑施工 安全事故 死亡」返回的是拦截页…
+          [18/24] open_gov             没连上    0 条   47.2s
+
+    按行相邻归属，就把百度那行算给了 `open_gov`——而 `open_gov.py` 里
+    `baidu` 一处都没有（它压根不走搜索层）。**能归属的行是带前缀的**
+    （`[open_gov] …` 是采集器自己打的），**不带前缀的行**（搜索层的
+    `百度搜索「…」…`、基类的 `未找到 div.…`）在旧输出里无凭据可归属。
+
+    修法不是「把搜索层加上源名」——那要让搜索层知道自己被谁调用，
+    侵入十八个源。改在**父进程侧**：子进程把输出写进 `<key>.stdout`
+    （`_probe_child`），父进程在汇总行之后整块打印并逐行补前缀。
+    于是**每一行都自带归属凭据**，缩进还告诉你这行属于上面那条汇总。
+
+    已带 `[key]` 前缀的行不重复加，否则会写成 `[hub_em] [hub_em] HTTP 412…`。
+    """
+    s = line.rstrip()
+    return f"{_BLOCK_INDENT}{s.lstrip()}" if s.lstrip().startswith(f"[{key}]") \
+        else f"{_BLOCK_INDENT}[{key}] {s.lstrip()}"
+
+
+def _print_result_block(res: dict, work: Path, done: int, total: int) -> None:
+    """打印一个源的汇总行 + 它自己的输出块（父进程侧，唯一打印出口）。"""
+    print(f"  [{done:2d}/{total}] {_fmt_line(res)}", flush=True)
+    for line in _read_captured(res["key"], work):
+        print(_attr_line(res["key"], line), flush=True)
+
+
 def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> list:
     pending = list(specs)
     running: list[dict] = []
@@ -463,7 +596,7 @@ def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> lis
                 results.append(res)
                 running.remove(item)
                 done += 1
-                print(f"  [{done:2d}/{total}] {_fmt_line(res)}", flush=True)
+                _print_result_block(res, work, done, total)
     except KeyboardInterrupt:
         for item in running:
             item["proc"].kill()

@@ -173,6 +173,67 @@ MEASURE = r"""
 """
 
 
+#: 量一页的**非文本**对比度（WCAG 1.4.11）：输入控件靠什么被认出来。
+#:
+#: 1.4.11 的原文管的是「用户界面组件的视觉信息」，要求 3:1。对输入框来说，
+#: 识别它靠的是**边框**或**底色差**——两者取较大者判，任一达 3:1 即可。
+#: **只扫输入控件**（input/select/textarea）：卡片、面板、图表轨道那些浅边框是
+#: 装饰性分隔，1.4.11 明确不管（把这些也算进来会报一批假红）。
+#: checkbox/radio 是浏览器原生绘制，`background-color` 拿不到它的勾选框，跳过。
+MEASURE_NT = r"""
+() => {
+  function parseRGB(s) {
+    const m = String(s).match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const p = m[1].split(/[,\s\/]+/).filter(x => x !== '').map(parseFloat);
+    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+  }
+  function lum(c) {
+    const f = v => { v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  }
+  function ratio(a, b) {
+    const la = lum(a), lb = lum(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+  function bgOf(el) {          // 向上找第一个不透明背景
+    let n = el;
+    while (n && n.nodeType === 1) {
+      const c = parseRGB(getComputedStyle(n).backgroundColor);
+      if (c && c.a > 0.99) return c;
+      n = n.parentElement;
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+  }
+  const out = [];
+  for (const el of document.querySelectorAll('input, select, textarea')) {
+    const t = (el.getAttribute('type') || '').toLowerCase();
+    if (['hidden', 'checkbox', 'radio', 'range', 'file'].includes(t)) continue;
+    if (el.checkVisibility && !el.checkVisibility()) continue;
+    const cs = getComputedStyle(el);
+    const pbg = bgOf(el.parentElement);
+    const bc = parseRGB(cs.borderTopColor);
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    const self = parseRGB(cs.backgroundColor);
+    const same = self && self.r === pbg.r && self.g === pbg.g && self.b === pbg.b;
+    const borderR = (bw > 0 && cs.borderTopStyle !== 'none' && bc && bc.a > 0.99)
+      ? ratio(bc, pbg) : null;
+    const fillR = (self && self.a > 0.99 && !same) ? ratio(self, pbg) : null;
+    out.push({
+      tag: el.tagName, id: el.id || '',
+      cls: (typeof el.className === 'string' ? el.className : '').slice(0, 30),
+      border: cs.borderTopColor, bw: bw,
+      pbg: `rgb(${Math.round(pbg.r)}, ${Math.round(pbg.g)}, ${Math.round(pbg.b)})`,
+      borderR: borderR === null ? null : Math.round(borderR * 100) / 100,
+      fillR: fillR === null ? null : Math.round(fillR * 100) / 100,
+    });
+  }
+  return out;
+}
+"""
+
+
 def sample_detail_id(main_db: str) -> str | None:
     """与 `screenshot_web.py` 同一口径挑详情页样本：有编码 + 有摘要 + 有伤亡 + 坍塌子类。"""
     con = sqlite3.connect(f"file:{main_db}?mode=ro", uri=True)
@@ -224,7 +285,11 @@ def measure_all(extra_css: str | None = None,
                 below = [x for x in r["items"] if x["ratio"] < x["need"]]
                 bad = [x for x in below if not x["inactive"]]
                 exempt = [x for x in below if x["inactive"]]
-                out.append({"page": path, "res": r, "bad": bad, "exempt": exempt})
+                nt = pg.evaluate(MEASURE_NT)
+                nt_bad = [x for x in nt
+                          if max(x["borderR"] or 0, x["fillR"] or 0) < 3.0]
+                out.append({"page": path, "res": r, "bad": bad, "exempt": exempt,
+                            "nt": nt, "nt_bad": nt_bad})
             b.close()
     finally:
         server.shutdown()
@@ -267,6 +332,29 @@ def part_a(rows: list[dict]) -> None:
         for x in r["exempt"]:
             print(f"    豁免 · {r['page']:<26} {x['ratio']:.2f}  {x['txt']!r}")
     print("    MARKS " + json.dumps(_marks(rows), ensure_ascii=False))
+
+
+def part_f(rows: list[dict]) -> None:
+    print("\n[F] 非文本对比度（WCAG 1.4.11）：输入控件靠什么被认出来")
+    total = total_bad = 0
+    for r in rows:
+        n, nb = len(r["nt"]), len(r["nt_bad"])
+        total += n
+        total_bad += nb
+        if n:
+            worst = min(max(x["borderR"] or 0, x["fillR"] or 0) for x in r["nt"])
+            print(f"    {r['page']:<26} 输入控件 {n}  低于 3:1 {nb}  最低 {worst:.2f}")
+    print(f"    ── 合计 {total_bad} / {total}（六页里只有带输入控件的页面计入）")
+    ok(total > 0, f"页面上确实有输入控件（{total} 个）",
+       "一个都没扫到——选择器或页面结构变了，这条判据正在真空通过")
+    ok(total_bad == 0,
+       "全部输入控件的边框或底色达 WCAG 1.4.11 的 3:1",
+       f"实测 {total_bad} 个不达标")
+    for r in rows:
+        for x in r["nt_bad"]:
+            print(f"    🔴 {r['page']:<20} {x['tag']}#{x['id']}.{x['cls']}  "
+                  f"边框 {x['border']} ({x['borderR']}) 底色差 {x['fillR']} "
+                  f"on {x['pbg']}")
 
 
 def part_b(rows: list[dict]) -> None:
@@ -328,16 +416,22 @@ def part_c(rows: list[dict]) -> None:
 
 
 #: 源码面自证：改**真实** `app.css` 的 token，端到端跑一遍，退出码必须转 1。
+#: `expect` 断言"红的恰好是哪一条"——只看退出码分不清是 A 段抓到的还是 F 段
+#: 抓到的（§2.5.68）。前两条是文字侧，第三条专测 **1.4.11 那条新判据**：
+#: 把 `--border-input` 还原成装饰用的 `--border`，只有 F 段该红。
 DRIFT = [
     dict(label="`--muted` 改回旧值", old="--muted:       #756E67;",
-         new="--muted:       #8A827A;"),
+         new="--muted:       #8A827A;", expect="全部可见文字达到"),
     dict(label="`--sev-3` 改回旧值", old="--sev-3: #9B612C;",
-         new="--sev-3: #C77D3A;"),
+         new="--sev-3: #C77D3A;", expect="全部可见文字达到"),
+    dict(label="`--border-input` 还原成 `--border` 的浅色",
+         old="--border-input: #8F8B84;", new="--border-input: #E4DED4;",
+         expect="全部输入控件的边框或底色达"),
 ]
 
 
 def part_d() -> int:
-    print("\n[D] 注入式自证：改真实 app.css，断言退出码转红")
+    print("\n[D] 注入式自证：改真实 app.css，断言退出码转红、且红的对得上")
     orig = CSS.read_text(encoding="utf-8")
     bad = 0
     try:
@@ -349,11 +443,14 @@ def part_d() -> int:
             CSS.write_text(orig.replace(c["old"], c["new"]), encoding="utf-8")
             r = subprocess.run([PY, str(Path(__file__).resolve()), "--no-inject"],
                                capture_output=True, text=True, cwd=str(ROOT))
-            good = r.returncode == 1
+            hit = c["expect"] in r.stdout
+            good = r.returncode == 1 and hit
             n = re.search(r"合计 (\d+) / (\d+)", r.stdout)
             print(f"    {'✅' if good else '🔴'} 用例 {i}「{c['label']}」→ "
                   f"退出码 {r.returncode}，合计 "
-                  f"{n.group(0)[3:] if n else '?'}" + ("" if good else "（期望 1）"))
+                  f"{n.group(0)[3:] if n else '?'}"
+                  + ("" if good else f"（期望 1 且失败清单里有「{c['expect']}」，"
+                                     f"实测{'有' if hit else '没有'}）"))
             if not good:
                 bad += 1
             CSS.write_text(orig, encoding="utf-8")
@@ -370,10 +467,14 @@ def part_e() -> None:
         ok(False, "文档存在", str(DOC))
         return
     text = DOC.read_text(encoding="utf-8")
+    # 核**标题行**不是 `§2.5.7x` 字符串：节的正文里通常不自称 `§`（`§` 出现在
+    # 别的节引用它时），拿 `§` 形式去搜会把"标题在、别处没引"误判成"没写"。
     for pat, label in [
-        (r"§2\.5\.72", "文档含 §2.5.72"),
+        (r"^### 2\.5\.72 ", "文档有 §2.5.72 标题行"),
+        (r"^### 2\.5\.73 ", "文档有 §2.5.73 标题行（F 段就写在这一节里）"),
     ]:
-        ok(re.search(pat, text) is not None, label, f"没匹配到 {pat!r}")
+        ok(re.search(pat, text, flags=re.M) is not None, label,
+           f"没匹配到 {pat!r}")
 
 
 def main() -> int:
@@ -389,6 +490,7 @@ def main() -> int:
     rows = measure_all()
     part_a(rows)
     part_b(rows)
+    part_f(rows)
     if not args.no_inject:
         part_c(rows)
     part_e()

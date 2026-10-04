@@ -19,6 +19,10 @@
   --surface-2:   #FAF8F4;
   --border:      #E4DED4;
   --border-soft: #EFEAE2;
+  /* 输入控件的边界**单独一个色**：WCAG 1.4.11 要求「识别用户界面组件的视觉
+     信息」达 3:1，而输入框底色就是白、只靠边框界定，用 --border（1.34:1）是
+     硬违规。--border 仍用于卡片/面板这类装饰性分隔（1.4.11 不管装饰）。 */
+  --border-input: #8F8B84;
 
   /* 文字 */
   --text:        #2A2724;
@@ -278,7 +282,7 @@ code { font-family: var(--mono); font-size: .88em;
   font: inherit; font-size: 13.5px;
   padding: 7px 10px; min-height: 36px;
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   min-width: 110px;
 }
 .field input:focus, .field select:focus {
@@ -1394,7 +1398,7 @@ body.lb-locked { overflow: hidden; }
 .edit-grid input {
   width: 100%; padding: 5px 8px; font: inherit; font-size: 13px;
   color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
 }
 .edit-grid input:focus { border-color: var(--brand); outline: none; }
 
@@ -1423,14 +1427,14 @@ body.lb-locked { overflow: hidden; }
 .cause-row-head .cause-name { margin-right: auto; }
 .ev-select {
   padding: 3px 6px; font: inherit; font-size: 12px;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .ev-text {
   width: 100%; box-sizing: border-box; margin-top: 5px;
   padding: 6px 8px; font: inherit; font-size: 12.5px; line-height: 1.6;
   color: var(--text-2); background: var(--surface-2);
-  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   resize: vertical;
 }
 .ev-text:focus { border-color: var(--brand); outline: none; background: var(--surface); }
@@ -1442,7 +1446,7 @@ body.lb-locked { overflow: hidden; }
 #noteIn {
   width: 100%; box-sizing: border-box; margin-top: 8px; padding: 6px 9px;
   font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
 }
 .task-error.is-ok { color: var(--brand-dark); }
 

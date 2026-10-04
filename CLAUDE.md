@@ -70,7 +70,7 @@ python -m construction_agent.main
 - 真值：`recover_gt.py`（多数投票 + Fleiss κ）
 - 评测：`eval_with_gt.py`（6 策略 + bootstrap 置信区间）
 - 格式：`build_v2_docs.py`（四格式一键构建）、`gen_v1v2_diff.py`（红绿对比）
-- 引用：`convert_numbered_citations.py`、`check_citations.py`、`verify_dois.py`
+- 引用：`convert_numbered_citations.py`、`check_citations.py`、**`check_citations_v2.py`**（V2 双向对账，退出码 0 = 无孤立文献/无悬空引用）、`verify_dois.py`
 - 核验：`stage45_final_verify.py`、`stage25_data_verify.py`
 
 ## 核心代码（主仓库）
@@ -92,6 +92,7 @@ python -m construction_agent.main
 ## 当前待办
 - [x] **2026-10-01 论文插图接入**：6 张图由 `scripts/gen_paper_figures.py` 生成（300 DPI PNG + SVG，输出 `docs/paper_v2/figures/`）并插入 V2 中英文正文（图在上、图注在下），四格式成品各内嵌 6 张。改前脚本里的分布数字停在孤儿外键清理前的 17,364，本次改为**从主库现读**（实测 16,323）；图 2 重画为「五层结构 + 一条真实记录的证据链」，图 1 多模态列溢出、图 5 标签重叠、图 6 图例压数据行一并修掉。**待决**：图 3 未采纳"按证据层级分层着色"（现按 CAICS 五层着色）；`[表2占位]` 已由下条补全。
 - [x] **2026-10-04 表 2 补全 + LaTeX 排版修缺陷**：`[表2占位]` 换成 25 行「5 层 19 类操作定义表」（定义逐条对照 `step2_caics_encoder.py` 的生产提示词，与主库落库类名一致；表注给出实测各层推断占比 M 12.0% / T 3.1%）。同轮修掉 7 处排版缺陷：中文表 2 逐行溢出、**成品纸张误为 US Letter**、中文标题 23 字渲染成豆腐块（`\title{}` 漏 `esc()`）、两版 12 个圈码 ①–⑫ 无字形、章节编号叠加成 `2 1. Introduction`、**9 个四级标题（3.2.1–4.4.5）整行丢失**（LaTeX 与 DOCX 两条路径都缺 `#### ` 分支）、中文 `vbox too high` 232pt。验收：中文 Overfull **0**、Missing **0**，英文仅剩表 10 末行 2.86pt。**第二轮又修 1 处**：§3.1 的 `$t_i$`/`$x_{ij}$` 数学被 `esc()` 的 `.replace('_','\_')` 破坏成字面下划线（DOCX 版更糟，美元号与反斜杠命令原样暴露）——`esc()` 改为先抽 `$...$` 占位保护，DOCX 侧新增 `_add_math()` 转「斜体 + 真下标」。四格式一致性验收见 `docs/paper_v2/修订对账记录.md` 第七节 7.4（DOCX 残留 `$` 两版均 0、真下标各 18 个、标题层级 H1/H2/H3 = 10/18/9 两版对称）。
+- [x] **2026-10-04 引用双向对账（V2 首次）**：既有 `check_citations.py` 硬编码指向 V1（27 条），新增 **`scripts/check_citations_v2.py`** 对 V2 做双向对账（文献→正文查孤立文献 ／ 正文→文献查悬空引用，退出码可接改稿流程）。首轮报 3 条疑似孤立文献，逐条复核实为 **1 条**：`Zhang (2025a)`/`Zhang (2025b)` 是假阳性（正文写作 `Zhang, Hou, et al. (2025a)`「姓氏+第二作者+et al.」形式，正则漏了这一种）；只剩 `Devlin (2019) BERT` 真孤立（正文 `Devlin` 0 次，`BERT` 5 次但仅作技术名词）。**处置：正文首次提及 BERT 处补 `(Devlin et al., 2019)`**（不删文献——它是 BERT 原始出处），中英同步。现两版均 28 条文献 / 24 个引用名 / 孤立 **0** / 悬空 **0**；补引用未引入新排版溢出（英文仍仅表 10 那 1 处 2.86pt）。见 `docs/paper_v2/修订对账记录.md` 第八节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照
@@ -114,6 +115,7 @@ python -m construction_agent.main
 2. 重新生成四格式成品：`.venv/bin/python3 scripts/build_v2_docs.py`
 3. 重新生成 V1→V2 对比：`python3 scripts/gen_v1v2_diff.py`
 4. 正文任何数字必须与 `修订对账记录.md` 的"数字对账清单"一致
+5. 跑引用双向对账：`.venv/bin/python3 scripts/check_citations_v2.py`（退出码须为 0）
 
 ## 环境与陷阱
 - **Python 解释器**：`/home/suntianhao/construction_agent/.venv/bin/python3`（系统 python 缺 dotenv/anthropic）

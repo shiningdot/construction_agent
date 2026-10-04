@@ -12,26 +12,28 @@
 的"清单↔正文"报零缺陷，对它们而言并不构成保护。本脚本补的就是这个盲区：
 把每张表逐格核到产生它的源文件。
 
-五张表的源（2026-10-04 核实）：
+五张表的源（2026-10-05 核实）：
   表 5/6  experiments/experiment-models/experiment1_metrics_*.json   主仓库
-  表 7    六策略原始输出 + gt_recovered.json（**由本脚本复现**，见下）
+  表 7    六策略落盘批 experiments/experiment_6strategies/（本 worktree）
+          + gt_recovered.json，F1 等六列**由本脚本复现**，见下
   表 8    experiments/ablation_original/f1_summary.json               本 worktree
   表 9    experiments/experiment_kappa/Basic/289/analysis/agreement_metrics.json  主仓库
 
-表 7 是五张表里唯一**没有落盘产物**的：它的 F1 与 bootstrap CI 来自一次
-`eval_with_gt.py` 的 stdout，而该脚本依赖的 `construction_agent/evaluation/
-experiment3/runner.py` 已不在主仓库生产路径（只剩 .pyc，且未进归档；唯一
-完整副本在 fix-collectors worktree）。故本脚本内联一份**按索引对齐**的
-compute_metrics 复现它。
+表 7 的 F1/Recall/Precision/Type/Sev 六列是一次 `eval_with_gt.py` 的 stdout，
+而该脚本的量算函数所在 `construction_agent/evaluation/experiment3/runner.py`
+已不在主仓库生产路径（只剩 .pyc，且未进归档）。故本脚本内联一份**按索引
+对齐**的 compute_metrics，对着落盘批复现它。
 
 内联版与被封存版的差别（实测）：runner.py 用 `list.index(pred)` 反查预测
 位置，预测列表里存在内容相同的重复条目时（各策略 3–13 条）恒返回首个匹配，
 fp/fn 统计错位，**系统性抬高 F1 与 Precision**；正文表 7 用的是对齐版，
 改用对齐版后 6 策略的 F1/Precision 有 4 个精确吻合、其余差 ≤0.003。
 
-表 7 的「有效输出率」与「耗时」两列**在现有源里找不到对应字段**（summary
-的 elapsed_total_sec 与表中的 Time 不符），按"源未落盘"单列报告，不计入
-退出码——它们不可能被自动核验，写在这里是为了不让它们悄悄混进"全绿"。
+表 7 的「有效输出率」与「耗时」两列**与同表其余六列不同源**：定义在 V1 草稿
+方法节（编码率 = 至少提取到一个编码的样本百分比；耗时 = 每样本平均推理秒数
+×100），但数值出自**另一批未落盘的 run**——落盘批实测六格耗时全不符，均值/
+中位数/p75/截尾均值/仅有效案例均值五种统计量都不命中。C 段按落盘批现算一遍
+并排打印，**不计入退出码**：改用哪一批是实验事实的裁决，不是脚本能判的。
 
 表 4 的「CLIP-filtered images 226」原先与表 7 那两列同待遇（"源未落盘"），
 2026-10-05 查明**源在文件系统而非库里**：CLIP 过滤的产物落在 imageV3/
@@ -54,14 +56,19 @@ PAPER = WT / 'docs' / 'paper_v2'
 FILES = {'EN': PAPER / 'eswa_paper_v2.md', 'ZH': PAPER / 'eswa_paper_v2_zh.md'}
 
 MAIN = Path('/home/suntianhao/construction_agent')
-# ⚠ 六策略原始输出只在 fix-collectors worktree，主仓库与归档都没有
+# 六策略原始输出原先只在 fix-collectors worktree（主仓库与归档都没有），
+# 那里一旦清理表 7 就核不了。2026-10-05 已把该目录复制进本 worktree 的
+# experiments/ 并随提交入 git（六份 results.json 逐份 md5 校验一致），
+# 故**优先用本地副本**，目录缺失时才回退旧路径（供旧检出兼容）。
 FC = MAIN / '.claude' / 'worktrees' / 'fix-collectors'
+_T7_LOCAL = WT / 'experiments' / 'experiment_6strategies'
+_T7_FALLBACK = FC / 'experiments' / 'experiment_6strategies'
 
 SRC = {
     'T5T6': MAIN / 'experiments' / 'experiment-models'
             / 'experiment1_metrics_20260626_102135.json',
     'T7_gt': WT / 'experiments' / 'ablation_gatekeeping' / 'gt_recovered.json',
-    'T7_base': FC / 'experiments' / 'experiment_6strategies',
+    'T7_base': _T7_LOCAL if _T7_LOCAL.exists() else _T7_FALLBACK,
     'T8': WT / 'experiments' / 'ablation_original' / 'f1_summary.json',
     'T9': MAIN / 'experiments' / 'experiment_kappa' / 'Basic' / '289'
           / 'analysis' / 'agreement_metrics.json',
@@ -1033,7 +1040,7 @@ def self_test():
     fails += not ok
     print(f'{"✅" if ok else "❌"} clip_images() 读磁盘 imageV3/ → {n_clip}')
 
-    # 表 7 两列对照：源在 fix-collectors worktree 的落盘批次，缺则该段跳过。
+    # 表 7 两列对照：源在六策略落盘批（2026-10-05 起随本 worktree 提交），缺则该段跳过。
     # 这里只验"读得出六行且都是数"，不验它是否等于论文值——不等是**已知事实**
     # （见 t7_unbacked_cols 的 docstring），不等于失败
     try:

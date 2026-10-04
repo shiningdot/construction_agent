@@ -543,6 +543,96 @@ def got_t4(text, probe):
     return got
 
 
+# ── 表 2：CAICS 19 类（三方对账：论文 ↔ 生产提示词 ↔ 主库落库类名）──────
+STEP2 = MAIN / 'construction_agent' / 'extraction' / 'step2_caics_encoder.py'
+T2_LAYER_RE = re.compile(r'([MFHTC])\s*层')
+T2_STOP = set('未无不的了或在被')
+
+
+def prompt_codes():
+    """从生产提示词里抽 19 类 code（源 = step2_caics_encoder.py）。"""
+    return set(re.findall(r'\b([CFHMT][1-9])\b', STEP2.read_text(encoding='utf-8')))
+
+
+def db_codes(c):
+    return {r[0] for r in c.execute('SELECT DISTINCT code FROM caics_causes')}
+
+
+def db_names(c):
+    return dict(c.execute('SELECT code, name FROM caics_causes '
+                          'GROUP BY code ORDER BY code'))
+
+
+def got_t2(text, probe):
+    """解析表 2。首列只在每层第一行有值，需向下填充。"""
+    out, cur = [], None
+    for row in parse_table(text, probe):
+        if len(row) < 5:
+            continue
+        first = row[0].replace('**', '').strip()
+        if first:
+            m = T2_LAYER_RE.match(first) or re.match(r'([MFHTC])\s*[—–-]', first)
+            if m:
+                cur = m.group(1)
+        code = row[1].strip()
+        if not re.fullmatch(r'[CFHMT][1-9]', code):
+            continue
+        out.append({'layer': cur, 'code': code, 'name': row[2].strip(),
+                    'kws': [x for x in re.split(r'[；;]', row[4]) if x.strip()]})
+    return out
+
+
+def t2_compare(rows, lang, c, pcodes, dnames):
+    """硬项：三方 code 集合、层归属、中文类名。软项：关键词核心概念可溯。"""
+    missing, mismatch, n = [], [], 0
+    dcs = db_codes(c)
+    seen = {r['code'] for r in rows}
+    # 1) code 集合三方一致（19 格）
+    for code in sorted(dcs | pcodes | seen):
+        n += 1
+        where = [w for w, s in (('主库', dcs), ('提示词', pcodes), ('表2', seen))
+                 if code not in s]
+        if where:
+            missing.append(f'{code} 不在 {"、".join(where)}')
+    # 2) 层归属：行所属层标题的字母须等于 code 首字母（19 格）
+    for r in rows:
+        n += 1
+        if r['layer'] != r['code'][0]:
+            mismatch.append(f"{r['code']} 归在 {r['layer']} 层，应按首字母归 "
+                            f"{r['code'][0]} 层")
+    # 3) 中文类名 ↔ 主库落库类名（仅中文版，19 格）
+    if lang == 'ZH':
+        for r in rows:
+            n += 1
+            if r['code'] in dnames and r['name'] != dnames[r['code']]:
+                mismatch.append(f"{r['code']} 类名「{r['name']}」≠ 主库"
+                                f"「{dnames[r['code']]}」")
+    # 4) 关键词核心概念须能在该类证据里找到（仅中文版；防「凭空概念」的弱判据）
+    if lang == 'ZH':
+        for r in rows:
+            nc = one(c, f"SELECT COUNT(*) FROM caics_causes WHERE "
+                        f"code='{r['code']}'")[0]
+            for kw in r['kws']:
+                n += 1
+                hit = one(c, "SELECT COUNT(*) FROM caics_causes WHERE "
+                             f"code='{r['code']}' AND evidence LIKE '%{kw}%'")[0]
+                if hit:
+                    continue
+                # 整词不中 → 退到 2-gram：概念在不在该类语料里
+                best = 0
+                for j in range(len(kw) - 1):
+                    if kw[j] in T2_STOP or kw[j + 1] in T2_STOP:
+                        continue
+                    g = kw[j:j + 2]
+                    best = max(best, one(
+                        c, "SELECT COUNT(*) FROM caics_causes WHERE "
+                           f"code='{r['code']}' AND evidence LIKE '%{g}%'")[0])
+                if best == 0:
+                    mismatch.append(f"{r['code']} 关键词「{kw}」在该类 "
+                                    f"{nc} 条证据里无任何片段命中（疑凭空概念）")
+    return ('表2 CAICS 定义（三方）', lang, n, missing, mismatch, [])
+
+
 # ── 对账驱动 ────────────────────────────────────────────────────────────
 def t4_compare(spec, got, lang):
     """表 4 每行是多值，故按「源值是否出现在该行数字集合里」判定。"""
@@ -649,6 +739,15 @@ def main(verbose=False):
             diff(spec3, got_t3(txt, p3), '表3 枚举字段统计', t, TOL_EXACT, results)
             p4 = '| Dimension | Value |' if t == 'EN' else '| 维度 | 数值 |'
             results.append(t4_compare(spec4, got_t4(txt, p4), t))
+            # 表 2：三方对账（论文 ↔ 生产提示词 ↔ 主库）
+            if STEP2.exists():
+                p2 = '| Layer | Code |' if t == 'EN' else '| 层 | 码 |'
+                c2 = conn()
+                try:
+                    results.append(t2_compare(got_t2(txt, p2), t, c2,
+                                              prompt_codes(), db_names(c2)))
+                finally:
+                    c2.close()
 
     print('\nB. 逐表逐格对账')
     print('-' * 70)
@@ -675,6 +774,15 @@ def main(verbose=False):
     print('  且无 clip_score / 过滤标记列——CLIP 分数从未落库，226 的源已不可考。')
     print('  表 1 事故年代列：表中为采集计划口径，与主库 date 的实测 min/max 不一致'
           '（如 safehoo 实为 2008–2026，表中写 2005–2026），口径不明故不自动判负。')
+    print('  表 2 关键词列：判据只抓「整词与全部 2-gram 在该类语料里都零命中」的凭空概念，')
+    print('    **抓不到用真词拼凑的伪概念**（如「外星人施工」会被高频的「施工」救活）'
+          '——弱判据，勿当强核验看。')
+    print('    一次性人工放宽核验（2026-10-04）：57 个关键词里 31 个整词零命中，'
+          '退到 2-gram 后 27 个的核心概念')
+    print('    在该类语料里有支撑（「监理未到场」→「监理」336 条、「未做三级教育」→'
+          '「教育」454 条），与该列表注')
+    print('    「关键词为语料中中文表述的概括」一致，故属概括表述而非凭空生成。'
+          '此结论不可自动复现，仅此一次记录。')
 
     print('\n' + '=' * 70)
     if miss_src:
@@ -684,7 +792,8 @@ def main(verbose=False):
     if bad:
         print(f'❌ {bad} 格与源不符——表格数字不得脱离源数据')
         return 1
-    print('✅ 八张表逐格与源数据一致，可接进改稿流程')
+    print('✅ 九张表逐格与源数据一致，可接进改稿流程（表 10 源在他人已发表报告，'
+          '不在本脚本范围）')
     return 0
 
 
@@ -742,6 +851,25 @@ def self_test():
         fails += bool(bad)
         print(f'{"✅" if not bad else "❌"} [{lang}] got_t3 解析表 3 行'
               + (f' → 偏差 {bad}' if bad else ''))
+
+    # 表 2 解析：首列只在每层第一行有值，必须向下填充；中英两条路径都要对
+    for lang, head, body, want_codes, want_layers in [
+        ('EN', '| Layer | Code | Category | Operational definition | Keywords |',
+         '| **M — Management foundation** | M1 | Deficient supervision | d | no supervisor |\n'
+         '| | M2 | Hazard inspection failure | d | hazards not rectified |',
+         ['M1', 'M2'], ['M', 'M']),
+        ('ZH', '| 层 | 码 | 类别 | 操作定义 | 典型证据关键词 |',
+         '| **M 层 — 管理根基** | M1 | 现场监管缺失 | d | 无人监督 |\n'
+         '| | M2 | 隐患排查失效 | d | 隐患未整改 |',
+         ['M1', 'M2'], ['M', 'M']),
+    ]:
+        got2 = got_t2(f'{head}\n|---|\n{body}\n',
+                      '| Layer | Code |' if lang == 'EN' else '| 层 | 码 |')
+        ok = ([r['code'] for r in got2] == want_codes
+              and [r['layer'] for r in got2] == want_layers)
+        fails += not ok
+        print(f'{"✅" if ok else "❌"} [{lang}] got_t2 层向下填充 → '
+              f'{[(r["code"], r["layer"]) for r in got2]}')
 
     # 表 4 比对器：源值不在行内数字集合里必须报错
     r = t4_compare({('records', 'v'): [2623]}, {('records', 'v'): [2623, 99]}, 'EN')

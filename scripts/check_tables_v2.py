@@ -337,6 +337,40 @@ def spec_t7():
     return out
 
 
+# 表 7 的「Valid-output rate」与「Time (s)」两列（硬编码自正文，供对照打印）。
+T7_PAPER_VALID = {'S0': 96, 'S1': 100, 'S2': 85, 'S3': 92, 'S4': 99, 'S5': 100}
+T7_PAPER_TIME = {'S0': 1382, 'S1': 1302, 'S2': 2401, 'S3': 1735, 'S4': 1843,
+                 'S5': 5430}
+
+
+def t7_unbacked_cols():
+    """表 7 那两列在**落盘批次**上的实测值，用于把"不同源"摆出来看。
+
+    2026-10-05 查明两列的定义（出自 V1 草稿方法节，见
+    docs/paper/caiems_paper_draft_zh.md:167）：
+      Valid-output rate = **编码率**（至少提取到一个编码的样本百分比）
+      Time (s)          = **每样本平均推理秒数 × 100**
+    定义清楚，但**落盘的 experiment_6strategies 批与论文值对不上**：
+    该批是表 7 F1/Recall/Precision/Type/Sev 六列的源（本脚本复现即用它），
+    却不是这两列的源——产生这两列的那批 run（F1 = 0.628/0.737/0.630/0.643/
+    0.676/0.488，即 V1 表 3）未落盘。故**同一张表混了两批数据**。
+
+    本函数不参与判负：论文值是否要改用落盘批次重算，须作者裁决。
+    它只保证每次核验都能看到这个差异，不让它悄悄滑进"全绿"。
+    S1 的记录里没有顶层 codes 字段（在 parsed 里），故编码率走 load_strategy。
+    """
+    rows = []
+    for i in range(6):
+        rs = json.loads((SRC['T7_base'] / f'S{i}_result'
+                         / f'S{i}_results.json').read_text(encoding='utf-8'))['results']
+        preds = load_strategy(SRC['T7_base'], i)
+        n = len(preds) or 1
+        rate = 100 * sum(1 for p in preds if p['codes']) / n
+        el = [r.get('elapsed_sec') or 0 for r in rs]
+        rows.append((f'S{i}', rate, sum(el) / (len(el) or 1) * 100))
+    return rows
+
+
 def got_t7(text, probe):
     got = {}
     for row in parse_table(text, probe):
@@ -798,9 +832,25 @@ def main(verbose=False):
 
     print('\nC. 表中无源可核的数字（源未落盘或口径不明，脚本只提醒、不计入退出码）')
     print('-' * 70)
-    print('  表 7 有效输出率 / 耗时 两列：现有源（S*_results.json 的 summary）'
-          '只有 elapsed_total_sec 与 success，')
-    print('  与表中值不符，故无法自动核验；如需核验须补留产生该表的运行记录。')
+    print('  表 7 Valid-output rate / Time 两列：**定义已查明，但与落盘批次不同源**')
+    print('    （2026-10-05）。定义出自 V1 草稿方法节（docs/paper/'
+          'archive_20260713/caiems_paper_draft_zh.md:167）：')
+    print('      Valid-output rate = 编码率（至少提取到一个编码的样本百分比）')
+    print('      Time (s)          = 每样本平均推理秒数 × 100')
+    print('    但落盘的 experiment_6strategies 批（= 本表 F1 六列的源）实测与之不符：')
+    if SRC['T7_base'].exists():
+        try:
+            print(f'      {"策略":<5}{"编码率 论文/落盘":>20}{"耗时 论文/落盘":>20}')
+            for s, rate, t in t7_unbacked_cols():
+                print(f'      {s:<5}{T7_PAPER_VALID[s]:>10}% / {rate:>4.0f}%'
+                      f'{T7_PAPER_TIME[s]:>12} / {t:>5.0f}')
+        except Exception as e:                       # 产物格式变动时不连累整脚本
+            print(f'      （落盘批次读数失败：{type(e).__name__}: {e}）')
+    else:
+        print('      （落盘批次不可达）')
+    print('    → **同一张表混了两批数据**：F1 六列出自落盘批，这两列出自未落盘的')
+    print('      V1 那批（F1 = 0.628/0.737/0.630/0.643/0.676/0.488）。是改用落盘批')
+    print('      重算、还是保留 V1 值并在表注说明，属作者裁决；本脚本只把差异摆出来。')
     print('  （2026-10-05 已转入核验，不再属于本段）表 4 「CLIP-filtered images 226」：'
           '源 = 磁盘 imageV3/ 目录的文件数（clip_images()）。')
     print('   原先记「源已不可考」是因为只在主库找——主库 image_files 只登记 211 条'
@@ -920,6 +970,21 @@ def self_test():
     ok = n_clip is None or isinstance(n_clip, int) and n_clip > 0
     fails += not ok
     print(f'{"✅" if ok else "❌"} clip_images() 读磁盘 imageV3/ → {n_clip}')
+
+    # 表 7 两列对照：源在 fix-collectors worktree 的落盘批次，缺则该段跳过。
+    # 这里只验"读得出六行且都是数"，不验它是否等于论文值——不等是**已知事实**
+    # （见 t7_unbacked_cols 的 docstring），不等于失败
+    try:
+        rows = t7_unbacked_cols()
+        ok = len(rows) == 6 and all(
+            isinstance(r[1], float) and isinstance(r[2], float) for r in rows)
+        detail = f'{len(rows)} 行，S0 编码率 {rows[0][1]:.0f}%'
+    except FileNotFoundError:
+        ok, detail = True, '（落盘批次不可达，跳过）'
+    except Exception as e:
+        ok, detail = False, f'{type(e).__name__}: {e}'
+    fails += not ok
+    print(f'{"✅" if ok else "❌"} t7_unbacked_cols() 读落盘批次 → {detail}')
 
     print('\n' + '=' * 70)
     if fails:

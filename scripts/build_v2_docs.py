@@ -4,14 +4,19 @@
 - PDF: LaTeX + tectonic（CJK 用 Noto Sans SC）
 - 图片占位符 [图X占位...] 渲染为可见占位框"""
 import re, os, subprocess
+from pathlib import Path
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.oxml.ns import qn
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-BASE = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2'
+# 本仓库根：脚本在 scripts/ 下，上溯一级即仓库根，worktree 与主仓库都成立。
+# 原先三处写死 `/.claude/worktrees/classifier-mod/`——那个 worktree 一旦改名、
+# 清理或在主仓库里执行，整条构建链就断（与 _common.REPO_ROOT 同一算法）。
+ROOT = Path(__file__).resolve().parents[1]
+BASE = str(ROOT / 'docs' / 'paper_v2')
 TECTONIC = '/home/suntianhao/TEM/tectonic'
-FIGDIR = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/figures'
+FIGDIR = str(ROOT / 'docs' / 'paper_v2' / 'figures')
 LOGDIR = f'{BASE}/.build'      # TeX 编译日志，供 check_formats_v2.py 判排版缺陷
 os.makedirs(FIGDIR, exist_ok=True)
 os.makedirs(LOGDIR, exist_ok=True)
@@ -489,7 +494,7 @@ def build_latex(src, out_tex, is_zh):
     open(out_tex, 'w', encoding='utf-8').write(tex)
     print(f'TeX: {out_tex}')
     r = subprocess.run([TECTONIC, '--keep-logs', out_tex], capture_output=True, text=True,
-                       cwd='/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod')
+                       cwd=str(ROOT))
     pdf = out_tex.replace('.tex', '.pdf')
     # 编译日志随 .tex 落在同目录，移进 .build/ 免得污染成品目录；
     # 它同时是 check_formats_v2.py 判 Overfull / Missing character 的唯一数据源。

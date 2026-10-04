@@ -2,13 +2,17 @@
 """V1 → V2 彩色对比文档生成器：红=删除（删除线），绿=新增
 输出：docs/paper_v2/v1_v2_对比.html（浏览器）+ v1_v2_对比.docx（Word）"""
 import re, difflib, html as html_mod
+from pathlib import Path
 from docx import Document
 from docx.shared import Pt, RGBColor
 
-V1 = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'
-V2 = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/eswa_paper_v2.md'
-OUT_HTML = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/v1_v2_对比.html'
-OUT_DOCX = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper_v2/v1_v2_对比.docx'
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立。
+# 原先四处写死 `/.claude/worktrees/classifier-mod/`。
+ROOT = Path(__file__).resolve().parents[1]
+V1 = str(ROOT / 'docs' / 'paper' / 'eswa_paper.md')
+V2 = str(ROOT / 'docs' / 'paper_v2' / 'eswa_paper_v2.md')
+OUT_HTML = str(ROOT / 'docs' / 'paper_v2' / 'v1_v2_对比.html')
+OUT_DOCX = str(ROOT / 'docs' / 'paper_v2' / 'v1_v2_对比.docx')
 
 RED = '#C0392B'
 GREEN = '#1E8449'

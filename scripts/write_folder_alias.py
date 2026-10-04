@@ -7,6 +7,7 @@
 总览见 docs/项目文件地图.md
 """
 import json, os, shutil
+from pathlib import Path
 
 CFG = '/home/suntianhao/private-folder-alias.json'
 
@@ -15,7 +16,10 @@ shutil.copy(CFG, CFG + '.bak')
 d = json.load(open(CFG, encoding='utf-8'))
 
 MAIN = 'construction_agent'
-WT = 'construction_agent/.claude/worktrees/classifier-mod'
+# VSCode 工作区根 = 家目录，故别名一律写"相对家目录"的路径。WT 由本脚本位置反推
+# （worktree 改名后自动跟随，不必手改）；MAIN 是主仓库名，从 worktree 位置推不出来，
+# 保持字面量（主仓库名不随 worktree 变动）。
+WT = str(Path(__file__).resolve().parents[1].relative_to(Path.home()))
 
 new_aliases = {
     # ============ 总览 ============

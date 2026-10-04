@@ -5,17 +5,23 @@
 """
 import json, os, sys, time, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-sys.path.insert(0, '/home/suntianhao/construction_agent')
-sys.path.insert(0, '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/scripts')
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立。
+# 原先两处 sys.path 与 OUT_DIR 写死 classifier-mod worktree。
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'scripts'))
+from _common import main_repo_root      # noqa: E402 —— 须在 sys.path 之后
 from dotenv import load_dotenv
-load_dotenv('/home/suntianhao/construction_agent/.env', override=True)
+# `.env` 的真源在主仓库根（worktree 里不一定有；config.py 亦按此上溯查找）
+load_dotenv(str(main_repo_root() / '.env'), override=True)
 from anthropic import Anthropic
 from ablation_gatekeeping import (PROMPTS, JSON_SPEC, USER_PREFIX, CHECKS_BODY,
                                   TWOSTEP_BODY, CONSERVATIVE, COVERAGE,
                                   extract_json, norm_codes)
 
-OUT_DIR = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_original'
+OUT_DIR = str(ROOT / 'experiments' / 'ablation_original')
 os.makedirs(OUT_DIR, exist_ok=True)
 MODEL = 'deepseek-v4-pro'
 MAX_TOKENS = 16384

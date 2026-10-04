@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Markdown(编号引用版) → DOCX（投稿工作稿）"""
 import re
+from pathlib import Path
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-SRC = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper_numbered.md'
-OUT = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.docx'
-FIGDIR = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/figures/'
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立
+ROOT = Path(__file__).resolve().parents[1]
+SRC = str(ROOT / 'docs' / 'paper' / 'eswa_paper_numbered.md')
+OUT = str(ROOT / 'docs' / 'paper' / 'eswa_paper.docx')
+FIGDIR = str(ROOT / 'docs' / 'paper' / 'figures') + '/'
 
 text = open(SRC, encoding='utf-8').read()
 text = re.sub(r'^> .*\n', '', text, flags=re.M)

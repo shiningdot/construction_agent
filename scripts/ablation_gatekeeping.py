@@ -20,7 +20,7 @@ load_dotenv('/home/suntianhao/construction_agent/.env', override=True)
 from anthropic import Anthropic
 
 DB = '/home/suntianhao/construction_agent/data/caiems_v2.db'
-OUT_DIR = Path('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_gatekeeping')
+OUT_DIR = Path(__file__).resolve().parents[1] / 'experiments' / 'ablation_gatekeeping'
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 MODEL = 'deepseek-v4-pro'
 MAX_TOKENS = 16384  # 思考块会消耗输出预算，需留足空间给最终 JSON

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """将论文中的图占位符替换为实际图片引用"""
 import re
+from pathlib import Path
+
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立
+ROOT = Path(__file__).resolve().parents[1]
 
 mapping = {
     '图1占位：技术路线图英文版，Figure 1': '![](figures/fig1_architecture.png)',
@@ -11,8 +15,8 @@ mapping = {
 }
 
 files = [
-    '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md',
-    '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper_zh.md',
+    str(ROOT / 'docs' / 'paper' / 'eswa_paper.md'),
+    str(ROOT / 'docs' / 'paper' / 'eswa_paper_zh.md'),
 ]
 
 for path in files:

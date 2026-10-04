@@ -71,9 +71,9 @@ python -m construction_agent.main
 > | 表 8 | `experiments/ablation_original/f1_summary.json` | 本 worktree |
 > | §4.1 真值 | `experiments/ablation_gatekeeping/gt_recovered.json` | 本 worktree |
 >
-> `scripts/eval_with_gt.py` 的 `BASE` 仍硬编码指向主仓库下**已不存在**的 6 策略目录，
-> 重算前须改指本 worktree 的 `experiments/experiment_6strategies`（2026-10-05 之前只能
-> 指 fix-collectors worktree）；`experiment3.runner` 已于同日从 git 回收进本仓库（见下）。
+> `scripts/eval_with_gt.py` 的 `BASE` 已于 2026-10-05 改为仓库根派生，指向本 worktree 的
+> `experiments/experiment_6strategies`（此前硬编码指主仓库下一个**不存在**的目录，属断链，
+> 不是"配置差异"）；`experiment3.runner` 已于同日从 git 回收进本仓库（见下）。
 >
 > ⚠️ **表 7 六列的复现**：F1/Recall/Precision/Type/Sev 出自 `eval_with_gt.py` 的 stdout，
 > `check_tables_v2.py` 因此内联了一份**按索引对齐**的 `compute_metrics` 复现它（被封存
@@ -93,6 +93,12 @@ python -m construction_agent.main
 > worktree）。它们是**论文实验对照物，勿用于生产**——生产编码链路是 `step1_basic_extractor`
 > + `step2_caics_encoder` 的 CAICS 五层。`scripts/eval_with_gt.py:5` 仍 import 其中的
 > `experiment3.runner.compute_metrics`，回收前那句 import 必失败。见对账记录第二十九节。
+>
+> 🔴 **脚本内路径一律仓库根派生**（2026-10-05 起，20 个脚本已改）：写
+> `ROOT = Path(__file__).resolve().parents[1]`，再 `str(ROOT / 'docs' / 'paper_v2' / ...)`。
+> **禁止**在脚本里写 `/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/...`
+> 这类 worktree 绝对路径——worktree 一改名或清理，脚本（**含四格式构建链 `build_v2_docs.py`**）
+> 就读到空气。`scripts/_common.py` 的 `REPO_ROOT` 是同一算法。见对账记录第三十节。
 
 - `experiments/ablation_gatekeeping/summary.json` — 2×2 消融（新样本 4×100）
 - `experiments/ablation_gatekeeping/gt_recovered.json` — 三专家多数投票真值
@@ -148,6 +154,7 @@ python -m construction_agent.main
 - [x] **2026-10-04 表格核验扩到主库侧 + 表 3 一处数值勘误**：`check_tables_v2.py` 的源从"实验产物文件"扩到**主库只读**，新增表 1（来源分布 18 格）、表 3（MECE 枚举 30 格）、表 4（数据库统计 17 格）× 中英 = **130 格**，总计 388→**518 格**。表 1 与表 4 **全中**；表 3 查出**唯一真缺陷**——工序行残余"其他"写 **2.9%，实为 2.8%**（WT99 62/2,202 = 2.816%；2.9% 对应 63–64 条，即写作时该字段比现在多 1–2 条）。口径已坐实：五字段各只有一个"其他"类，其余四行（1.9/11.1/6.3/3.6%）与其余 29 格全部与现库一致。已改正文（中英同步）、四格式重出、V1→V2 对比重出、七项核验 0。**两处无源可核**：①表 4「CLIP-filtered images 226」——`image_files` 1,108 行全为 downloaded，**无 clip_score / 过滤标记列**，分数从未落库，226 的源已不可考（§「62.4%」那句同用此数）；②表 1 年代列（表中 2005–2026 vs safehoo 实为 2008–2026），口径疑为采集计划声明，需作者定义。**→ ① 2026-10-05 查明源在文件系统、已转入核验（第二十五节）；② 2026-10-05 查明为时代区块、已接入弱判据（第二十七节）。****坑**：`len(row)<6` 把 5 列的表 3 整张滤掉、行首带括号须前缀匹配、`WT02` 会被数字正则当成 2、中文表用全角逗号与全角括号、表 4 一行多值须按数字集合判定。见 `docs/paper_v2/修订对账记录.md` 第十七节
 - [ ] 导师真实姓名替换 `[Supervisor name]`（CRediT 与投稿信）
 - [x] **实验框架源文件回归主仓库（2026-10-05 全部结清）**：①`experiments/experiment_6strategies/`（六策略原始输出，2.3 MB / 27 文件）已复制回本 worktree 并提交——此前 `check_tables_v2.py` 读的是 fix-collectors 的**文件系统路径**，那个 worktree 一清理表 7 就核不了（见第二十八节）；②`construction_agent/evaluation/experiment1|2|3`（17 个 `.py`）已从 git `1c14cde` **回收到原位**——此前主仓库工作副本只剩 `__pycache__`（实测 8/3/1 个 `.pyc`，零个 `.py`）而源只在 fix-collectors worktree。回收后 `scripts/eval_with_gt.py:5` 那句 `from construction_agent.evaluation.experiment3.runner import compute_metrics` 恢复可用（回收前必 ImportError）。**属实验对照物、勿用于生产**（生产编码链路是 step1+step2 的 CAICS 五层）。见对账记录第二十八、二十九节
+- [x] **2026-10-05 脚本内 worktree 绝对路径全部改为仓库根派生（20 个文件）**：第二十八、二十九节暴露的是"某个实验的核验链依赖另一个 worktree 存活"，本轮清的是**更底层的同一种病**——`scripts/` 下 **20 个脚本**把 `/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/...` 写进了代码。worktree 一旦改名、清理，或在主仓库里执行，脚本读到的就是空气；**其中最危险的是 `build_v2_docs.py`（四格式构建链主脚本）**——它读不到路径，`eswa_paper_v2.{docx,tex,pdf}` 全部重建不了（不是少一张图，是成品链断掉）。统一改为 `ROOT = Path(__file__).resolve().parents[1]` 派生（`_common.py` 早就是这个算法；脚本在 `scripts/` 下，上溯一级即仓库根，worktree 与主仓库同一份代码都成立）。**验收四段**（ast 求值各脚本顶层赋值 vs 旧字面量逐个比对）：A 段路径解析 **24/24 相同**（只换写法不换指向）、B 段**有意变更**正确（`eval_with_gt.py` 的 BASE 原指主仓库下一个**不存在**的目录，属断链，现接上）、C 段 **18/18 编译通过**、D 段 `scripts/` 下 `classifier-mod` 仅剩 7 处**全部是注释/docstring**；一键入口 **9/9 全绿**回归。**一处有意保留**：`write_folder_alias.py` 的 `MAIN`（主仓库名，从 worktree 位置推不出来）——其 `WT` 已改为相对家目录反推，**结果与旧字面量逐字相同**、worktree 改名后自动跟随。见对账记录第三十节
 - [ ] **表 7 的「Valid-output rate / Time」两列须作者裁决**（2026-10-05 查明，见对账记录第二十六节）：定义已明确——**Valid-output rate = 编码率（至少提取到一个编码的样本百分比）；Time (s) = 每样本平均推理秒数 × 100**（出自 V1 方法节 `archive_20260713/caiems_paper_draft_zh.md:167`，换算规律经 V1 表 3 六格验证）。**但这两列与同表其余六列不同源**：F1/Recall/Precision/Type/Sev 六列出自落盘的 `experiment_6strategies` 批（V2 重算过，S5 从 0.488→0.665），这两列出自**未落盘的 V1 批**。落盘批实测与之不符：编码率 90/100/85/87/100/100（论文 96/100/85/92/99/100）、耗时 1933/2043/2879/2823/2666/6050（论文 1382/1302/2401/1735/1843/5430），且均值/中位数/p75/截尾均值/仅有效案例均值**五种统计量全部不命中**——排除"统计量取错"，确系另一批 run。**建议用落盘批重算**（同表同源）；改动会牵动表注、§4.4.2 附近表述、四格式与数字清单。脚本已把两批对照动态打印在 C 段（`t7_unbacked_cols()`），每次核验都可见
 - [ ] 数据仓库选择
 - [ ] 可靠性路线图 P0–P7 未执行：独立人工金标准、冻结测试集、正式因子实验、多模型同任务对比、编码一致性研究、数据审计、模型快照
@@ -205,6 +212,7 @@ python -m construction_agent.main
 - **Python 解释器**：`/home/suntianhao/construction_agent/.venv/bin/python3`（系统 python 缺 dotenv/anthropic）
 - **模型与 key 配置分散三处**，切档位需同步改：`~/.bashrc`、`~/.claude/settings.json`、`construction_agent/.env`（后者 `override=True`，对项目代码有最终决定权）
 - **模型不一致风险**：论文实验脚本硬编码 `deepseek-v4-pro`，主管道读 `.env`（现为 `deepseek-v4-flash`）；补跑数据前先确认档位
+- **脚本内路径一律仓库根派生，禁止写 worktree 绝对路径**：写 `ROOT = Path(__file__).resolve().parents[1]`（脚本在 `scripts/` 下，上溯一级即仓库根），再 `str(ROOT / 'docs' / 'paper_v2' / ...)`。2026-10-05 已把 20 个脚本从写死的 `/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/...` 改过来——worktree 一改名或清理，脚本（**含四格式构建链 `build_v2_docs.py`**）就读到空气。`scripts/_common.py` 的 `REPO_ROOT` 是同一算法。落款见对账记录第三十节
 - **WAL 是持久属性；库一旦被切成 WAL，就不能再用 `shutil.copy2` 备份**：`scripts/create_db_v2.py` 建库、`review/promote.py` 并入都会 `PRAGMA journal_mode=WAL`（写进文件头，此后一直是 WAL）。WAL 模式下主文件在 checkpoint 之前是滞后的，文件级复制只拿到旧状态（实测 51 行只备到 1 行）。备份一律用 `construction_agent.database.backup.safe_backup`
 - **禁止裸 `git stash`**（与其它 worktree 共享栈）；worktree 会话禁止操作主仓库 git
 - 调用 DeepSeek 时思考块会吃掉输出预算，`max_tokens` 需 ≥16384，否则返回空文本

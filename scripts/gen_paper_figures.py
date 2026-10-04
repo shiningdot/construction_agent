@@ -13,6 +13,7 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 import numpy as np
 import os
+from pathlib import Path
 import textwrap
 import warnings
 import logging
@@ -27,8 +28,7 @@ plt.rcParams['axes.unicode_minus'] = False
 # 噪声会把"到底哪张图真的变了"淹掉（实测改前改后 229 行全在变 id 与时间戳）
 plt.rcParams['svg.hashsalt'] = 'caiems'
 
-OUT = ('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod'
-       '/docs/paper_v2/figures')
+OUT = str(Path(__file__).resolve().parents[1] / 'docs' / 'paper_v2' / 'figures')
 os.makedirs(OUT, exist_ok=True)
 
 # 分布数字一律从主库现读，脚本里不留死数。2026-10-01：fig3 曾停在孤儿外键

@@ -12,16 +12,17 @@
   check_forbidden_v2.py      导师要求删除的 7 类禁用措辞（含 --self-test 自证）
   check_tables_v2.py         九张表逐格 ↔ 源数据（含 --self-test 自证）
   check_figures_v2.py        六张图内数值 ↔ 源数据（含 --drift-test 自证）
+  check_formats_v2.py        四格式成品 ↔ md 源（含 --self-test / --drift-test 自证）
   check_highlights_v2.py     Highlights：条数 / 字符数 / 措辞 / 数字有据
   check_cover_letter_v2.py   投稿信：数字有据 / 措辞 / 标题一致
 
-前四项管"正文与自己的另一份记录对不对"，表与图两项管"正文与源数据对不对"，
-末两项管"投稿要件与正文对不对"。**检查不到的部分不会被这行绿盖住**：
-表格项会把表 7 无源可核的两列显式列出来，图项会把图 1 的 226 列出来，
-而不是跳过。
+前四项管"正文与自己的另一份记录对不对"，表/图/成品三项管"正文与源数据、
+与交付的成品对不对"，末两项管"投稿要件与正文对不对"。
+**检查不到的部分不会被这行绿盖住**：表格项会把表 7 无源可核的两列显式列出来，
+图项会把图 1 的 226 列出来，成品项会把圈码/DOI 断行的有意差异列出来，而不是跳过。
 
 用法：python3 scripts/check_v2_all.py [--quiet]
-退出码 0 = 八项全绿；非 0 = 有分项未通过（汇总行列出）。
+退出码 0 = 九项全绿；非 0 = 有分项未通过（汇总行列出）。
 """
 import subprocess
 import sys
@@ -36,6 +37,7 @@ CHECKS = [
     ('措辞', 'check_forbidden_v2.py'),
     ('表格', 'check_tables_v2.py'),
     ('图', 'check_figures_v2.py'),
+    ('成品', 'check_formats_v2.py'),
     ('Highlights', 'check_highlights_v2.py'),
     ('投稿信', 'check_cover_letter_v2.py'),
 ]

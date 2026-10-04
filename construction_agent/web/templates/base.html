@@ -6,6 +6,10 @@
 <title>{% block title %}CAIEMS{% endblock %}</title>
 {# 不引 CDN：内网环境与外网断开时页面必须完整可用 #}
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+{# 量出顶栏真实高度写回 `--topbar-h`（吸顶表头的停靠线与 scroll-padding-top
+   都靠它）。放 base 是因为每个页面都用得上，且必须在 DOM 解析后、渲染前跑，
+   故用 defer 而不是塞进各页的 scripts 块。 #}
+<script defer src="{{ url_for('static', filename='layout.js') }}"></script>
 </head>
 <body>
 

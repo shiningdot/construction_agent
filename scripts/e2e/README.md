@@ -75,14 +75,17 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | `scripts/check_contrast_a11y.py` | 六个页面的**每一个有文本的元素**按 WCAG 2.1 AA 量前景/背景比（正文 4.5:1、大字 3:1）。首跑 1,869 处文字里 **757 处（40.5%）不达标**，改完 `:root` 的 8 个色号后 0（2026-10-05，见 `docs/web/01_在线采集.md` §2.5.72）。**F 段另量非文本对比度**（WCAG 1.4.11，输入控件边框须 3:1）——查出输入框静止态边框只有 1.34:1，新增 `--border-input` 后六页 **27 个控件最低 3.39:1**（§2.5.73）。**改 `app.css` 的 `:root` 任何色号都要重跑** | 5140 |
 | `scripts/check_color_source.py` | 验「颜色只有一个定义源」：静态扫 `static/*.js` + `templates/*.html` 的色值字面量（注释先剥掉）、运行时比 SVG 里真画出来的颜色 ↔ `:root` token 现值、注入自证（**首次渲染前**改写 `app.css`，颜色须跟着变）。改前 `causes.js` 有 9 个色值字面量、**7 个已与 token 分叉**，改完 0（2026-10-05，见 `docs/web/01_在线采集.md` §2.5.73）。**改任何一处配色（CSS 或 JS）都要重跑它** | 5141 |
 | `scripts/check_value_domain.py` | 验 `step1_basic_extractor.py` 的 tool schema 声明的 `enum` ↔ 主库 `accidents` 的**实际落库值**（`check_enum_alignment.py` 查的是工作库与前端标签，**不含**这份）。首查出一条真缺陷：`report_type` 声明 `教材/案例` 而库里 895 条（34.1%）是 `教材案例`——改声明对齐数据（§2.5.74）。另查清缺失的四**种**表示（NULL/空串/字符串哨兵/数值哨兵 `0`）并登记 12+4 条哨兵 | 不起服务（纯 SQL + 文本解析），约 3 秒 |
+| `scripts/check_2575_focus_obscured.py` | **WCAG 2.4.11 Focus Not Obscured (AA)**：键盘用户 Tab 走过页面时，拿到焦点的元素不得被吸顶顶栏 / 吸顶表头 / 底部批量条**完全遮住**。查出两处硬违规（滚动进视口的元素压在表头下 8 个组合、批量条盖住采集页底部 5/5），修 `scroll-padding-top: 94px` + `scroll-padding-bottom: 74px`（§2.5.75）。**改 `app.css` 的 `position`/`top`/`bottom`/`z-index`/`--topbar-h`/`--thead-h`/`--bulkbar-*` 都要重跑** | 5150，**约 4 分钟**（五视口 × 五页完整 Tab 往返） |
 
-十条都只读不写，跑几次都行。（2026-10-05 核对两处计数：加 `check_color_source.py`
+十一条都只读不写，跑几次都行。（2026-10-05 核对三处计数：加 `check_color_source.py`
 之前本表实为**八行**却写着"九条"——§2.5.72 那次加 `check_contrast_a11y.py` 时改了计数
-没补行；加 `check_value_domain.py` 后同步改为"十条"。）它们的结论与判据记在
+没补行；加 `check_value_domain.py` 后同步改为"十条"、加
+`check_2575_focus_obscured.py` 后改为"十一条"。）它们的结论与判据记在
 `docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互
 〔含 §8.6 对比度、§8.7 配色来源与非文本对比度〕、§九 蓝图↔实现、§十 响应契约、
 §十一 枚举取值、§十二 编码列的中文名、§十三 查询计划；**取值域**这一维见
-`docs/web/01_在线采集.md` §2.5.74 与 09 号 §十五 里的**第十六个**）。
+`docs/web/01_在线采集.md` §2.5.74 与 09 号 §十五 里的**第十六个**；**焦点遮挡**这一维
+见 §2.5.75 与 09 号 §十五 里的**第十七个**）。
 
 `check_api_contract.py` 跟上面四个各管一头：字段核查问「前端有没有人读它」，
 蓝图核查问「路由在不在」，**中间空着「文档写了这个字段、实现给没给」**——这一格
@@ -104,7 +107,8 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
   同时跑会撞**）· 键盘自检 5138 / 5139（`scripts/check_2570_keyboard_path.py`，同规矩：
   5138 是它 A 段自己的服务，5139 转给对方）。往上是各阶段的审计探针，同样各占一个
   （5128 是 §2.5.68 的自检）· 对比度核查 5140（`scripts/check_contrast_a11y.py`）·
-  配色来源核查 5141（`scripts/check_color_source.py`）。
+  配色来源核查 5141（`scripts/check_color_source.py`）· 焦点遮挡核查 5150
+  （`scripts/check_2575_focus_obscured.py`，**跑得最久的一条，约 4 分钟**）。
   （踩过：交互核查第一版默认 5098，正好是主库对账的端口，两套同时跑会撞。）
   （两个 `e2e_restart_*.py` 都不起 HTTP 服务——它们用 `app.test_client()` 打开页面，
   所以**不占端口**。它们要的「重启」是**进程**语义，端口上分不出来。）

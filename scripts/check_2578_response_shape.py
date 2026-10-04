@@ -71,6 +71,7 @@ STAGING_DB = main_repo_root() / "data" / "caiems_staging.db"
 ENV_STAGING = "C2578_STAGING_DB"
 
 KEY_RE = re.compile(r'"([A-Za-z_][A-Za-z0-9_]*)"')
+NUM_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 MAX_DEPTH = 12
 LIST_HEAD = 50
 
@@ -97,8 +98,47 @@ DOC_NEEDLES = ["样例画的层级，实现给的是不是那一层"]
 # ══════════════════════════════════════════════════════════════════
 # 路径解析
 # ══════════════════════════════════════════════════════════════════
-def paths_of(text: str) -> tuple[set[str], set[str]]:
-    """括号配对解出样例的**键路径** → `(全部路径, 其中是容器的路径)`。
+def peek_type(text: str, j: int) -> str:
+    """看值位置的字面量定**类型**，但不移动扫描位置（纯函数）。
+
+    分成两份是刻意的：解析器的**扫描位置**逻辑（尤其栈的进出）不能为了读值而
+    改——值里的 `}`/`,` 会让"读到分隔符为止"的循环提前停下、把容器的闭括号
+    当成结构字符弹栈。让扫描照原路走、类型另用一次只看不用改位置的前瞻来定，
+    解析器的回归面就为零。
+
+    返回 `object`/`array`/`string`/`number`/`boolean`/`null` 或 `placeholder`
+    （`…`、`<载荷>`、空值一律归 `placeholder`——它们**不声明类型**）。
+    """
+    n = len(text)
+    while j < n and text[j] in " \t\r\n":
+        j += 1
+    if j >= n:
+        return "placeholder"
+    c = text[j]
+    if c == "{":
+        return "object"
+    if c == "[":
+        return "array"
+    if c == '"':
+        k = j + 1
+        while k < n and text[k] != '"':
+            k += 2 if text[k] == "\\" else 1
+        return "string"
+    k = j
+    while k < n and text[k] not in ",\n}]":
+        k += 1
+    raw = text[j:k].strip()
+    if raw in ("true", "false"):
+        return "boolean"
+    if raw == "null":
+        return "null"
+    if NUM_RE.fullmatch(raw):
+        return "number"
+    return "placeholder"
+
+
+def paths_of(text: str) -> tuple[set[str], set[str], dict[str, set[str]]]:
+    """括号配对解出样例的**键路径** → `(全部路径, 其中是容器的路径, 路径→类型集合)`。
 
     数组元素的对象**继承数组键的路径**（`items` 里的 `id` 记作 `items.id`，
     不记 `items[].id`——判据要比的是层级，不是下标）。
@@ -111,9 +151,13 @@ def paths_of(text: str) -> tuple[set[str], set[str]]:
     `…`），但**容器结构是画全的**。所以「实现多给了字段」不该报红，「实现多
     包了一层容器」才该报红——这条区分让 B2 只判层级、不判字段完整性（字段
     完整性有另一个方向的判据在 `check_api_contract.py` 里）。
+
+    第三项（类型）本节不用，是 §2.5.79 要的：**同一份解析器出两样东西**，
+    比在那边另写一遍解析可靠（§2.5.76：同一个源不写第二遍解析）。
     """
     res: set[str] = set()
     conts: set[str] = set()
+    types: dict[str, set[str]] = {}
     stack: list[str] = []                      # 每层容器内的路径前缀
     i, n = 0, len(text)
     while i < n:
@@ -132,6 +176,7 @@ def paths_of(text: str) -> tuple[set[str], set[str]]:
                     prefix = stack[-1] if stack else ""
                     path = f"{prefix}.{key}" if prefix else key
                     res.add(path)
+                    types.setdefault(path, set()).add(peek_type(text, j))
                     if j < n and text[j] in "{[":
                         conts.add(path)
                         stack.append(path)
@@ -159,13 +204,15 @@ def paths_of(text: str) -> tuple[set[str], set[str]]:
             i += 1
             continue
         i += 1
-    return res, conts
+    return res, conts, types
 
 
-def doc_shapes() -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-    """接口 → 样例的路径集合 / 容器集合。归属口径与 `A.doc_samples` 逐字一致。"""
+def doc_shapes() -> tuple[dict[str, set[str]], dict[str, set[str]],
+                          dict[str, dict[str, set[str]]]]:
+    """接口 → 样例的路径 / 容器 / 路径→类型。归属口径与 `A.doc_samples` 逐字一致。"""
     out: dict[str, set[str]] = {}
     conts: dict[str, set[str]] = {}
+    types: dict[str, dict[str, set[str]]] = {}
     for path in sorted(A.DOCS.glob("[0-9][0-9]_*.md")):
         lines = path.read_text(encoding="utf-8").splitlines()
         cur: str | None = None
@@ -184,27 +231,55 @@ def doc_shapes() -> tuple[dict[str, set[str]], dict[str, set[str]]]:
                 text = "\n".join(chunk)
                 if '"ok"' in text and cur:
                     key = A.norm(cur)
-                    ps, cs = paths_of(text)
+                    ps, cs, ts = paths_of(text)
                     out.setdefault(key, set()).update(ps)
                     conts.setdefault(key, set()).update(cs)
+                    tp = types.setdefault(key, {})
+                    for p, s in ts.items():
+                        tp.setdefault(p, set()).update(s)
                 i = j
             i += 1
-    return out, conts
+    return out, conts, types
+
+
+def json_type(v) -> str:
+    """Python 值 → JSON 类型名。`bool` 必须先判：它是 `int` 的子类，
+    漏了这一条 `True`/`False` 会被记成 `number`。"""
+    if isinstance(v, bool):
+        return "boolean"
+    if isinstance(v, (int, float)):
+        return "number"
+    if isinstance(v, str):
+        return "string"
+    if v is None:
+        return "null"
+    if isinstance(v, dict):
+        return "object"
+    if isinstance(v, list):
+        return "array"
+    return f"other:{type(v).__name__}"
 
 
 def real_shape(obj, prefix: str = "", paths: set[str] | None = None,
                conts: set[str] | None = None, empt: set[str] | None = None,
-               depth: int = 0):
-    """响应对象 → `(全部路径, 容器路径, 空容器路径)`。
+               types: dict[str, set[str]] | None = None,
+               bools: dict[str, set[bool]] | None = None, depth: int = 0):
+    """响应对象 → `(全部路径, 容器路径, 空容器路径, 路径→类型集合, 路径→布尔取值)`。
 
     数组**遍历所有元素**（上限 `LIST_HEAD` 条，防大列表拖慢）：只取前几条会
     漏掉「第 6 个元素才有的键」，那是**假绿**的方向。
+
+    类型与布尔取值都**取并集**：同一路径在不同元素上给不同类型或取值（`weather`
+    有时 null 有时字符串、`ok` 理论上可能有的真有的假）都要收着。后三项里
+    `types`/`bools` 本节不用，是 §2.5.79 复用的——**同一次遍历出三份产出**，
+    比在那边另写一遍遍历可靠（§2.5.76：同一个源不写第二遍解析）。
     """
     if paths is None:
-        paths, conts, empt = set(), set(), set()
+        paths, conts, empt, types, bools = set(), set(), set(), {}, {}
     assert conts is not None and empt is not None
+    assert types is not None and bools is not None
     if depth > MAX_DEPTH:
-        return paths, conts, empt
+        return paths, conts, empt, types, bools
     if isinstance(obj, dict):
         if prefix:
             conts.add(prefix)
@@ -213,15 +288,18 @@ def real_shape(obj, prefix: str = "", paths: set[str] | None = None,
         for k, v in obj.items():
             p = f"{prefix}.{k}" if prefix else str(k)
             paths.add(p)
-            real_shape(v, p, paths, conts, empt, depth + 1)
+            types.setdefault(p, set()).add(json_type(v))
+            if isinstance(v, bool):            # `json_type` 也是先判 bool 的
+                bools.setdefault(p, set()).add(v)
+            real_shape(v, p, paths, conts, empt, types, bools, depth + 1)
     elif isinstance(obj, list):
         if prefix:
             conts.add(prefix)
             if not obj:
                 empt.add(prefix)
         for v in obj[:LIST_HEAD]:
-            real_shape(v, prefix, paths, conts, empt, depth + 1)
-    return paths, conts, empt
+            real_shape(v, prefix, paths, conts, empt, types, bools, depth + 1)
+    return paths, conts, empt, types, bools
 
 
 def tops(paths: set[str]) -> set[str]:
@@ -262,8 +340,12 @@ def measure() -> dict:
     aid = con.execute("SELECT id FROM accidents LIMIT 1").fetchone()[0]
     con.close()
 
-    doc, doc_conts = doc_shapes()
+    doc, doc_conts, doc_types = doc_shapes()
+    # 类型两栏本节不用，是 §2.5.79 复用的：同一份实测两个脚本共用一遍
+    # （§2.5.76：同一个源不写第二遍解析），故此处的收留不是死代码。
     res: dict = {"doc": {k: sorted(v) for k, v in doc.items()},
+                 "doc_types": {k: {p: sorted(s) for p, s in v.items()}
+                               for k, v in doc_types.items()},
                  "real": {}, "no_sample": [], "non_json": []}
     for rule in sorted({str(r) for r in app.url_map.iter_rules()
                         if "GET" in r.methods}):
@@ -277,9 +359,11 @@ def measure() -> dict:
         if key not in doc:
             res["no_sample"].append(key)
             continue
-        paths, conts, empt = real_shape(r.get_json(silent=True))
+        paths, conts, empt, types, bools = real_shape(r.get_json(silent=True))
         res["real"][key] = {"paths": sorted(paths),
-                            "conts": sorted(conts), "empt": sorted(empt)}
+                            "conts": sorted(conts), "empt": sorted(empt),
+                            "types": {p: sorted(s) for p, s in types.items()},
+                            "bools": {p: sorted(s) for p, s in bools.items()}}
     return res
 
 

@@ -1,4 +1,4 @@
-"""江西省应急管理厅 (yjglt.jiangxi.gov.cn) 事故调查报告采集器。
+r"""江西省应急管理厅 (yjglt.jiangxi.gov.cn) 事故调查报告采集器。
 
 目标: https://yjglt.jiangxi.gov.cn/jxsyjglt/col/251210dxsgal/（栏目「典型事故案例」）
 TRS CMS, 基于 TrsCmsCollector 通用基类。
@@ -15,7 +15,7 @@ TRS CMS, 基于 TrsCmsCollector 通用基类。
 ——站点本身完全健康，没有 412、没有 JS 挑战。所以这里显式打开该开关；
 判据与安全代价见 `trs_cms_base.build_ssl_verify`。
 
-### 第二层：列表页已不是 HTML（**未修**）
+### 第二层：列表页已不是 HTML（**未修**，通路已定案）
 
 TLS 修好后 `list_link_pattern` 命中 **0 条**。实测原因：原 `list_url` 返回的
 是一个 SPA 壳——全页只有 7 个 `<a>`，**全部是 `javascript:void(0)`**。
@@ -29,30 +29,72 @@ GET /jxsyjglt/251210dxsgal/251210dxsgal-articleList.json   → 200 / 15 条
 `/jxsyjglt/col/251210dxsgal/content/content_<id>.html`）。**这个形态与老版
 TRS 的 `/202609/t20260917_9714722.html` 完全不同**，基类现在没有 JSON 通路。
 
-**接口只吐 15 条，而栏目元数据说 `articleCount = 49`**：GET 的六种分页参数
-（`page` / `pageNum` / `pageIndex` / `pageSize` / `size` / `limit`）、POST、
-路径式后缀（`/index_2.json` 等）**全部无效或 404**——接口不提供翻页。
+两个细节（2026-10-05 实测）：
 
-### 第三层：详情页是 Handlebars 模板壳（**未修**）
+- **`urls` 字段是双重编码的 JSON 字符串**——`json.dumps` 一层后形如
+  `"{\"pc\":\"/jxsyjglt/col/…\"}"`。直接 `item["urls"]["pc"]` 会拿到一个
+  `str` 的下标，或拼出一个带引号的 URL（`httpx.InvalidURL: Invalid port: '"'`）。
+  要先 `json.loads(item["urls"])`。
+- **接口只吐 15 条，而栏目元数据说 `articleCount = 49`**：GET 的六种分页参数
+  （`page` / `pageNum` / `pageIndex` / `pageSize` / `size` / `limit`）、POST、
+  路径式后缀（`/index_2.json` 等）**全部无效或 404**——接口不提供翻页。
 
-`content_<id>.html` 返回 200 / 28,293 字节，但 `<body>` 里躺着的是**模板源码**：
+### 第三层：正文是 PDF 附件，藏在 JS 数据岛里（**未修**，形状已探明）
 
+> **2026-10-05 更正**：本条原先写「详情页是 Handlebars 模板壳，得先找到喂给
+> 模板的数据接口；5 个候选（`content_<id>.json` 等）全部 404」。**那个判断错
+> 了方向**——正文不需要任何额外接口，它就在详情页 HTML 自己的内联 `<script>`
+> 里，`_crawl_detail` 拿不到只是因为 `BeautifulSoup` 对 `<script>` 内容一律当
+> **文本**（与 `js_em` 数据岛是同一个机制，见 `_unwrap_data_islands`）。
+
+数据岛形如（`content_2074388022702022656.html`，2265 字符）：
+
+```js
+// 1 519199 文章正文 col0
+const col0_519199 = [{
+  content:{"content":"<p …><a class=\"tinymce-annex\"
+      href=\"/jxsyjglt/251210dxsgal/2074388022702022656/ZD7IpYi6.pdf\"
+      download=\"…评估报告.pdf\">…评估报告．pdf</a>&nbsp;</p>"},
+  images:[{}], title:'…', pubDate:'2026-07-07 14:59',
+  urls:'{"pc":"/jxsyjglt/col/251210dxsgal/content/content_2074388022702022656.html"}',
+  …
+}]
 ```
-{{#each data}}{{#with this}}
-{{title}}
-发布日期：{{formatDate pubDate 'YYYY'}}-…
-{{{content.content}}}          ← 正文占位符，等前端 JS 注入
-```
 
-所以 `_crawl_detail` 对四条不同的事故各提到**完全相同的 467 字**——提的是
-模板文字本身。想走通静态 HTML 通路，得先找到喂给模板的那个数据接口；
-5 个候选（`content_<id>.json` 等）**全部 404**，`relation` 接口返回 `[]`。
+三点实测结论：
+
+1. **它是 JS 对象字面量，不是 JSON**——键无引号（`content:{…}`），
+   `json.loads` 直接报 `Expecting property name enclosed in double quotes`。
+   要解析得先给无引号键补引号，或按 `"content"\s*:\s*"((?:[^"\\]|\\.)*)"`
+   抠值再反转义（后者实测三篇全部成功）。
+2. **正文就是一串附件链接**——三篇样本的 `content.content` 剥掉标签后分别是
+   「…评估报告．pdf」/「…调查报告.pdf」/「…评估报告.pdf」，正文实体全在
+   **PDF 里**。这与 `ln_em`（默认下 PDF）、`gd_em`（附件是 Word）是同一族。
+3. **PDF 是相对路径、可拼可下**：`/jxsyjglt/<文章id>/<随机8位>.pdf`。
+   基类 `_crawl_detail` 的附件提取（PDF / Office / 图片、多附件去重、
+   `_absolute`）**本来就能处理这种链接**——只要它进得了 DOM。
+
+所以第三层的修法不是「找接口」，是**让数据岛里的 HTML 进 DOM**：给
+`_unwrap_data_islands` 加一种形态（无 `type` 属性的内联 JS 字面量），附件
+链接就会被现成的选择器抓到，PDF 下载与 `extract_pdf_text` 也都是现成的。
 
 ### 结论
 
-**修好第一层不等于能采到**：这个站已经整体迁到「JSON 数据 + 前端渲染」的
-新一代 TRS。三步里只完成了第一步，`_total_listed` 仍然是 0——**与修之前
-逐格相同**，区别只在于 `_fetch_failed` 从「握手失败」变成了「列表 0 条」。
+**修好第一层不等于能采到**：这个站已经整体迁到「JSON 列表 + JS 数据岛正文 +
+PDF 附件」的新一代 TRS。三步里只完成了第一步，`_total_listed` 仍然是 0
+——**与修之前逐格相同**，区别只在于 `_fetch_failed` 从「握手失败」变成了
+「列表 0 条」。
+
+**但三层的形状现在全部探明了**（2026-10-05），修法是两步、都落在现成能力上：
+
+| 层 | 改哪里 | 做什么 |
+|---|---|---|
+| 列表 | `JxEMCollector` 覆盖 `_discover_pages` + `_parse_list` | 走 JSON 接口（记得 `json.loads(item["urls"])`） |
+| 详情 | `_unwrap_data_islands` 加一种形态 | 把内联 JS 字面量里的 HTML 提到 DOM，附件选择器自然命中 |
+
+**两步都做完才有意义**：只做列表层，健康检查会从「解析空」变成「有数据
+15 条」，而详情正文仍为空——那是**把「采不到」变成「采到一堆空壳」**，
+比现在更容易被放过。
 
 同一个现象（表上显示「空」）在本源是**三层**，在 `jl_em` 是域名笔误 + 列表
 JS 渲染两层，在 `hub_em` 是 JS 挑战型 WAF 一层——这正是 `_fetch_failed`

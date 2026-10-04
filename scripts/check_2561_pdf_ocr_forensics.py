@@ -234,6 +234,11 @@ def part_b(m: dict) -> None:
     # 没有这条判据，回退路径平时不执行、执行时又全绿 —— 归档哪天掉了都没人知道。
     ok(local, "归档落在本仓库 `construction_agent/input/`（§2.5.62）",
        "" if local else "**回退中：归档未落地本仓库**")
+    # ⚠️ 「磁盘上有」≠「归档完成」。归档的完成定义是**进了分支**——否则下次
+    # cleanup / 换 checkout 它照样不见，本节第七节的坑原样重演。故须核 `git ls-tree HEAD`。
+    ok(m["head_tree_has_input"],
+       "归档**已进分支**（`git ls-tree HEAD` 有它）——「落在磁盘上」不等于归档完成",
+       "" if m["head_tree_has_input"] else "**尚未提交进分支（磁盘有、分支没有）**")
     ok(m["pp_lines"] == 466, "文件 466 行", f"实测 {m['pp_lines']}")
     ok(m["has_mineru"], "文件头写的是 MinerU PDF 处理器")
     ok(m["flash_extract"] and m["is_ocr"],
@@ -513,8 +518,11 @@ def drift_test() -> int:
     return bad
 
 
+SRC_CASES = 4        # 源码面用例条数（与 drift_test_src 内逐一对应，末尾核对）
+
+
 def drift_test_src() -> int:
-    """源码面注入——**文档面（DRIFT）覆盖不到的三条**，§2.5.62 新增。
+    """源码面注入——**文档面（DRIFT）覆盖不到的四条**，§2.5.62 新增。
 
     为什么必须单独做：§2.5.62 新增的 B 段判据全部依赖「归档文件是哪一版」与
     「git 里两版各是什么形态」，而 DRIFT 只改文档、**碰不到这两样**。
@@ -524,6 +532,7 @@ def drift_test_src() -> int:
     print("\nE2. 源码面漂移自证（归档落错版 / 版本常量指错 / 回退分支）")
     print("=" * 74)
     bad = 0
+    ran = 0        # 实际跑了多少条用例——改 `SRC_CASES` 忘了改用例，会在末尾那条判据上红
     if not _PP_LOCAL.exists():
         print(f"  ❌ 归档文件不在：{_PP_LOCAL}（§2.5.62 归档未落地，无法自证）")
         return 1
@@ -531,6 +540,7 @@ def drift_test_src() -> int:
 
     # --- 用例 1：把归档文件换成旧版 —— 「归档版 == git 最新版」应转红 ---
     try:
+        ran += 1
         old = git_file(GIT_VER_AT_RUN, _PP_REL)
         if not old:
             print(f"  ❌ git 取不到 {GIT_VER_AT_RUN}:{_PP_REL}")
@@ -551,6 +561,7 @@ def drift_test_src() -> int:
     # --- 用例 2：版本常量指错 —— 「旧版只认中文数字」应转红 ---
     saved = GIT_VER_AT_RUN
     try:
+        ran += 1
         GIT_VER_AT_RUN = GIT_VER_LATEST          # 两版都指最新 ⇒ 两版无差
         rc = run()
         print(f"  {'✅' if rc == 1 else '❌'} GIT_VER_AT_RUN 指成最新版"
@@ -565,25 +576,65 @@ def drift_test_src() -> int:
     # （`t7_selfproof`），不测它就只是一句承诺。
     hidden = _PP_LOCAL.with_suffix(".py.hidden")
     try:
+        ran += 1
         _PP_LOCAL.rename(hidden)
         del fails[:]
         import io
         import contextlib
+        import subprocess
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             b = measure_src()
             part_b(b)
-        hit = any("归档落在本仓库" in f for f in fails)
         rc = 1 if fails else 0
-        print(f"  {'✅' if (rc == 1 and hit) else '❌'} 归档文件改名 ⇒ 回退 fix-collectors"
-              f"，且**恰好**报「归档未落地」 → 退出码 {rc}，命中={hit}"
-              + ("" if hit else f"（实际不符项：{fails}）"))
-        if not (rc == 1 and hit):
+        # ⚠️ 断言**红的集合**而不是「见红就算过」。归档改名会同时触发两条判据：
+        #   ①「归档落在本仓库」——回退到 fix-collectors 了；
+        #   ②「归档版锚点与 git 最新版逐字相同」——回退取到的是磁盘旧版。
+        # 只断言「命中①且退出码为 1」的话，②哪天失灵了用例照样绿；而且标签里的
+        # 「恰好」也就成了一句空话（§2.5.61 的规矩：判据的强度不超过覆盖范围）。
+        want = ["归档落在本仓库", "归档版锚点与 git 最新版"]
+        got = {w: any(w in f for f in fails) for w in want}
+        ok_all = rc == 1 and all(got.values()) and len(fails) == len(want)
+        print(f"  {'✅' if ok_all else '❌'} 归档文件改名 ⇒ 回退 fix-collectors"
+              f"，且**恰好**报「归档未落地」+「锚点是旧版」两条"
+              f" → 退出码 {rc}，命中={got}，红 {len(fails)} 条"
+              f"（预期 {len(want)}）" + ("" if ok_all else f"｜实际：{fails}"))
+        if not ok_all:
             bad += 1
     finally:
         hidden.rename(_PP_LOCAL)
 
-    total = 3
+    # --- 用例 4：归档未进分支（`HEAD~1` 就是这个状态，**不用伪造**）---
+    # 「磁盘有、分支没有」不是假想状态：归档提交的那一次之前，工作区就已经有文件了。
+    # 拿历史提交当对照，比人工构造可信。
+    ran += 1
+    import io
+    import contextlib
+    import subprocess
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "HEAD~1", _PP_REL],
+                       capture_output=True, text=True)
+    prev_has = bool(r.stdout.strip())
+    del fails[:]
+    m = measure_src()
+    m["head_tree_has_input"] = False        # 唯一注入点
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        part_b(m)
+    hit = any("已进分支" in f for f in fails)
+    rc = 1 if fails else 0
+    print(f"  {'✅' if (not prev_has and rc == 1 and hit) else '❌'} "
+          f"归档未进分支（`HEAD~1` 实测无此路径 = {not prev_has}）"
+          f" ⇒ 判据转红 → 退出码 {rc}，命中={hit}")
+    if not (not prev_has and rc == 1 and hit):
+        bad += 1
+
+    total = SRC_CASES
+    # ⚠️ 这里的 `bad` 才是返回值——`ok()` 只往 `fails` 里记，**不影响退出码**。
+    # 故条数核对必须自己 `bad += 1`，否则「改常量忘改用例」这句承诺是空的。
+    if ran != total:
+        bad += 1
+        print(f"  ❌ 源码面用例条数与常量不符（实跑 {ran} 条，`SRC_CASES`={total}）"
+              "——**改常量忘改用例会在这里红**")
     ok(bad == 0, f"源码面用例全部被捕获（{total - bad}/{total}）")
     return bad
 
@@ -626,9 +677,9 @@ if __name__ == "__main__":
         print("\n" + "=" * 74)
         if rc_doc or rc_src:
             print(f"❌ 漂移自证未全过：文档面 {len(DRIFT) - rc_doc}/{len(DRIFT)}，"
-                  f"源码面 {3 - rc_src}/3")
+                  f"源码面 {SRC_CASES - rc_src}/{SRC_CASES}")
             sys.exit(1)
-        print(f"✅ 漂移用例全部被捕获（文档面 {len(DRIFT)}/{len(DRIFT)} + 源码面 3/3 = "
-              f"{len(DRIFT) + 3} 条）")
+        print(f"✅ 漂移用例全部被捕获（文档面 {len(DRIFT)}/{len(DRIFT)} + "
+              f"源码面 {SRC_CASES}/{SRC_CASES} = {len(DRIFT) + SRC_CASES} 条）")
         sys.exit(0)
     sys.exit(main())

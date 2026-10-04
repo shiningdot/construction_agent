@@ -282,3 +282,83 @@ def test_缓存命中不计数也不发请求():
 
     assert c._fetch("https://example.invalid/list") == "<html>列表</html>"
     assert c._fetch_failed == 0
+
+
+# --------------------------------------------------------------------------
+# _Sink：两条投递通路要合计数，不能各记一次
+# --------------------------------------------------------------------------
+
+
+def _feed_record(sink, url: str, text: str = "x" * 10) -> None:
+    """走通路 A（`store.attach(sink)` → `RawAccidentStore.add()` 回调）。"""
+    sink({"title": "t", "source_url": url, "content": text})
+
+
+def _feed_item(sink, url: str, text: str = "x" * 10) -> None:
+    """走通路 B（`for item in collector.collect(): sink.feed(item)`）。"""
+    sink.feed(SimpleNamespace(title="t", source_url=url, raw_text=text))
+
+
+def test_同一URL经两条通路只记一次(tmp_path):
+    """`run_source` 对**同一个** sink 接了两条投递路径：
+
+        通路 A：`store.attach(sink)` → `RawAccidentStore.add()` 里回调
+        通路 B：`for item in collector.collect(): sink.feed(item)`
+
+    而 TRS 族的 `collect()` **两条都走**（`raw_store.add_batch(...)` 与
+    `return results`）。不去重就把同一批数据记两遍——实测 `jx_em`：
+    `collect()` 返回 3 条，表上印 **6** 条（2026-10-05 §2.5.48）。
+
+    去重口径与生产侧一致：`raw_accidents` 表有 `UNIQUE(url_hash)`，真写库
+    那边本来就幂等，**只有这张纯内存的表会翻倍**。
+    """
+    sink = health._Sink(tmp_path / "sink.jsonl", limit=99)
+    for u in ("https://x/1", "https://x/2"):
+        _feed_record(sink, u)
+    for u in ("https://x/1", "https://x/2"):
+        _feed_item(sink, u)
+    sink.close()
+
+    assert sink.count == 2, f"同一批 URL 被记了 {sink.count} 次"
+    lines = [ln for ln in (tmp_path / "sink.jsonl").read_text(
+        encoding="utf-8").splitlines() if ln]
+    assert len(lines) == 2, "落盘也要只有两行，否则「正文中位」也会被同一批数据加倍"
+
+
+def test_两条通路来的正文不一样时保留先到的(tmp_path):
+    """通路 A 的键是 `content`、通路 B 的是 `raw_text`，且**不保证一样**：
+    `collect()` 返回的是 `RawAccidentText`，store 里那条可能已剥过模板行。
+    去重保留先到的（通路 A），不合并、不覆盖——**合并是另一件事，没做**。
+    """
+    sink = health._Sink(tmp_path / "sink.jsonl", limit=99)
+    _feed_record(sink, "https://x/1", text="A" * 30)
+    _feed_item(sink, "https://x/1", text="B" * 5)
+    sink.close()
+
+    assert sink.count == 1
+    only = (tmp_path / "sink.jsonl").read_text(encoding="utf-8").strip()
+    assert '"chars": 30' in only, "保留的应当是通路 A 那条"
+
+
+def test_URL为空时不去重(tmp_path):
+    """没有键可用就退回原行为——**不猜**。两条空 URL 就是两条。"""
+    sink = health._Sink(tmp_path / "sink.jsonl", limit=99)
+    _feed_record(sink, "", text="x")
+    _feed_record(sink, "", text="y")
+    sink.close()
+
+    assert sink.count == 2
+
+
+def test_去重后条数不因通路数翻倍(tmp_path):
+    """3 条走两条通路仍是 3——这是表上「条数」那一栏的字面判据。"""
+    sink = health._Sink(tmp_path / "sink.jsonl", limit=99)
+    urls = [f"https://x/{i}" for i in range(3)]
+    for u in urls:
+        _feed_record(sink, u)
+    for u in urls:
+        _feed_item(sink, u)
+    sink.close()
+
+    assert sink.count == 3
+

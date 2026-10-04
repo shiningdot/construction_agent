@@ -170,6 +170,8 @@ class _Sink:
         self._fh = path.open("w", encoding="utf-8")
         self.limit = limit
         self.count = 0
+        # 已记过的 URL（见 `_accept`：两条通路会把同一批数据送两次）
+        self._seen: set[str] = set()
         # 挂上采集器，好在早停之前先看一眼「列表到底有多长」——见 `_short_list()`。
         # 允许为 None：build 失败时没有采集器可挂。
         self.watch = None
@@ -193,6 +195,19 @@ class _Sink:
         return False
 
     def _accept(self, title, url, text) -> None:
+        # **同一 URL 只记一次。** `run_source` 对同一个 sink 接了两条投递路径
+        # ——`store.attach(sink)`（`RawAccidentStore.add()` 里回调）与
+        # `for item in collector.collect()`——而 TRS 族的 `collect()`
+        # **两条都走**。不挡就把一批数据记两遍：实测 `jx_em`
+        # `collect()` 返回 3 条、表上印 **6** 条（2026-10-05 §2.5.48）。
+        #
+        # 去重口径与生产侧对齐：`raw_accidents` 表有 `UNIQUE(url_hash)`，
+        # 所以真写库那边本来就是幂等的，**只有这张纯内存的表会翻倍**。
+        # `url` 为空时不去重——没有键可用，退回原行为。
+        if url:
+            if url in self._seen:
+                return
+            self._seen.add(url)
         self.count += 1
         # 逐条落盘 + flush：父进程超时 kill 之后，已经收到的条目还能读出来。
         # 「120 秒收到 47 条」和「120 秒一条没有」是完全不同的两个结论。

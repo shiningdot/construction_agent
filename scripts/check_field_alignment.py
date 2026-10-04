@@ -40,6 +40,16 @@
 （43 个列名）漏列了它们，实现照抄分档表。**缺口是从文档抄进代码的**，所以这个
 核查同时也盯着「分档表列全了没有」。
 
+## `DETAIL_NOT_SHOWN` 的例外要自证（2026-10-05 补）
+
+白名单是永久豁免，理由写在字符串里再没人复核——两条例外各有**无声过期**的
+方式：`raw_text` 的理由是「前端读它渲染原文」（渲染被删就没人知道），
+`work_task_enum` 的理由是「编码在枚举表里不存在」（枚举表补录就过期）。
+故每条例外配一条**可证伪判据**，不成立就报错；`EXEMPTION_RULES` 还要求覆盖
+`DETAIL_NOT_SHOWN` 的每一个键，防的是"加例外忘了配判据"。
+
+一句话：**白名单里的理由也得有人守着**，否则它和「这列本来就不显示」没区别。
+
 ## 两个已知的假信号（写在这里免得下次又查一遍）
 
 - **注释里的文件名**。`/* … overview.js 里还有一份… */` 会被当成 `.js` 属性读取。
@@ -51,8 +61,11 @@
 
     .venv/bin/python3 scripts/check_field_alignment.py
     .venv/bin/python3 scripts/check_field_alignment.py --verbose
+    .venv/bin/python3 scripts/check_field_alignment.py --self-test
 
-退出码 `0` = 没有未归类的读取、也没有未收进详情页的列；`1` = 两者任一存在（可直接接 CI）。
+退出码 `0` = 没有未归类的读取、没有未收进详情页的列、且两条例外的理由都仍成立；
+`1` = 三者任一存在（可直接接 CI）。`--self-test` 给每条豁免判据注入反例，
+断言它确实会转红——**退出码 0 只有在脚本有能力报 1 时才可信**。
 """
 from __future__ import annotations
 
@@ -75,6 +88,81 @@ DETAIL_NOT_SHOWN = {
     "raw_text": "不进 `fields`，在响应顶层单独下发（前端读它渲染原文）",
     "work_task_enum": "1.0 残留列，703 条编码在枚举表里根本不存在（蓝图 05 §2.3）",
 }
+
+# ──────────────────────────────────────────────────────────────
+# 例外白名单的可证伪性（2026-10-05 补）
+# ──────────────────────────────────────────────────────────────
+# 白名单是个危险结构：**写上去就是永久豁免**，理由写在字符串里、再没人复核。
+# 本节两个例外各自会「无声过期」，方式还不一样：
+#
+#   · `raw_text` 的理由是「**前端读它渲染原文**」。哪天 `accident.js` 里那段
+#     渲染被删掉或改名，豁免依然生效——这一列就真的哪儿都不显示了，而脚本
+#     照样报绿。（口径要点：渲染在本项目**主要在 `static/*.js`**，不在 Jinja
+#     模板里；只查模板会得出"前端没读"的错误结论。）
+#   · `work_task_enum` 的理由是「**编码在枚举表里根本不存在**」。枚举表哪天补录
+#     了 WT11–WT15，这条也过期，同样无声。
+#
+# 故每条例外配一条**可证伪的判据**：判据不成立 ⇒ 豁免失效 ⇒ 报错要求处置。
+# `EXEMPTION_RULES` 必须覆盖 `DETAIL_NOT_SHOWN` 的**每一个键**——有人加例外却
+# 忘了配判据时，`exemption_checks()` 会直接点出来（那正是"只声明不验证"的复发）。
+
+
+def _raw_text_still_rendered(front: dict[str, set[str]]) -> tuple[bool, str]:
+    """判据：`raw_text` 的豁免理由「前端读它渲染原文」是否仍成立。"""
+    where = sorted(f for f, s in front.items() if "raw_text" in s)
+    if where:
+        names = ", ".join(Path(w).name for w in where)
+        return True, f"前端 {len(where)} 个文件在读：{names}"
+    return False, ("**没有任何前端文件读 `.raw_text`**——豁免理由已不成立，"
+                   "这一列现在真的哪儿都不显示。要么补回渲染，要么把它移出 "
+                   "`DETAIL_NOT_SHOWN` 另给理由")
+
+
+def _work_task_enum_still_unknown(main_db: str) -> tuple[bool, str]:
+    """判据：`work_task_enum` 的豁免理由「编码在枚举表里不存在」是否仍成立。"""
+    import sqlite3
+
+    from construction_agent.web import accidents_query
+
+    con = sqlite3.connect(f"file:{main_db}?mode=ro", uri=True)
+    try:
+        rows = con.execute(
+            "SELECT work_task_enum, COUNT(*) FROM accidents "
+            "WHERE work_task_enum IS NOT NULL AND TRIM(work_task_enum) != '' "
+            "GROUP BY work_task_enum").fetchall()
+    finally:
+        con.close()
+
+    total = sum(c for _, c in rows)
+    if total == 0:
+        return False, "`work_task_enum` 全表无值——豁免无从谈起，该列可直接删"
+    names = accidents_query.enum_names("work_task", main_db)
+    unknown = sum(c for code, c in rows if code not in names)
+    if unknown == 0:
+        return False, (f"{total} 条取值**全部**能在枚举表里查到名字——豁免理由"
+                       "「编码根本不存在」已不成立，该列应按正常字段处理"
+                       "（补进四档或另给理由）")
+    return True, f"{total} 条中 {unknown} 条（{100.0 * unknown / total:.1f}%）仍查不到名字"
+
+
+EXEMPTION_RULES = {
+    "raw_text": lambda db, front: _raw_text_still_rendered(front),
+    "work_task_enum": lambda db, front: _work_task_enum_still_unknown(db),
+}
+
+
+def exemption_checks(main_db: str,
+                     front: dict[str, set[str]]) -> list[tuple[str, bool, str]]:
+    """逐条验收 `DETAIL_NOT_SHOWN` 的豁免理由，返回 (列名, 是否成立, 说明)。"""
+    out: list[tuple[str, bool, str]] = []
+    for col in DETAIL_NOT_SHOWN:
+        rule = EXEMPTION_RULES.get(col)
+        if rule is None:
+            out.append((col, False, "**豁免没有配判据**——只声明不验证"))
+            continue
+        ok_, detail = rule(main_db, front)
+        out.append((col, ok_, detail))
+    return out
 
 
 def detail_tier_gaps(main_db: str) -> list[str]:
@@ -276,12 +364,95 @@ def backend_fields(main_db: str, staging_db: str) -> tuple[set[str], list[tuple[
     return paths, holes
 
 
+def self_test() -> int:
+    """`--self-test`：给每条豁免判据注入反例，断言它**确实会转红**。
+
+    一条永远返回 `True` 的判据与没有判据是一样的，而且更坏——它让报告看起来
+    是绿的。故这里逐条走失败路径，不是走通过路径。
+    """
+    import sqlite3
+    import tempfile
+
+    from construction_agent.web import accidents_query
+
+    print("=" * 74)
+    print("--self-test：给每条判据注入反例，断言它确实转红")
+    print("=" * 74)
+    bad = 0
+
+    def case(label: str, red: bool) -> None:
+        nonlocal bad
+        print(f"    {'✅' if red else '🔴'} {label}")
+        if not red:
+            bad += 1
+
+    # ── 用例 1/2：`raw_text` 判据的两端 ──
+    ok1, _ = _raw_text_still_rendered({})
+    case("raw_text：前端一个都不读 ⇒ 判据转红", not ok1)
+    ok2, _ = _raw_text_still_rendered({"static/a.js": {"raw_text", "title"}})
+    case("raw_text：前端在读 ⇒ 判据放行", ok2)
+
+    # ── 用例 3/4：`work_task_enum` 判据的两端（造临时库，不碰主库）──
+    def _mk_db(path: Path, values: list[str]) -> str:
+        con = sqlite3.connect(str(path))
+        con.execute("CREATE TABLE accidents (id INTEGER PRIMARY KEY, work_task_enum TEXT)")
+        con.executemany("INSERT INTO accidents (work_task_enum) VALUES (?)",
+                        [(v,) for v in values])
+        con.execute("CREATE TABLE enum_definitions (id INTEGER PRIMARY KEY, "
+                    "enum_type TEXT, code TEXT, name TEXT, is_active INTEGER DEFAULT 1)")
+        con.execute("INSERT INTO enum_definitions (enum_type, code, name, is_active) "
+                    "VALUES ('work_task', 'WT01', '地基与基础工程', 1)")
+        con.commit()
+        con.close()
+        return str(path)
+
+    with tempfile.TemporaryDirectory() as td:
+        all_known = _mk_db(Path(td) / "known.db", ["WT01", "WT01", "WT01"])
+        accidents_query.reset_cache()
+        ok3, d3 = _work_task_enum_still_unknown(all_known)
+        case(f"work_task_enum：取值全可查 ⇒ 判据转红（{d3[:34]}…）", not ok3)
+
+        has_unknown = _mk_db(Path(td) / "unk.db", ["WT01", "WT99", "WT99"])
+        accidents_query.reset_cache()
+        ok4, d4 = _work_task_enum_still_unknown(has_unknown)
+        case(f"work_task_enum：仍有查不到的码 ⇒ 判据放行（{d4[:34]}…）", ok4)
+
+        empty = _mk_db(Path(td) / "empty.db", [])
+        accidents_query.reset_cache()
+        ok5, _ = _work_task_enum_still_unknown(empty)
+        case("work_task_enum：全表无值 ⇒ 判据转红", not ok5)
+
+        # ── 用例 6：有人加例外却忘了配判据 ⇒ 必须点出「只声明不验证」──
+        # 用一个**真实存在**的临时库：传 `:memory:` 会让真判据去查一张不存在的
+        # 表、抛 sqlite3.OperationalError，用例看起来"红了"但红的是异常不是判据。
+        DETAIL_NOT_SHOWN["__fake_column__"] = "随便编个理由"
+        try:
+            got = exemption_checks(empty, {})
+            row = [r for r in got if r[0] == "__fake_column__"]
+            case("新增例外没配判据 ⇒ 报「只声明不验证」",
+                 bool(row) and not row[0][1] and "没有配判据" in row[0][2])
+        finally:
+            del DETAIL_NOT_SHOWN["__fake_column__"]
+
+    print()
+    if bad:
+        print(f"🔴 {bad} 条用例没走通——判据本身有问题")
+        return 1
+    print("✅ 6/6 用例全部转红/放行如预期")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--main-db", default=None)
     ap.add_argument("--staging-db", default=None)
     ap.add_argument("--verbose", action="store_true", help="打印放过的每一类")
+    ap.add_argument("--self-test", action="store_true",
+                    help="注入反例，验证豁免判据有能力报红")
     args = ap.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     main_db = args.main_db or main_db_path()
     staging_db = args.staging_db or str(main_repo_root() / "data" / "caiems_staging.db")
@@ -325,6 +496,16 @@ def main() -> int:
         print("  这些列的值后端有、页面上永远不显示。要么补进 `detail.CONTENT_TIERS`，")
         print("  要么进 `DETAIL_NOT_SHOWN` 并写清为什么不展示。")
 
+    exempt = exemption_checks(main_db, front)
+    bad_exempt = [e for e in exempt if not e[1]]
+    print(f"\n详情页豁免理由复核   {len(exempt):>4}  （`DETAIL_NOT_SHOWN` 逐条自证，"
+          f"不是写上去就算）")
+    for col, good, detail in exempt:
+        print(f"    {'✓' if good else '✗'} {col:<18} {detail}")
+    if bad_exempt:
+        print("  豁免理由不成立 ⇒ 这一列现在真的不可见了。按上面的提示处置，"
+              "别只改判据。")
+
     if holes:
         print(f"\n⚠ {len(holes)} 个端点的数组是空的，元素字段无从验证：")
         for path, blanks in holes:
@@ -347,12 +528,13 @@ def main() -> int:
         print("\n  逐个看：要么是后端该返回而没返回（真错配），"
               "要么该补进 JS_AND_DOM 白名单。")
 
-    if unclassified or gaps:
+    if unclassified or gaps or bad_exempt:
         return 1
 
     print("\n✓ 前端读的每个名字都能归到「后端返回」「DOM 自带」「前端内部」「后端源码」"
           "四者之一；")
-    print("  `accidents` 的每一列也都有归宿。")
+    print("  `accidents` 的每一列也都有归宿；")
+    print("  两条例外的理由也都当场复核过、仍然成立。")
     return 0
 
 

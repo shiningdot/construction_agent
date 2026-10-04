@@ -267,6 +267,32 @@ def _date_from_url(href: str) -> str:
     return ""
 
 
+def _is_js_challenge(body: str) -> bool:
+    """这段响应体是不是「JS 挑战型 WAF」下发的验证页。
+
+    `hub_em`（湖北省应急管理厅）2026-10-05 实测：列表页恒 412，六种请求头
+    组合（只有 UA ／ +Accept ／ +Accept-Language ／ +Referer ／
+    +Upgrade-Insecure-Requests ／ 全套浏览器头）**全部 412**，响应体约 3.1 KB。
+    **不是缺头。** 响应体长这样：
+
+        $_ss=window['$_ss'];if(!$_ss)$_ss={};$_ss.nsd=18589;
+        $_ss.cd="qhrqrpAlEf3qWqlarGgumGqarkqmkOWaqu9vm…";if($_ss.lcd)$_ss.lcd();
+        <script src="/8aLU4IL2XLG3/khy8TTLck25V.294cc83.js">
+
+    响应头里没有 `Set-Cookie`、没有 `WWW-Authenticate`，`server` 的值被打码
+    成 `******`。要过这一关得在浏览器里执行 `$_ss.cd` 那段混淆代码算出 cookie
+    再重新请求——**这是逆向 WAF 虚拟机，不做**（详见 `docs/web/01_在线采集.md`
+    §2.5.52）。
+
+    判据**故意取窄**：只认 `$_ss` 这个变量名（该 WAF 的固定特征），
+    **不用「含 `<script>` 就算」**——那会把任何一个带脚本的 412 页面
+    （比如真·需要登录的网关提示页）一起吞掉，等于把「没见过」当「已知」。
+    别的 WAF 换了变量名 → 不匹配 → 走原来的重试路径，**最坏也只是白重试，
+    不会误判**。
+    """
+    return "$_ss" in body
+
+
 class TrsCmsCollector(BaseCollector):
     """TRS CMS 通用采集器基类。
 
@@ -997,6 +1023,19 @@ class TrsCmsCollector(BaseCollector):
                 if resp.status_code == 200:
                     return resp.text
                 elif resp.status_code in (404, 410):
+                    return None
+                elif resp.status_code == 412 and _is_js_challenge(resp.text):
+                    # JS 挑战型 WAF（`hub_em`，见 `_is_js_challenge`）。
+                    # **重试永远不会成功**：退避 1s + 2s 之后再打两次，拿回来
+                    # 的还是同一份挑战页——它要的是浏览器把 `$_ss.cd` 跑一遍
+                    # 算出 cookie，不是等一会儿就好。而且反复打是负面的
+                    # （`news_aggregator` 连打百度，第 1 次拿到真结果页、
+                    # 之后全是拦截页——§2.5.39 实测）。所以这里不重试，
+                    # 立刻按「没连上」计数返回。
+                    logger.warning(
+                        f"[{self.cfg.source_name}] HTTP 412 且是 JS 挑战页，"
+                        f"重试无用（需浏览器执行挑战脚本，本采集器不逆向 WAF）: {url}")
+                    self._fetch_failed += 1
                     return None
                 logger.warning(f"HTTP {resp.status_code} (尝试 {attempt+1}): {url}")
             except Exception as e:

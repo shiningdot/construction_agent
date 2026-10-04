@@ -1383,3 +1383,136 @@ def test_同一个零条两种来路只有页数分得开(tmp_path):
     finally:
         _close(down)
         _close(parsed)
+
+
+# --------------------------------------------------------------------------
+# M 组：412 JS 挑战页不重试
+# --------------------------------------------------------------------------
+#
+# 第四十九轮。`hub_em`（湖北省应急管理厅）在健康检查表上长期显示 412。
+# 2026-10-05 实测：六种请求头组合（只有 UA ／ +Accept ／ +Accept-Language ／
+# +Referer ／ +Upgrade-Insecure-Requests ／ 全套浏览器头）**全部 412**，
+# 响应体恒约 3.1 KB 的同一份挑战页——**不是缺头**。
+#
+# 挑战页要的是浏览器执行 `$_ss.cd` 那段混淆代码算 cookie 再重载。**不逆向**
+# （理由见 `_is_js_challenge` 的 docstring）。代码侧能做、也唯一该做的，是
+# 让 `_fetch` **认得出这是挑战页、别白重试三次**：退避 1s + 2s 之后拿回来的
+# 还是同一份挑战页，而反复打是对抗性 WAF 最容易被升级封禁的行为
+# （`news_aggregator` 已被风控挡死的形态）。
+#
+# 这里真东西只有一份：`hub_em_412.html` 里那段响应体。下面的
+# `_CHALLENGE_BODY` 是从它截的原文（`$_ss` 变量名 + `$_ss.cd` 赋值 +
+# 外部 js 三个特征都在）。
+
+_CHALLENGE_BODY = (
+    "<script type=\"text/javascript\" r='m'>$_ss=window['$_ss'];"
+    "if(!$_ss)$_ss={};$_ss.nsd=18589;"
+    "$_ss.cd=\"qhrqrpAlEf3qWqlarGgumGqarkqmkOWaqu9vmGqaqsqDkOWarkqmqflEtn"
+    "qKqkqrWq3iWS3qWqAar1lumGqAJA9KqkqcWqWiWuqXlA9lEkqDkPEkm\";"
+    "if($_ss.lcd)$_ss.lcd();</script>"
+    "<script type=\"text/javascript\" charset=\"utf-8\" "
+    "src=\"/8aLU4IL2XLG3/khy8TTLck25V.294cc83.js\" r='m'></script>"
+)
+
+# 一个**带脚本**但不是挑战页的 412：网关要登录。用来钉住判据的窄度。
+_PLAIN_412_BODY = (
+    "<html><body><h1>412 Precondition Failed</h1>"
+    "<p>您的会话已过期，请重新登录。</p>"
+    "<script>setTimeout(function(){location.href='/login';},3000);</script>"
+    "</body></html>"
+)
+
+
+def test_412挑战页只请求一次不重试(tmp_path):
+    """**这一组的主断言。** 改前 `_fetch` 会退避 1s + 2s 再打两次。"""
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    client = _FakeClient(resp)
+    c._client = client
+    try:
+        assert c._fetch("https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/") is None
+        assert len(client.calls) == 1, "挑战页不该重试，只允许打一次"
+        assert c._fetch_failed == 1, "要计成「没连上」，不能一声不响"
+    finally:
+        _close(c)
+
+
+def test_412挑战页的日志说得出这是什么(tmp_path, caplog):
+    """日志得让人一眼看出「重试无用」，而不是含糊的 `HTTP 412`。
+
+    含糊的日志会把人引去调请求头——**这一轮实测已经证伪了那条路**
+    （六种头组合全 412）。日志里必须点名「挑战」。
+    """
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    c._client = _FakeClient(resp)
+    try:
+        with caplog.at_level(logging.WARNING):
+            c._fetch("https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/")
+        hits = [r for r in caplog.records if "挑战" in r.getMessage()]
+        assert hits, f"没有一条日志点明是挑战页：{[r.getMessage() for r in caplog.records]}"
+    finally:
+        _close(c)
+
+
+def test_412但不是挑战页时仍然重试三次(tmp_path):
+    """**判据取窄的反向钉。** 带 `<script>` 的登录页不算挑战页。
+
+    若判据写成「含 `<script>` 就算」，这类页会被当成挑战页一次就打住——
+    可它们退避几秒再打**是可能好的**，白丢一个源。
+    """
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _PLAIN_412_BODY
+    client = _FakeClient(resp)
+    c._client = client
+    try:
+        assert c._fetch(_LIST_URL) is None
+        assert len(client.calls) == 3, "非挑战页要走原重试路径"
+        assert c._fetch_failed == 1
+    finally:
+        _close(c)
+
+
+def test_挑战页判据只认下划线双s那个变量名():
+    """直接钉函数：真挑战页认，别的都不认。"""
+    assert trs_cms_base._is_js_challenge(_CHALLENGE_BODY) is True
+    # 只留外部 js 那一行也要认（有的响应体省略内联那段）
+    assert trs_cms_base._is_js_challenge(
+        "<script src=\"/8aLU4IL2XLG3/khy8TTLck25V.294cc83.js\"></script>") is False
+    # 带脚本的普通 412 不认
+    assert trs_cms_base._is_js_challenge(_PLAIN_412_BODY) is False
+    # 普通的 200 页面不认
+    assert trs_cms_base._is_js_challenge("<html><body>列表</body></html>") is False
+    assert trs_cms_base._is_js_challenge("") is False
+
+
+def test_412挑战页在端到端里表现为零条零页(tmp_path):
+    """接到 `collect()` 上：挑战页 = 这个源这一轮一条也拿不到。
+
+    与 `test_列表页压根取不到时页数为零` 同一个形态——**这正是我们想要的**：
+    不是「解析出 0 条」，而是明确地「页面一张都没回来」。
+
+    `_collector` 会把 `_fetch` 换成假的（`_list_html`），所以这里必须先
+    `del` 掉那个实例属性，让真正的 `_fetch` 接上假 `_client`——**否则这条
+    测试压根没走 `_fetch`，是个恒真的假绿**。
+    """
+    c = _collector(tmp_path, n=2)
+    real_client = c._client
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    fake = _FakeClient(resp)
+    del c._fetch
+    c._client = fake
+    try:
+        out = c.collect()
+        assert out == []
+        assert c._list_pages_ok == 0
+        assert c._total_listed == 0
+        assert c._fetch_failed > 0
+        assert len(fake.calls) == 1, "挑战页只该打一次"
+    finally:
+        fake.close()
+        real_client.close()

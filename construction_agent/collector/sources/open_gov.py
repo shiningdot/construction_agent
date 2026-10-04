@@ -39,9 +39,18 @@ GOV_DATASETS: list[dict] = [
         "base_url": "https://data.shenyang.gov.cn",
         "description": "沈阳于洪区生产安全事故调查处理",
         "record_count": 1266,
+        # **标注与实际不符**（2026-10-05 实测，§2.5.50）：该端点 302 到辽宁政务
+        # 统一身份认证（`sso.lnzwfw.gov.cn` 的 `login.jsp`），**要登录才拿得到**。
+        # 仍写 `True`：数据集本身确实向社会开放，差的只是一个账号；但**它现在
+        # 拿不到数据**。是否为此申请账号/改为手工下载/下线该源，是作者的裁决项，
+        # 代码侧不擅自改这个开关。
         "open_access": True,
         "api_endpoint": "https://data.shenyang.gov.cn/api/dataset/{dataset_id}/data",
-        "dataset_id": "yuhong_shengchanshigu",  # 需要实际查询确认
+        # 2026-10-05 实测：这个 ID **服务端认得**——登录页把原始 URL 原样放在
+        # `surl` 里回传（base64 解码 = `http://data.shenyang.gov.cn:8080/api/
+        # dataset/yuhong_shengchanshigu/data`）。原先「需要实际查询确认」可以
+        # 划掉了，但 `:8080` 是内网/反代后端地址，外网直连三段全超时（§2.5.50）。
+        "dataset_id": "yuhong_shengchanshigu",
         "formats": ["json", "csv", "xlsx"],
         "keywords": ["事故", "生产安全"],
     },
@@ -202,6 +211,22 @@ class OpenGovCollector(BaseCollector):
         - `shandong`  `base_url` 200 / 179,446（站点活着），可是**配置里压根
           没有 `api_endpoint`**，本地也没有手工下载的文件——三条通路只剩两条，
           两条都空。
+
+        **上面 `shenyang` 与 `heze` 两条的推断，2026-10-05 直连实测后都不成立**
+        （见 `docs/web/01_在线采集.md` §2.5.50）：
+
+        - `shenyang`  那个 HTML **是辽宁政务 SSO 的登录页**，不是 404 页。
+          302 的 `Location` 把原始 URL 放在 `surl` 参数里回传（base64 解码 =
+          `http://data.shenyang.gov.cn:8080/api/dataset/yuhong_shengchanshigu/data`）
+          ——**服务端认得这个数据集 ID，端点是活的，只是要登录**。
+          旧推断把「拿到 HTML」等同于「端点失效」，把 64,943 字节的登录页与
+          156 字节的错误页混成了一件事。
+        - `heze`      强制 IPv4（猴补丁 `getaddrinfo` 只留 `AF_INET`）后
+          **从 `ENETUNREACH` 变成 `ConnectTimeout`**——路由有了、SYN 没人应。
+          两种错误不是一回事：前者是「没有到该网络的路由」（IPv6 无出口），
+          后者是「对端丢包」。**IPv4 也不通，所以换机器不一定能解决**。
+          且实测到的 IPv4 已是 `112.6.51.21`，与上面记的 `58.59.15.41` 不同，
+          DNS 已更新——那条观测本身也过了保质期。
 
         修前第二种会落进 `else: 无数据或需要手动获取`，与「这个平台今天确实
         没数据」**同形**；第一种更糟，连 INFO 都没有。

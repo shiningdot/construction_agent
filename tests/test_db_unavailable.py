@@ -392,6 +392,50 @@ class TestImagesStats:
         assert r.status_code == 200
         assert r.get_json()["data"]["state"] == "unavailable"
 
+    @pytest.fixture
+    def staging_with_manifest(self, tmp_path, monkeypatch):
+        """工作库可用、清单有一行——`stats()` 会走到「查最终库」那一步。"""
+        staging = tmp_path / "staging.db"
+        con = sqlite3.connect(staging)
+        con.execute("CREATE TABLE raw_accidents (id TEXT PRIMARY KEY)")
+        con.execute(_MANIFEST_DDL)
+        con.execute("INSERT INTO image_manifest (accident_id, rel_path, version,"
+                    " analyzed) VALUES ('a1','imageV3/a1/x.jpg','v3',0)")
+        con.commit()
+        con.close()
+        monkeypatch.setenv(sdb.ENV_STAGING_DB, str(staging))
+        return staging
+
+    @pytest.mark.parametrize("kind", ["partial", "partialcols", "emptytable"])
+    def test_只依赖accidents的最终库形态照常工作(
+            self, tmp_path, monkeypatch, staging_with_manifest, kind):
+        """**八种最终库形态里只有四种让它 503，另外四种是 200。**
+
+        `stats()` 在最终库那一侧只执行一条 SQL：`SELECT COUNT(*) FROM
+        accidents`（`images.py` 的 `stats()` 里那一行）。所以「缺
+        `caics_causes`」（`partial`）与「列不齐」（`partialcols`）都拦不住
+        它——`accidents` 表在就够了。
+
+        这条断言同时钉住一件更容易被改坏的事：将来给 `stats()` 加一个要读
+        `caics_causes` 的字段（比如「有编码的图片事故数」），`partial` 会
+        **静默**从 200 变成 503；有这条断言，改的人当场看得见。
+
+        上一轮记的未决说「工作库可用、最终库缺表时 `images.stats()` 会 503
+        而不是返回 `accidents_total: 0`」——实测（2026-10-05，八形态 × 两
+        工作库状态）那只对**零张表**的库成立（`notables`，见上一条测试）。
+        「缺表」这个词在八形态里对应四种不同的库，它们对这个端点的意义不同。
+        """
+        # 不用 `point_at`：那个 fixture 在本体里把工作库指到不存在的路径，
+        # 与 `staging_with_manifest` 互相覆盖。
+        monkeypatch.setenv(db.ENV_DB_PATH, str(_make_db(tmp_path, kind)))
+        province.reset_cache()
+        overview.reset_cache()
+        accidents_query.reset_cache()
+
+        r = create_app({"TESTING": True}).test_client().get("/api/images/stats")
+        assert r.status_code == 200, f"{kind}：这个端点只查 accidents 一张表"
+        assert r.get_json()["data"]["state"] == "ready"
+
 
 # ══════════════════════════════════════════════════════════════
 # D 组：/api/health 的 ok 判据

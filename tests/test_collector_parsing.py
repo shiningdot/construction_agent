@@ -149,15 +149,46 @@ def test_sc_em_正则认得本站详情页():
 @pytest.mark.parametrize(
     "href",
     [
-        "/scyjt/dcbg/2023/8/14/0123456789abcdef0123456789abcdef/files/abc.pdf",  # 无详情解析
-        "/scyjt/dcbg/other.shtml",                                               # 无日期目录
-        "/art/2019/4/18/art_81395_8732508.html",                                 # 别的 CMS
+        "/scyjt/dcbg/other.shtml",                                       # 无日期目录
+        "/art/2019/4/18/art_81395_8732508.html",                         # 别的 CMS
+        "/scyjt/dcbg/2023/8/14/0123456789abcdef0123456789abcdef.html",   # 尾段两边都不是
+        "/scyjt/dcbg/2023/8/14/abcdef012345678.shtml",                   # hex 只有 15 位
     ],
 )
 def test_sc_em_正则不收别的形状(href):
-    """PDF 直链故意不收：它没有配套的详情解析，收进来只会多一条「有标题、无正文」的记录。"""
+    """**PDF 直链原本在这一组里，2026-10-05 移走了**——见下面那条。
+
+    留在这里的是真的不收的形状：没有日期目录、别的 CMS、尾段既不是
+    `.shtml` 也不是 `/files/*.pdf`、hex 长度不够。
+    """
     pattern = ScEMCollector(data_dir=Path("/tmp")).cfg.list_link_pattern
     assert not re.search(pattern, href)
+
+
+def test_sc_em_正则收PDF直链():
+    """**这条是翻转过来的。**
+
+    原先是 `assert not re.search(...)`，就排在上一组的参数表里，docstring
+    写着「PDF 直链故意不收：它没有配套的详情解析，收进来只会多一条『有标题、
+    无正文』的记录」。
+
+    **前半句错了**——PDF 直链**不需要**详情解析，它自己就是正文；基类的
+    `_download_and_extract_pdf` 通路（对全站默认有效）本来就能吃下它。这个
+    判断让本源唯一带建筑施工内容的那几条（成都成华起重伤害、自贡九鼎大楼
+    火灾）常年收不进来，而健康检查表上显示的却是「空 / 列表 4 / 闭环 ✓」
+    ——**账是平的，是入口少了**。
+
+    2026-10-05 翻转，见 `docs/web/01_在线采集.md` §2.5.54。
+    """
+    pattern = ScEMCollector(data_dir=Path("/tmp")).cfg.list_link_pattern
+    assert re.search(
+        pattern,
+        "/scyjt/dcbg/2023/8/14/0123456789abcdef0123456789abcdef/files/abc.pdf")
+    # 文件名是**纯 hex** 的也收——实测第 7、8 条就是这么发的
+    assert re.search(
+        pattern,
+        "/scyjt/dcbg/2022/6/27/1dbb8ca08e6841d68b553ccbf0428023/files/"
+        "a5358736217c42bab1e070f7f94fc16c.pdf")
 
 
 # ═══════════════════════════════════════════════════════════════════

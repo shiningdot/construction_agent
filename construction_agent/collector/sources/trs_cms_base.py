@@ -425,16 +425,32 @@ class TrsCmsCollector(BaseCollector):
              for h in detail_html.values()],
             min_pages=BOILERPLATE_MIN_PAGES,
         )
-        # 页数不够时 `tpl` 是空集，后面自动退化成「不剥」——**退化不无声**，
-        # 日志里说得出来。
+        # `tpl` 是空集时后面自动退化成「不剥」——**退化不无声**，日志里说得出
+        # 来。但空集有**两种**成因，2026-10-05 之前这里把第二种说成了第一种：
+        #
+        #   ① 页数不够 —— `template_lines` 在 `len(pages) < min_pages` 时直接
+        #      返回空集。`jl_em` 那轮是这一种（候选 1 页）。
+        #   ② 页数够、但各页**没有公共行** —— `sc_em` 首次踩到：3 页、
+        #      `MIN_PAGES` 也是 3，`3 < 3` 为假，本该去求交集；但三页全是
+        #      **PDF 直链**，`page_lines` 把 PDF 字节当 HTML 解析得 **0 行**，
+        #      交集自然为空。旧日志照打「候选页只有 3 页（<3）」——
+        #      **句子本身就自相矛盾**（3 不小于 3），把诊断引向"分页没配好"。
+        #
+        # 12 个 TRS 源此前只有 ① 的案例，所以这句话一直没被证伪；不是"以前
+        # 是对的、现在坏了"，是**第一次走到没走过的分支**。判据（`tpl` 空
+        # 就退化）一个字没动，改的只是归因。
         if tpl:
             logger.info(f"[{self.cfg.source_name}] 模板文字 {len(tpl)} 行 / "
                         f"{sum(len(x) for x in tpl)} 字（取自 "
                         f"{len(detail_html)} 页）")
         elif detail_html:
-            logger.info(f"[{self.cfg.source_name}] 候选页只有 "
-                        f"{len(detail_html)} 页（<{BOILERPLATE_MIN_PAGES}），"
-                        f"本轮不剥模板文字")
+            n_pages = len(detail_html)
+            if n_pages < BOILERPLATE_MIN_PAGES:
+                logger.info(f"[{self.cfg.source_name}] 候选页只有 {n_pages} 页"
+                            f"（<{BOILERPLATE_MIN_PAGES}），本轮不剥模板文字")
+            else:
+                logger.info(f"[{self.cfg.source_name}] {n_pages} 页之间没有"
+                            f"公共行，本轮不剥模板文字")
 
         # 4. 逐条爬取
         results: list[RawAccidentText] = []

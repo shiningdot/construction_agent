@@ -1523,3 +1523,59 @@ def test_412挑战页在端到端里表现为零条零页(tmp_path):
     finally:
         fake.close()
         real_client.close()
+
+
+# --------------------------------------------------------------------------
+# H 组：`tpl` 空集时的日志归因（2026-10-05）
+# --------------------------------------------------------------------------
+#
+# 空集有**两种**成因，旧日志把第二种也说成第一种：
+#
+#   ① 页数不够 —— `template_lines` 在 `len(pages) < min_pages` 时直接返回
+#      空集。`jl_em` 那轮是这一种（候选 1 页），措辞本来就是对的。
+#   ② 页数够、但各页**没有公共行** —— `sc_em` 首次踩到：3 条候选全是
+#      **PDF 直链**，`page_lines` 把 PDF 字节当 HTML 解析得 **0 行**，交集自然
+#      为空。旧日志照打「候选页只有 3 页（<3）」——**句子自相矛盾**
+#      （3 不小于 3），会把诊断引向"分页没配好"。
+#
+# 12 个 TRS 源此前只有 ① 的案例，所以这句话一直没被证伪。**判据（`tpl` 空就
+# 退化）一个字没动，改的只是归因**；下面两条互为对照——第二条证明改动不是
+# "把所有情况都换成了新措辞"。
+
+
+def test_页数不足时日志说页数(tmp_path, caplog):
+    from construction_agent.collector.boilerplate import MIN_PAGES
+    c = _collector(tmp_path, n=MIN_PAGES - 1)          # 2 < 3
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        with caplog.at_level(
+                logging.INFO,
+                logger="construction_agent.collector.sources.trs_cms_base"):
+            c.collect()
+        assert f"候选页只有 {MIN_PAGES - 1} 页（<{MIN_PAGES}）" in caplog.text
+        assert "之间没有公共行" not in caplog.text
+    finally:
+        _close(c)
+
+
+def test_页数够但无公共行时日志说没有公共行(tmp_path, caplog):
+    from construction_agent.collector.boilerplate import MIN_PAGES
+    c = _collector(tmp_path, n=MIN_PAGES)              # 恰等于阈值，不会因页数退化
+    # 每页一段**独有**文字：交集为空，但页数是够的。
+    # 独有后缀用**完整 url**——最初写的是 `url[-6:]`，三条地址的尾 6 字符
+    # 恰好都是 `.html` 的尾巴（`0.html`），于是真求出一行公共文字，用例
+    # 当场失效。**路径别名越长越容易撞**，这里直接用整串。
+    c._fetch = lambda url: (
+        _list_html(MIN_PAGES) if url == _LIST_URL
+        else "<html><body><div class='con'>"
+             f"只此一页才有的文字 {url}</div></body></html>")
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        with caplog.at_level(
+                logging.INFO,
+                logger="construction_agent.collector.sources.trs_cms_base"):
+            c.collect()
+        assert f"{MIN_PAGES} 页之间没有公共行" in caplog.text
+        assert "候选页只有" not in caplog.text
+    finally:
+        _close(c)

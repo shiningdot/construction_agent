@@ -72,10 +72,12 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
 | `scripts/check_api_contract.py` | 蓝图画的响应样例 ↔ 真实响应的**字段** | 不起服务（`app.test_client()`） |
 | `scripts/check_enum_alignment.py` | 三节：① `staging_schema.py` 注释声明的枚举取值 ↔ 前端标签表的键，外加后端写入的字面量（静态）；② 编码列（`work_task` 等）在详情 / 列表 / 审核三页有没有中文名（**打接口，要连库**） | 前两节纯静态；第三节 `app.test_client()`，靠 `CAIEMS_DB` / `CAIEMS_STAGING_DB` 指定库 |
 | `scripts/check_query_plan.py` | 带筛选的列表查询，`EXPLAIN QUERY PLAN` 走没走索引（蓝图 07 §四 M1 的验收条目）。抓的是**真跑出来的 SQL**，不照抄源码 | 不起服务（打补丁抓 SQL） |
+| `scripts/check_contrast_a11y.py` | 六个页面的**每一个有文本的元素**按 WCAG 2.1 AA 量前景/背景比（正文 4.5:1、大字 3:1）。首跑 1,869 处文字里 **757 处（40.5%）不达标**，改完 `:root` 的 8 个色号后 0（2026-10-05，见 `docs/web/01_在线采集.md` §2.5.72）。**改 `app.css` 的 `:root` 任何色号都要重跑** | 5140 |
 
-七条都只读不写，跑几次都行。它们的结论与判据记在
-`docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互、
-§九 蓝图↔实现、§十 响应契约、§十一 枚举取值、§十二 编码列的中文名、§十三 查询计划）。
+九条都只读不写，跑几次都行。它们的结论与判据记在
+`docs/web/09_端到端对齐核查.md`（§六 渲染、§七 字段〔含 §7.3 反向那一半〕、§八 交互
+〔含 §8.6 对比度〕、§九 蓝图↔实现、§十 响应契约、§十一 枚举取值、§十二 编码列的中文名、
+§十三 查询计划）。
 
 `check_api_contract.py` 跟上面四个各管一头：字段核查问「前端有没有人读它」，
 蓝图核查问「路由在不在」，**中间空着「文档写了这个字段、实现给没给」**——这一格
@@ -96,7 +98,7 @@ python3 scripts/e2e/e2e_click_review.py    # ③ 层（需 playwright + chromium
   服务，5133 转给 `check_web_interaction.py`——**不传的话对方默认 5100，与本脚本自检
   同时跑会撞**）· 键盘自检 5138 / 5139（`scripts/check_2570_keyboard_path.py`，同规矩：
   5138 是它 A 段自己的服务，5139 转给对方）。往上是各阶段的审计探针，同样各占一个
-  （5128 是 §2.5.68 的自检）。
+  （5128 是 §2.5.68 的自检）· 对比度核查 5140（`scripts/check_contrast_a11y.py`）。
   （踩过：交互核查第一版默认 5098，正好是主库对账的端口，两套同时跑会撞。）
   （两个 `e2e_restart_*.py` 都不起 HTTP 服务——它们用 `app.test_client()` 打开页面，
   所以**不占端口**。它们要的「重启」是**进程**语义，端口上分不出来。）

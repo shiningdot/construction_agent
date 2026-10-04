@@ -23,31 +23,36 @@
   /* 文字 */
   --text:        #2A2724;
   --text-2:      #55504A;
-  --muted:       #8A827A;
+  /* ⚠️ 这几个色号按 WCAG 2.1 AA 定过（§2.5.72）。改动前先跑
+     `scripts/check_contrast_a11y.py`——它量的是**浏览器算出来的**前景/背景
+     实际比，会逐个报出低于 4.5:1（大字 3:1）的文字。原值 `#8A827A` 在三种
+     底色上分别只有 3.78 / 3.56 / 3.39，全站 757 处文字不合格。 */
+  --muted:       #756E67;
 
   /* 主色：绿。品牌色保留，但只承担一个角色（主行动 + 数据主色） */
-  --brand:       #0D7C6B;
+  --brand:       #0D7867;
   --brand-dark:  #0A6355;
   --brand-soft:  #E3F0ED;
   --link:        #2E6B9E;
 
   /* 事故等级 */
   --sev-1: #8E2F2F;  /* 特别重大 */
-  --sev-2: #B5544A;  /* 重大 */
-  --sev-3: #C77D3A;  /* 较大 */
-  --sev-4: #6B7B8C;  /* 一般 */
+  --sev-2: #AA4F46;  /* 重大 */
+  --sev-3: #9B612C;  /* 较大 */
+  --sev-4: #616F7E;  /* 一般 */
 
-  /* CAICS 五层 */
+  /* CAICS 五层。与上面的等级色同值是有意的：同一件事（F 层≈较大事故）
+     在两处出现，颜色不该有肉眼可辨的差别。 */
   --layer-M: #5B6ABF;
-  --layer-F: #C77D3A;
-  --layer-T: #3E8E7E;
-  --layer-H: #B5544A;
-  --layer-C: #7A6BA8;
+  --layer-F: #9B612C;
+  --layer-T: #377E70;
+  --layer-H: #AA4F46;
+  --layer-C: #7969A7;
 
   /* 证据三级 */
-  --ev-direct:   #0D7C6B;
-  --ev-indirect: #C77D3A;
-  --ev-weak:     #9A9A9A;
+  --ev-direct:   #0D7867;
+  --ev-indirect: #9B612C;
+  --ev-weak:     #737373;
 
   --radius:    10px;
   --radius-sm: 6px;

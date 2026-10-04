@@ -449,6 +449,45 @@ def spec_t1(c):
     return out
 
 
+def t1_era_check(rows, got):
+    """表 1 第 5 列（EN「Accident period」/ ZH「事故年代」）的弱判据。
+
+    这一列标注的是**时代区块**（该来源属于语料的两个时间窗中的哪一个），
+    不是该来源的实测跨度——2026-10-05 查明（见对账记录第二十七节）：
+      - 正文 §3.1 的两个窗是 1978–1990 与 2005–2026；
+      - 全库实测 min/max = 2005/2026，2005 那一条来自住建部汇编，
+        即「2005–2026」是当代窗的**实际边界**而非采集器参数（采集侧只有
+        `collector/sources/mem.py:142` 有明文年份区间：2005–2025 目录遍历）；
+      - 各来源实测跨度普遍更窄（esafety 实为 2022–2025、provincial 2009–2025、
+        mem 2007–2020、mohurd 2005–2018），故**不能**按"逐行等于实测跨度"核。
+
+    判据：标注窗口必须**包含**该来源的实测年份区间。它能抓住"标到错误的
+    窗口"（如给 esafety 标 1978–1990），抓不到"窗口端点不够贴切"——
+    后者取决于表头语义怎么写，属作者裁决，不在脚本射程。
+    """
+    bad, detail = [], []
+    for key, pred in T1_SRC:
+        mark = got.get(('era', key))
+        if not mark:
+            bad.append(f'{key}: 表中未解析到年代区间')
+            continue
+        yrs = []
+        for s, d in rows:
+            if pred(s):
+                m = re.match(r'(\d{4})', str(d or ''))
+                if m:
+                    yrs.append(int(m.group(1)))
+        if not yrs:
+            continue
+        lo, hi = min(yrs), max(yrs)
+        if mark[0] <= lo and hi <= mark[1]:
+            detail.append(f'{key} 实测 {lo}–{hi} ⊆ 标注 {mark[0]}–{mark[1]}')
+        else:
+            bad.append(f'{key}: 实测 {lo}–{hi} 不在标注区间 '
+                       f'{mark[0]}–{mark[1]} 内')
+    return bad, detail
+
+
 def got_t1(text, probe):
     got, subs = {}, []
     for row in parse_table(text, probe):
@@ -459,6 +498,7 @@ def got_t1(text, probe):
         rec, share = first_num(row[2]), first_num(row[3])
         if rec is None:
             continue
+        era = re.search(r'(\d{4})\s*[–\-—~至]\s*(\d{4})', row[4] if len(row) > 4 else '')
         key = None
         for k, pats in [('safehoo', ('safehoo',)), ('esafety', ('esafety',)),
                         ('provincial', ('provincial', '省级')),
@@ -481,6 +521,8 @@ def got_t1(text, probe):
             got[('rec', key)] = rec
             if share is not None:
                 got[('share', key)] = share
+            if era:
+                got[('era', key)] = (int(era.group(1)), int(era.group(2)))
     for nm, (rec, share) in zip(('sub_web', 'sub_doc'), subs):
         got[('rec', nm)] = rec
         if share is not None:
@@ -796,11 +838,22 @@ def main(verbose=False):
             spec1 = spec_t1(c)
             spec3 = spec_t3(c)
             spec4 = spec_t4(c)
+            era_rows = c.execute('SELECT source_name, date FROM accidents'
+                                 ).fetchall()
         finally:
             c.close()
         for t, txt in texts.items():
             p1 = '| Track | Source |' if t == 'EN' else '| 轨道 | 来源 |'
-            diff(spec1, got_t1(txt, p1), '表1 数据来源分布', t, TOL_EXACT, results)
+            got1 = got_t1(txt, p1)
+            # 表 1 的年代列：弱判据（标注窗口须包含该来源实测年份区间）。
+            # 先取出 era 再从 got1 里摘掉——它没有"源值"可比（语义是时代区块，
+            # 不是实测跨度），留在 got1 里会被 diff 当成"正文多出的格"
+            era_bad, era_ok = t1_era_check(era_rows, got1)
+            for k, _ in T1_SRC:
+                got1.pop(('era', k), None)
+            diff(spec1, got1, '表1 数据来源分布', t, TOL_EXACT, results)
+            results.append(('表1 年代列（时代区块 ⊇ 实测）', t, len(era_ok),
+                            [], [(d, '', 0.0) for d in era_bad], []))
             p3 = '| Field | Categories |' if t == 'EN' else '| 字段 | 类别数 |'
             diff(spec3, got_t3(txt, p3), '表3 枚举字段统计', t, TOL_EXACT, results)
             p4 = '| Dimension | Value |' if t == 'EN' else '| 维度 | 数值 |'
@@ -856,8 +909,17 @@ def main(verbose=False):
     print('   原先记「源已不可考」是因为只在主库找——主库 image_files 只登记 211 条'
           ' imageV3 记录、比磁盘少 15（登记滞后），')
     print('   拿库去核会核出一个 15 的假差；CLIP 的产地在文件系统，不在库里。')
-    print('  表 1 事故年代列：表中为采集计划口径，与主库 date 的实测 min/max 不一致'
-          '（如 safehoo 实为 2008–2026，表中写 2005–2026），口径不明故不自动判负。')
+    print('  表 1 年代列：**2026-10-05 查明语义并转入核验**（原记"口径不明"）——它标的')
+    print('    是**时代区块**（该来源属于语料两个时间窗中的哪一个），不是该来源的实测跨度：')
+    print('    正文 §3.1 的两窗是 1978–1990 与 2005–2026；全库实测 min/max = 2005/2026')
+    print('    （2005 那一条来自住建部汇编，「2005–2026」是当代窗的实际边界；采集侧只有')
+    print('    collector/sources/mem.py:142 有明文年份区间 = 2005–2025 目录遍历）；')
+    print('    而各来源实测普遍更窄（esafety 2022–2025、provincial 2009–2025、mem 2007–2020、')
+    print('    mohurd 2005–2018），**按"逐行等于实测"核会全行假报**。')
+    print('    现行判据弱一档：标注窗口须**包含**该来源实测年份区间（抓"标到错误的窗口"，')
+    print('    抓不到"端点不够贴切"）。已进 B 段计退出码。')
+    print('    **留白**：表头 "Accident period" 读起来像实测跨度，建议改 "Era block" 并在')
+    print('    表注说明语义——属作者裁决，本轮未改正文。')
     print('  表 2 关键词列：判据只抓「整词与全部 2-gram 在该类语料里都零命中」的凭空概念，')
     print('    **抓不到用真词拼凑的伪概念**（如「外星人施工」会被高频的「施工」救活）'
           '——弱判据，勿当强核验看。')
@@ -985,6 +1047,18 @@ def self_test():
         ok, detail = False, f'{type(e).__name__}: {e}'
     fails += not ok
     print(f'{"✅" if ok else "❌"} t7_unbacked_cols() 读落盘批次 → {detail}')
+
+    # 表 1 年代列的弱判据必须能报错，否则"6 格不符 0"是只核了个必然为真的空集。
+    # 判据是"⊇"不是"=="，故两个用例都要有：标到**错误的窗口**须报错；
+    # 标注窗口比实测**更宽**须放行（这是设计意图——各来源实测跨度普遍更窄）
+    fake = [('safehoo', '2010-05-01'), ('safehoo', '2015-01-01')]
+    full = {('era', k): (2005, 2026) for k, _ in T1_SRC}
+    bad_wrong, _ = t1_era_check(fake, {**full, ('era', 'safehoo'): (1978, 1990)})
+    bad_wide, _ = t1_era_check(fake, full)
+    ok = len(bad_wrong) == 1 and not bad_wide
+    fails += not ok
+    print(f'{"✅" if ok else "❌"} t1_era_check：标错窗口报 {len(bad_wrong)} 条'
+          f'（应 1）、窗口更宽报 {len(bad_wide)} 条（应 0）')
 
     print('\n' + '=' * 70)
     if fails:

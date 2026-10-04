@@ -300,6 +300,17 @@
   const Lightbox = (function () {
     let host = null, img = null, cap = null, prev = null, next = null;
     let items = [], idx = 0;
+    let lastFocus = null;      // 打开前的焦点位置，关闭时归还
+
+    /* 灯箱内当前可聚焦的元素。`prev`/`next` 只有一张图时被 display:none，
+       `offsetParent === null` 正好把不可见的滤掉——不然焦点陷阱会把焦点
+       送进一个看不见的按钮。 */
+    function focusables() {
+      return [...host.querySelectorAll(
+        'a[href], button:not([disabled]), input, select, textarea,'
+        + ' [tabindex]:not([tabindex="-1"])',
+      )].filter((el) => el.offsetParent !== null);
+    }
 
     function show(i) {
       idx = (i + items.length) % items.length;   // 两端循环
@@ -370,6 +381,7 @@
     function open(list, i) {
       items = list;
       if (!host) build();
+      lastFocus = document.activeElement;
       prev.style.display = next.style.display =
         items.length > 1 ? '' : 'none';
       show(i);
@@ -385,6 +397,12 @@
       host.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('lb-locked');
       img.src = '';
+      // 焦点归还触发它的那张缩略图。不还的话它落在 <body> 上（实测），
+      // 键盘用户按 Esc 之后要从页首重新 Tab 一遍才回得到画廊。
+      // `document.contains` 是必要的：触发它的缩略图可能已被重新渲染掉。
+      if (lastFocus && document.contains(lastFocus)
+          && typeof lastFocus.focus === 'function') lastFocus.focus();
+      lastFocus = null;
     }
 
     function build() {
@@ -415,9 +433,26 @@
       });
       document.addEventListener('keydown', function (e) {
         if (!host.classList.contains('is-open')) return;
-        if (e.key === 'Escape') close();
-        else if (e.key === 'ArrowLeft') show(idx - 1);
-        else if (e.key === 'ArrowRight') show(idx + 1);
+        if (e.key === 'Escape') { close(); return; }
+        if (e.key === 'ArrowLeft') { show(idx - 1); return; }
+        if (e.key === 'ArrowRight') { show(idx + 1); return; }
+        if (e.key !== 'Tab') return;
+        // 焦点陷阱。`aria-modal="true"` 是一句**声明**，不是实现——不拦 Tab
+        // 的话按一次就跑到背景导航上（实测：焦点从 .lb-next → <body> →
+        // 背景链接），而屏幕阅读器会照着 aria-modal 把背景整个隐藏掉，
+        // 于是用户以为对话框已关、实际焦点在背景里，位置全丢。
+        // 循环在首尾之间：末个向后 Tab 回首个，首个（或焦点已在外面时）
+        // 向前 Tab 去末个。
+        const f = focusables();
+        if (f.length < 2) { e.preventDefault(); return; }
+        const first = f[0], last = f[f.length - 1];
+        const cur = document.activeElement;
+        const outside = !host.contains(cur);
+        if (e.shiftKey && (outside || cur === first)) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && (outside || cur === last)) {
+          e.preventDefault(); first.focus();
+        }
       });
     }
 

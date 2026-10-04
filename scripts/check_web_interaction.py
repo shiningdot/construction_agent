@@ -16,7 +16,7 @@
 所以脚本不写 `2623` 这种数字，数据变了照样跑。唯一写死的期望是「点两次同一个
 chip 回到原点」这类结构性断言。
 
-## 验的十五件事
+## 验的十七件事
 
 1. 初始加载：分页器有总数，且是多页
 2. **概览页筛选维度齐全**：`/api/filters` 给几维可筛，页面就渲染几维
@@ -33,6 +33,8 @@ chip 回到原点」这类结构性断言。
 13. **「展开全文」按钮真点有效**：点前字数 + 按钮说还剩的 = 接口全文 = 点后字数
 14. **图片灯箱**：点缩略图开、点「下一张」换图、按 Esc 关
 15. **列表 → 详情 → 返回**：这条导航链走得通
+16. **键盘路径**（§2.5.70）：Tab 真实遍历可达缩略图与折叠；Enter / Space 真开合
+17. **灯箱键盘与焦点**：键盘能开灯箱；Tab 按多少次都出不去；Esc 后焦点归位
 
 第 2、3 条是后来补的。原先 chips 只能按「第几个」定位，`/api/filters` 返回五维、
 概览页只画三维这种缺口测不出来——那两维的值在接口里躺着、用户筛不到，页面上
@@ -44,10 +46,17 @@ chip 回到原点」这类结构性断言。
 `preventDefault`，程序式照样能开、用户真点开不了，而 §2.5.68 那条判据会报绿。
 12–15 条一律走 `locator.click()`，走真实事件链。
 
+第 16、17 条又是另一条链（§2.5.70）。12–15 条虽然走的是真事件，但走的是**鼠标**
+事件链；键盘走「focus + keydown → 浏览器激活语义」，两条路不等价——一个
+`<div onclick>` 鼠标点得开而键盘永远 Tab 不到，一段吃掉 keydown 的 JS 也能让
+Enter 失效而鼠标照常。17 条还管**焦点**：灯箱声明了 `aria-modal="true"` 却按一次
+Tab 就跑到背景上（§2.5.70 实测到的真缺陷，已修），而类名与 `aria-*` 属性都看不出
+这件事——只有问「焦点此刻在谁身上」才知道。
+
 用法：
     .venv/bin/python3 scripts/check_web_interaction.py
 
-退出码 `0` = 十五条全过，`1` = 有不过的。
+退出码 `0` = 十七条全过，`1` = 有不过的。
 """
 from __future__ import annotations
 
@@ -499,6 +508,154 @@ def main() -> int:
                     pg.close()
             step("列表→详情→返回", s12)
 
+            def s13():
+                """键盘路径：Tab 到不到得了、Enter/Space 开不开得动。
+
+                §2.5.70。`locator.click()` 走的是**鼠标事件链**，键盘走
+                「focus + keydown → 浏览器激活语义」——两条路不是一回事：一个
+                `<div onclick>` 鼠标点得开、键盘永远 Tab 不到；一段吃掉 keydown
+                的 JS 也能让 Enter 失效而鼠标照常。第 12–15 条全用鼠标，这一条
+                补键盘那一半。
+
+                可达性必须**真实 Tab 遍历**，不能拿 `.focus()` 代替——那等于
+                先假设"已经能到"再去用。
+                """
+                pg = ctx.new_page()
+                try:
+                    pg.goto(f"{base}/accident/{many_img}", wait_until="networkidle",
+                            timeout=30000)
+                    pg.wait_for_timeout(1500)
+                    trail = []
+                    for _ in range(30):
+                        pg.keyboard.press("Tab")
+                        trail.append(pg.evaluate(
+                            "() => { const e = document.activeElement;"
+                            " return e ? e.tagName + '.' + (e.className || '') : ''; }"))
+                    assert any("img-tile" in t for t in trail), \
+                        "Tab 遍历 30 次没到过任何缩略图——键盘用户打不开灯箱"
+                    assert any(t.startswith("SUMMARY") for t in trail), \
+                        "Tab 遍历 30 次没到过任何折叠 summary"
+
+                    d = pg.locator("details").nth(1)
+                    d.locator("summary").first.focus()
+                    # ⚠️ 基准要取**前一次**的状态，不能取初始状态：`<details>`
+                    # 是能来回翻转的，拿初始值当基准时「按 Space 把 True 翻回
+                    # False」会被误判成"没翻转"（第一版就这么错的，报了一次假红）。
+                    for key in ("Enter", "Space", "Enter"):
+                        prev = d.evaluate("x => x.open")
+                        pg.keyboard.press(key)
+                        pg.wait_for_timeout(220)
+                        now = d.evaluate("x => x.open")
+                        if now == prev:
+                            raise AssertionError(
+                                f"summary 聚焦后按 {key} 没翻转（仍 {now}）——"
+                                "键盘开不了/关不上折叠")
+
+                    # 长文页：**闭合的 details 内部按规范不该被 Tab 到**，
+                    # 所以「展开全文」按钮的键盘路径必须是「先 Enter 展开折叠、
+                    # 再聚焦按钮、再 Space」。这条链本身就是判据。
+                    pg.goto(f"{base}/accident/{long_text}", wait_until="networkidle",
+                            timeout=30000)
+                    pg.wait_for_timeout(1500)
+                    # ⚠️ 「看不看得见」要用 `is_visible()`，**不能用 `count()`**：
+                    # 按钮在 DOM 里一直都在（只是被闭合的 `<details>` 藏起来），
+                    # `count()` 恒为 1，拿它判可见性永远为假（第一版就这么错的，
+                    # 报了一次假红）。同 §2.5.69 那对 `inner_text()` /
+                    # `text_content()`——都是选到了测不出这件事的那个 API。
+                    if pg.locator("button.raw-more").is_visible():
+                        raise AssertionError("还没展开折叠，「展开全文」按钮就可见了")
+                    idx = pg.evaluate(
+                        "() => [...document.querySelectorAll('details')]"
+                        ".findIndex(d => d.querySelector('pre.raw-text'))")
+                    assert idx >= 0, "长文页找不到「原文全文」那个折叠"
+                    # 顺带验这条键盘链的**前提**：闭合的 `<details>` 内部不进
+                    # Tab 序，所以「展开全文」必须先展开折叠才够得着。
+                    pg.locator("details").nth(idx).locator("summary").first.focus()
+                    pg.keyboard.press("Tab")
+                    here = pg.evaluate(
+                        "() => { const e = document.activeElement;"
+                        " return e ? (e.className || '') : ''; }")
+                    if "raw-more" in here:
+                        raise AssertionError(
+                            "折叠还没展开，Tab 就落到了「展开全文」按钮上")
+                    pg.locator("details").nth(idx).locator("summary").first.focus()
+                    pg.keyboard.press("Enter")
+                    pg.wait_for_timeout(280)
+                    if not pg.locator("details").nth(idx).evaluate("x => x.open"):
+                        raise AssertionError("长文页 summary 按 Enter 没展开")
+                    more = pg.locator("button.raw-more")
+                    assert more.count() == 1, \
+                        "折叠展开后「展开全文」按钮没出现（或不止一个）"
+                    pre = pg.locator("pre.raw-text").first
+                    b4 = pre.evaluate("e => e.textContent.length")
+                    more.first.focus()
+                    pg.keyboard.press("Space")   # 按钮用 Space 激活，比 Enter 更典型
+                    pg.wait_for_timeout(320)
+                    af = pre.evaluate("e => e.textContent.length")
+                    if af <= b4:
+                        raise AssertionError(
+                            f"聚焦「展开全文」按 Space 没展开（{b4}→{af}）")
+                    return (f"Tab {len(trail)} 次可达缩略图与折叠；Enter/Space 真开合；"
+                            f"长文 {b4}→{af} 字")
+                finally:
+                    pg.close()
+            step("键盘路径", s13)
+
+            def s14():
+                """灯箱的焦点管理：`aria-modal="true"` 是**声明**，不是实现。
+
+                §2.5.70 实测出两个真缺陷（已修）：①灯箱开着时按一次 Tab 焦点就
+                跑到背景导航上——而屏幕阅读器会照着 aria-modal 把背景整个隐藏，
+                于是用户以为对话框已关、实际焦点在背景里；②按 Esc 关闭后焦点掉到
+                `<body>`，键盘用户要从页首重新 Tab 一遍才回得到画廊。
+
+                判据不看类名、只看**焦点在哪**：Tab 按多少次都必须仍在灯箱内，
+                关闭后焦点必须回到触发它的那张缩略图。
+                """
+                pg = ctx.new_page()
+                try:
+                    pg.goto(f"{base}/accident/{many_img}", wait_until="networkidle",
+                            timeout=30000)
+                    pg.wait_for_timeout(1500)
+                    tile = pg.locator("button.img-tile").nth(1)
+                    tile.scroll_into_view_if_needed()
+                    pg.wait_for_timeout(200)
+                    tile.focus()
+                    pg.keyboard.press("Enter")      # 键盘开，不是点
+                    pg.wait_for_timeout(420)
+                    lb = pg.locator(".lightbox").first
+                    assert lb.evaluate("e => e.classList.contains('is-open')"), \
+                        "缩略图聚焦后按 Enter 没打开灯箱——键盘开不了"
+
+                    inside = ("() => { const a = document.activeElement;"
+                              " const h = document.querySelector('.lightbox');"
+                              " return !!(a && h && h.contains(a)); }")
+                    assert pg.evaluate(inside), \
+                        "灯箱开了，但焦点没移进灯箱（键盘用户还留在背后的页面上）"
+                    for i in range(12):
+                        pg.keyboard.press("Tab")
+                        assert pg.evaluate(inside), \
+                            f"第 {i + 1} 次 Tab 焦点跑出了灯箱——`aria-modal` 是空话"
+                    for i in range(4):
+                        pg.keyboard.press("Shift+Tab")
+                        assert pg.evaluate(inside), \
+                            f"第 {i + 1} 次 Shift+Tab 焦点跑出了灯箱"
+
+                    pg.keyboard.press("Escape")
+                    pg.wait_for_timeout(350)
+                    assert not lb.evaluate("e => e.classList.contains('is-open')"), \
+                        "按 Esc 灯箱没关"
+                    who = pg.evaluate(
+                        "() => { const e = document.activeElement;"
+                        " return e ? e.tagName + '.' + (e.className || '') : ''; }")
+                    assert "img-tile" in who, \
+                        f"Esc 关闭后焦点没归还给触发它的缩略图，现在在 {who or '(空)'}"
+                    return ("键盘开灯箱；Tab 12 次 + Shift+Tab 4 次都在灯箱内；"
+                            "Esc 后焦点归位到缩略图")
+                finally:
+                    pg.close()
+            step("灯箱键盘与焦点", s14)
+
             browser.close()
     finally:
         server.shutdown()
@@ -509,9 +666,9 @@ def main() -> int:
         for name, _, err in bad:
             print(f"  ✗ {name}：{err}")
         return 1
-    print("✓ 交互十五条全过：两页维度齐全 / 筛选 / 取消 / 翻页 / 分享链接 / "
+    print("✓ 交互十七条全过：两页维度齐全 / 筛选 / 取消 / 翻页 / 分享链接 / "
           "过期链接自愈 / 搜索 / 重置；详情页折叠真点 / 展开全文 / 灯箱 / "
-          "列表↔详情往返。")
+          "列表↔详情往返；键盘路径 / 灯箱焦点陷阱与归还。")
     return 0
 
 

@@ -17,13 +17,25 @@
   // 状态
   // ══════════════════════════════════════════════════════════
 
-  // 多选筛选维度。**必须与 /api/filters 返回的键一一对应**：这里少一维，
-  // 后端多给的那组值就白算了——蓝图 04 §256 的筛选条画了五格
+  // 多选筛选维度。**必须与 /api/filters 里"带 count 的那些键"一一对应**：
+  // 这里少一维，后端多给的那组值就白算了——蓝图 04 §256 的筛选条画了五格
   // （关键词 / 地区 / 等级 / 类型 / 工程类型），原先只渲染前三维，
   // 工程类型与施工阶段两维在后端与致因页都有、唯独列表页漏了。
+  // （`/api/filters` 比这五个多返回一个 `sort`，那是下拉选项集、不是多选维度，
+  //  故"一一对应"的口径是"带 count 的键"，不是"返回的全部键"。）
   const MULTI_KEYS = [
     'province', 'severity', 'accident_type', 'project_type', 'construction_phase',
   ];
+
+  /* 分页尺寸的两个界。**必须与后端 `accidents_query.py` 的同名常量一致**
+     ——前端在 `readHash` 里 clamp 一次、后端在 `ListParams.from_request` 里再
+     clamp 一次，两份数字对不上时，hash 里写的 size 与列表实际返回的条数就会
+     不一致（且不一致的方向是"前端以为改了、后端没认"）。
+     §2.5.73「同一个语义的 N 个实现」的账：三处引用（state 初值 / readHash /
+     writeHash 的省略判断）共用这一个来源，check_2599 的 A6 段跨语言核它与
+     后端常量相等。 */
+  const DEFAULT_SIZE = 50;
+  const MAX_SIZE = 200;
 
   const state = {
     q: '',
@@ -37,7 +49,7 @@
     has_causes: false,
     sort: 'date_desc',
     page: 1,
-    size: 50,
+    size: DEFAULT_SIZE,
   };
 
   let overviewData = null;
@@ -112,7 +124,8 @@
     state.has_causes = p.get('has_causes') === '1';
     state.sort = p.get('sort') || 'date_desc';
     state.page = Math.max(1, parseInt(p.get('page') || '1', 10) || 1);
-    state.size = Math.min(200, Math.max(1, parseInt(p.get('size') || '50', 10) || 50));
+    state.size = Math.min(MAX_SIZE, Math.max(
+      1, parseInt(p.get('size') || String(DEFAULT_SIZE), 10) || DEFAULT_SIZE));
     MULTI_KEYS.forEach((k) => { state[k] = p.getAll(k).filter(Boolean); });
   }
 
@@ -125,7 +138,7 @@
     if (state.has_causes) p.set('has_causes', '1');
     if (state.sort !== 'date_desc') p.set('sort', state.sort);
     if (state.page > 1) p.set('page', String(state.page));
-    if (state.size !== 50) p.set('size', String(state.size));
+    if (state.size !== DEFAULT_SIZE) p.set('size', String(state.size));
 
     const next = p.toString();
     const url = next ? '#' + next : location.pathname;
@@ -770,10 +783,17 @@
       loadList();
     });
 
+    /* 重置 = 把 state 的每一个键写回文件顶部 `const state = {…}` 的初值。
+       **这份清单必须与那份声明一一对应**：漏一个键，那个维度就"重置不掉"，
+       而 `writeHash()` 又会把非默认值写回 hash —— 用户以为全清了，URL 里却还
+       留着它。`size` 就是这么漏的（§2.5.99 实测），而它偏偏是**唯一没有控件**
+       的维度（页面 21 个 id 里没有 `f_size`），用户连"看见它还在"的办法都没有。
+       check_2599 的 A5 段钉住"重置清单键集 == state 声明键集"。 */
     $('resetBtn').addEventListener('click', () => {
       MULTI_KEYS.forEach((k) => { state[k] = []; });
       state.q = ''; state.year_from = ''; state.year_to = '';
       state.has_causes = false; state.sort = 'date_desc'; state.page = 1;
+      state.size = DEFAULT_SIZE;
       writeHash();
       syncFormFromState();
       loadFilters();

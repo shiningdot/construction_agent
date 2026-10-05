@@ -128,11 +128,13 @@ REGISTER: dict[str, tuple[str | None, str, str]] = {
     ),
     "static/overview.js": (
         "d1aedb7b4cca84a27acb96fe6589db69",
-        "a62fe5eab033c32e8857702e1e0a9e85",
+        "6f1fa3b820ce89bf902d772e528d0b55",
         "§2.5.83：图片统计补解 `data` 层（此前「现场图片」卡从没出现过）；"
         "§2.5.87：两处静默 catch 改为写进 DOM；"
         "§2.5.95：本页内联 `el()` 副本同步加同一份守卫（A4 核两份逐字相同）；"
-        "§2.5.96：那处合并登记的注释与 `dom.js` 一起改挂 backlog",
+        "§2.5.96：那处合并登记的注释与 `dom.js` 一起改挂 backlog；"
+        "§2.5.99：重置 handler 补 `state.size` 归位 + 抽 `DEFAULT_SIZE`/`MAX_SIZE`"
+        "两个常量（与后端 `accidents_query.py` 同名常量对齐）",
     ),
     "factory.py": (
         "61a81671d981e20a14a18be5ea56096d",

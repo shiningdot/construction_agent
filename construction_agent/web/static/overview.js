@@ -698,11 +698,16 @@
   }
 
   function loadQuality(ov) {
-    // 两个端点并行取。图片统计失败（工作库没建）不该拖垮整个质量面板，
-    // 所以那一路单独 catch 成 null，由 renderQuality 决定要不要出卡。
+    // 两个端点并行取，但**层级不同**：`/api/province/audit` 顶层直接就是统计量
+    // （`by_kind` / `rows`），`/api/images/stats` 的统计量在响应体的 `data` 下
+    // （`{ok, data:{files, available, ...}}`）。早先这条没解 `data` 这一层，
+    // `img.available` 恒为 `undefined`，整张「现场图片」卡因此从来没出现过。
+    // 图片统计失败（工作库没建）不该拖垮整个质量面板，所以那一路单独 catch 成
+    // null，由 renderQuality 决定要不要出卡。
     return Promise.all([
       jsonGet('/api/province/audit'),
-      jsonGet('/api/images/stats').catch(() => null),
+      jsonGet('/api/images/stats').then((r) => (r && r.data) || null)
+        .catch(() => null),
     ]).then(([a, img]) => renderQuality(ov, a, img))
       .catch(() => {});
   }

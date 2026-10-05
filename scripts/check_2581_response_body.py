@@ -92,7 +92,10 @@ SEARCH = [WEB, ROOT / "construction_agent" / "review", ROOT / "construction_agen
 #: 字面量 → `**probe()` → `describe()` → 字面量），4 会误报"深度超限"。
 MAXD = 20
 
-DOC_NEEDLES = ["前端读的键 ↔ 实现返回的键"]
+# 锚点句用**本节独有**的整行标题。首版写作 `前端读的键 ↔ 实现返回的键`——§2.5.83
+# （读接口的响应面）的标题与它**逐字相同**，两节撞车后这条判据在 §2.5.81 被删的情况下
+# **仍然为真**，"锚点被删"用例因此静默失效（§2.5.77：判据恒真就等于没有）。
+DOC_NEEDLES = ["### 2.5.81 展示层（续）：写接口的响应面——**前端读的键 ↔ 实现返回的键**"]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -206,9 +209,39 @@ def _tree_of_call(call: ast.Call, fn, mod, depth: int, why: list[str]):
     for modname in [m for m in (alias, mod) if m]:
         funcs, _ = _module(modname)
         if fname in funcs:
-            return _func_tree(funcs[fname], modname, depth + 1, why)
+            tag = f"{hint + '.' if hint else ''}{fname}"
+            n0 = len(why)
+            sub = _func_tree(funcs[fname], modname, depth + 1, why)
+            if not sub:
+                # **空键树 ≠ 确证没有子键**。函数跟到了却一个键也没解出来，只说明
+                # 解不出（`query_one` 的 `dict(row) if row is not None else None`
+                # 就是这样），不能冒充"已知为空"——否则前端读的键全被误报成
+                # "实现不返回"（§2.5.73）。记 why 后返回 None，路由进 B1。
+                why.append(f"跟进 {tag} 但键树为空" if len(why) == n0
+                           else f"跟进 {tag}，期间有键解不出")
+                return None
+            return sub
     why.append(f"调用解不出 {hint + '.' if hint else ''}{fname}")
     return None
+
+
+_SCALAR_NODES = (ast.Constant, ast.JoinedStr, ast.List, ast.Tuple, ast.Set,
+                 ast.ListComp, ast.SetComp, ast.GeneratorExp)
+
+
+def _scalar_like(v) -> bool:
+    """值能否**证明「不是字典」**——只有这样的值才配记 `{}`（键在、无子键）。
+
+    `[] if data is None else data` 这类三元表达式**证明不了**：它可能是字典。
+    首版把它记成 `{}`，于是 `unavailable_payload` 的 `data` 键在**每一个**调用
+    它的路由上都成了「确证没有子键」，前端读的键被整片误报成「实现不返回」。
+    §2.5.63：判据的宽度决定结论的强度——宽一格，就是三条假缺陷。
+    """
+    if isinstance(v, _SCALAR_NODES):
+        return True
+    if isinstance(v, ast.UnaryOp) and isinstance(v.op, ast.Not):
+        return True
+    return isinstance(v, ast.Compare)
 
 
 def _tree(expr, fn, mod, depth: int, why: list[str]):
@@ -228,8 +261,13 @@ def _tree(expr, fn, mod, depth: int, why: list[str]):
                     sub = _tree(v, fn, mod, depth + 1, why)
                     # 解不出 ⇒ None（键在、子结构未知），**不是** `{}`
                     out[k.value] = sub if isinstance(sub, dict) else None
-                else:
+                elif _scalar_like(v):
                     out[k.value] = {}
+                else:
+                    # 形态未知的表达式（三元 / 运算 / 属性访问…）证不了"无子键"，
+                    # 记 None + why，别让它冒充已知（§2.5.73）。
+                    out[k.value] = None
+                    why.append(f"{k.value} 值形态解不出（{type(v).__name__}）")
             elif k is None:
                 # `**expr` 展开：解不出就丢失整片键，必须记 why
                 n0 = len(why)
@@ -668,8 +706,9 @@ def part_c() -> None:
         ("01 号文档的「写路由」数被改错",
          DOC, "| 写路由 | **13** |", "| 写路由 | **12** |",
          "文档「写路由」应为 13"),
-        ("01 号文档的锚点被删",
-         DOC, "前端读的键 ↔ 实现返回的键", "前端读的键与实现返回的键",
+        ("01 号文档本节标题被改（与 §2.5.83 同族措辞不再可辨）",
+         DOC, "### 2.5.81 展示层（续）：写接口的响应面——**前端读的键 ↔ 实现返回的键**",
+         "### 2.5.81 展示层（续）：写接口的界面——**前端读的键 ↔ 实现返回的键**",
          "01 号文档缺锚点"),
     ]
     for label, path, old, new, want in dcases:

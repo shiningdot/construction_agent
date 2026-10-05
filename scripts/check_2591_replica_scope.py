@@ -125,10 +125,29 @@ REGISTER: dict[str, tuple[str | None, str, str]] = {
         "§2.5.83：图片统计补解 `data` 层（此前「现场图片」卡从没出现过）；"
         "§2.5.87：两处静默 catch 改为写进 DOM",
     ),
+    "factory.py": (
+        "61a81671d981e20a14a18be5ea56096d",
+        "fd728cfd3f33c2fe4b382dbdf4639632",
+        "§2.5.93：`TRUSTED_HOSTS` 白名单 + `before_request` 同源守卫"
+        "（跨源非安全方法 403；`setdefault` 是空操作，改判调用方有没有显式传）",
+    ),
+    "review.py": (
+        "f640f59c8f6eff8d025f85fb29d8f78d",
+        "c579765b136501f327952dbe009389f7",
+        "§2.5.92：`rollback` 必须指名 `promote_id`"
+        "（此前一个空 body 的 POST 就删掉了最终库 1 条事故与它下面的编码）",
+    ),
+    "static/review.js": (
+        "517e5cde46c6c3fc3043f469b0c2bf59",
+        "80f06a6eeedbf1204933d562173676d7",
+        "§2.5.92：回滚带 `promote_id`（取页面渲染时那条），"
+        "确认文案与请求体说的是同一条",
+    ),
     "static/collect.js": (
         "c5c0769fa606e4d4c7814373ca1e938e",
-        "303d6213f960023eb077d30800faca21",
-        "§2.5.9x：采集页的前端改动（逐条见 01 号对应节）",
+        "fcd24179edf3e9edb01e5d705b80b917",
+        "§2.5.92：`deleteTask` 补一句确认（同一个删除动作"
+        "在提取段有确认、采集段一句都没有）；`showDbNotice` 原样透传 `hint`",
     ),
     "static/extract.js": (
         "db6222ed6577d72dc0d643b1e781ba3a",
@@ -390,7 +409,7 @@ def inject_test() -> int:
     # 否则替换落空会与"判据没报"长得一模一样（§2.5.89）。
     print("  ── C5 文档面：e2e/README 计数句被改 ──")
     orig = E2E.read_text(encoding="utf-8")
-    injected = orig.replace("二十六条里 **25 条只读不写**", "二十七条里 **26 条只读不写**")
+    injected = orig.replace("二十八条里 **27 条只读不写**", "二十九条里 **28 条只读不写**")
     if injected == orig:
         print("  ✗ C5 注入未生效：README 里找不到待替换的计数句")
         rc = 1
@@ -466,7 +485,7 @@ def part_d() -> list[str]:
         (SNAP, r"§2\.5\.91", "11 号快照登记本节"),
         (CM, r"§2\.5\.91", "CLAUDE.md 登记本节"),
         (E2E, r"check_2591_replica_scope\.py", "e2e/README 只读脚本表登记本节脚本"),
-        (E2E, r"二十六条里 \*\*25 条只读不写\*\*", "e2e/README 计数已随表行数递增"),
+        (E2E, r"二十八条里 \*\*27 条只读不写\*\*", "e2e/README 计数已随表行数递增"),
     ]
     for i, (path, pat, what) in enumerate(checks, start=1):
         if not path.is_file():

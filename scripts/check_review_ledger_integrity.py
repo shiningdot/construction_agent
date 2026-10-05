@@ -198,9 +198,21 @@ ENTRIES = [
      'The flagship claims rest on confounded comparisons', 1, '', ''),
     ('EIC', '2', 'CAICS 推导必须文档化（操作定义不足以承载构念效度）',
      'Taxonomy derivation must be documented', 3, '', ''),
-    ('EIC', '3', '主张强度须与证据对齐（摘要领先于正文；须与 §5 的 hedge 一致）',
+    # ⚠️ 探针 2026-10-05 修正：原用的是三个**元讨论词**（主张强度／夸大／对冲一类），
+    # 中英两侧实测 0/0 命中——期刊正文不会自称"我的主张强度如何"。但 EIC-3 要的是
+    # **实质回应**，而 V2 的实质回应是「摘要逐实验声明 scope」这一具体写法，与元讨论词
+    # 无关。探针改为指向那些句子的具名形态（§2.5.66：判据必须收窄接收者，宽到"任何
+    # 论文都命中"与窄到"永远不命中"都不算判据）。改后实测 EN 2/1/2 命中、ZH 1/1/2 命中
+    # ⇒ covered。
+    # ⚠️ 旧探针词**不逐字复述**（§2.5.96：引述旧声明一律描述、不复述）——本条注释首版
+    # 把旧正则原样抄了进来，而 check_abstract_alignment.py 的 E1 判据核的正是"这个词
+    # 有没有退回"（裸搜本文件），于是判据扫到了判据自己写的注释、报一次假红。判据的宽度
+    # 是对的（文件里任何位置出现旧词都该响），错的是"注释复述旧值"这个动作。
+    # 判据边界：词形命中仍只能证明"这句话在"，不能证明"它足以回应"——实质判断在第三十六节。
+    ('EIC', '3', '主张强度须与证据对齐（摘要须逐实验声明 scope）',
      'Claims versus evidence discipline', 0,
-     r'claim strength|overclaim|hedg', r'主张强度|降调|谨慎表述'),
+     r'unequal conditions|system-level selection|not as an isolated causal mechanism',
+     r'运行条件并不对等|系统级比较|而非已分离的因果机制'),
     ('EIC', '4', '代码可用性声明完全缺失',
      'code availability statement is missing entirely', 16, '', ''),
 ]

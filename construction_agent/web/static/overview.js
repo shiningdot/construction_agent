@@ -46,13 +46,37 @@
   // 小工具
   // ══════════════════════════════════════════════════════════
 
+  /* URL 属性的协议白名单。
+
+     本页要写进 href/src 的值来自采集到的原始网页与主库字段——直接
+     setAttribute 等于把数据当代码执行（javascript: 可执行脚本、data: 可
+     换出文档）。故凡带协议头而不是 http(s)/mailto/tel/blob 的值，一律
+     **不写该属性**：渲染成纯文本，与 textContent 那条纪律是同一件事的两面。
+
+     下面这段与另一份副本必须逐字相同（dom.js ↔ overview.js，两份 el() 是
+     历史遗留的等价拷贝，统一留到 M1 收尾时做）——check_2595 的 A4 段核它。 */
+  const URL_ATTRS = ['href', 'src', 'srcset', 'action', 'formaction', 'poster',
+                     'xlink:href', 'data', 'background', 'cite', 'ping',
+                     'manifest', 'longdesc', 'usemap'];
+  const SAFE_SCHEMES = ['http', 'https', 'mailto', 'tel', 'blob'];
+  function safeUrlValue(v) {
+    const s = String(v).replace(/[\x00-\x20]/g, '');
+    const m = /^([a-z][a-z0-9+.\-]*):/i.exec(s);
+    if (!m) return String(v);              // 无协议头 ⇒ 相对路径，安全
+    return SAFE_SCHEMES.indexOf(m[1].toLowerCase()) >= 0 ? s : null;
+  }
+
   function el(tag, opts, children) {
     const node = document.createElement(tag);
     opts = opts || {};
     if (opts.cls) node.className = opts.cls;
     if (opts.text != null) node.textContent = opts.text;
     if (opts.attrs) {
-      for (const k in opts.attrs) node.setAttribute(k, opts.attrs[k]);
+      for (const k in opts.attrs) {
+        if (URL_ATTRS.indexOf(String(k).toLowerCase()) >= 0 &&
+            safeUrlValue(opts.attrs[k]) == null) continue;   // 危险协议 ⇒ 不写属性
+        node.setAttribute(k, opts.attrs[k]);
+      }
     }
     if (opts.on) {
       for (const k in opts.on) node.addEventListener(k, opts.on[k]);

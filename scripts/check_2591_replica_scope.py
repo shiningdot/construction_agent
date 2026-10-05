@@ -119,11 +119,18 @@ REGISTER: dict[str, tuple[str | None, str, str]] = {
         "180b4a2180f62907f825ea72150fb43d",
         "§2.5.70：灯箱焦点陷阱（Tab 环形）+ 关闭后焦点归还",
     ),
+    "static/dom.js": (
+        "163291f4a86f7e5e694ed9c6d7f09725",
+        "55d033e25ca4c1a50b2ab75a515b33d3",
+        "§2.5.95：`el()` 的属性写入循环加 URL 协议白名单"
+        "（`URL_ATTRS` + `safeUrlValue()`，危险协议不写该属性）",
+    ),
     "static/overview.js": (
         "d1aedb7b4cca84a27acb96fe6589db69",
-        "027d0ca31917c7572054a86fe61c7fa3",
+        "19319b14cae325d8cac37398250b5a77",
         "§2.5.83：图片统计补解 `data` 层（此前「现场图片」卡从没出现过）；"
-        "§2.5.87：两处静默 catch 改为写进 DOM",
+        "§2.5.87：两处静默 catch 改为写进 DOM；"
+        "§2.5.95：本页内联 `el()` 副本同步加同一份守卫（A4 核两份逐字相同）",
     ),
     "factory.py": (
         "61a81671d981e20a14a18be5ea56096d",

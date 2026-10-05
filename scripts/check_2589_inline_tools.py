@@ -109,8 +109,12 @@ TOOLS = ("el", "num", "blank", "fetchJson", "loadDbChip", "clear", "$")
 
 #: **登记的分叉**——A 段双向核的就是它。改动这份表要同时改 `docs/web/01_在线采集.md`。
 KNOWN_KEY_DIVERGENCE = {"dom.js": {"id"}, "overview.js": {"on"}}
-#: 取值处理特征：`el` 函数体里有没有 `String(`（`dom.js` 规范化、`overview.js` 直接透传）。
-KNOWN_STRING_FEATURE = {"dom.js": True, "overview.js": False}
+#: 取值处理特征：`el` 函数体里有没有 `String(`。
+#: **两份现在都是 True**——原先 `overview.js` 是直接透传（False），§2.5.95 给它的
+#: `el` 加 URL 协议守卫时用了 `String(k).toLowerCase()`（属性名小写化），这条
+#: 特征分叉随之消失。**这是"改共享源要复跑别节"的实例**：A 段判据在 §2.5.95
+#: 落地后如实报出 `overview.js` 由 False 变 True，登记表跟着更新。
+KNOWN_STRING_FEATURE = {"dom.js": True, "overview.js": True}
 
 
 # ══════════════════════════════════════════════════════════════════

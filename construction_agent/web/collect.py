@@ -227,7 +227,13 @@ def api_create_task():
 def api_list_tasks():
     if not staging_db.has_table("collect_tasks"):
         return jsonify(staging_db.unavailable_payload(missing="collect_tasks"))
-    limit = min(int(request.args.get("limit", 50) or 50), 500)
+    # `max(1, ...)` 不能省：`list_tasks` 把它直接拼进 `LIMIT ?`，而 SQLite 的
+    # `LIMIT -1` 表示**不限条数**——`?limit=-1` 会把整张表吐出来。`0` 同理静默变空。
+    # 与 `extract.api_list_tasks` 对齐（同一件事两处的写法必须一致）。
+    try:
+        limit = max(1, min(int(request.args.get("limit", 50) or 50), 500))
+    except (TypeError, ValueError):
+        limit = 50
     tasks = [_task_payload(t) for t in executor.list_tasks(limit)]
     return jsonify({"ok": True, "available": True, "data": tasks})
 

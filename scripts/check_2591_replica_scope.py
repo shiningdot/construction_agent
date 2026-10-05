@@ -165,6 +165,13 @@ REGISTER: dict[str, tuple[str | None, str, str]] = {
         "9d3ee639667ff39da58dce9158e63dfc",
         "§2.5.9x：提取页的前端改动（逐条见 01 号对应节）",
     ),
+    "collect.py": (
+        "149d5b52dada467de68beca0e6001960",
+        "c36e4dd8279d2f27265956701e8206ef",
+        "§2.5.100：`api_list_tasks` 的 `limit` 补 `try` + `max(1, min(…, 500))`"
+        "（此前 `?limit=-1` 原样进 SQL 变 `LIMIT -1` 吐全表，且是静默的；"
+        "同名的 `/api/extract/tasks` 一直有 `try`，两条路由兜底不一致）",
+    ),
 }
 
 # A 段探的两个资源 + 四个"只在分支侧"的修复 token

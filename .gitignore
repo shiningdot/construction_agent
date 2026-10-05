@@ -29,6 +29,12 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 data/*.db.bak*
+# 备份目录本身也要忽略：promote.py 的 BACKUP_DIRNAME = "db_backups"，
+# 每次并入主库都会往 data/db_backups/ 写一份 ~28 MB 备份。
+# 注意 `data/*.db.bak*` 只匹配 data/ **直下**，覆盖不到这一层子目录——
+# 实测主仓库 data/db_backups/ 里 7 个备份（128 MB）曾全部处于未忽略状态。
+data/db_backups/
+data/**/*.db.bak*
 *.sqlite
 *.sqlite3
 
@@ -39,6 +45,15 @@ docs/paper_v2/.build/
 *.toc
 *.out
 *.synctex.gz
+
+# web 核查截图（可重生成的核查产物，不入版本库）
+# 由 scripts/screenshot_web.py 产出（6 页首屏 + 带折叠页的「_全展开」版，约 5 MB）。
+# 它不是交付物：起一次服务 + 无头 Chromium 就能重跑出来，且界面一改就过期——
+# 入库等于把「某一刻的界面快照」当成资产长期背着（§2.5.71 待决②）。
+# 注意这与 docs/paper/figures/ 的既有做法不同：那里那 6 张是当年误落进
+# **V1 论文插图目录**的，V1 正文一个字都不引用它们（§2.5.71 已查明），
+# 不构成「截图该入库」的先例。
+docs/web/figures/
 
 # OS
 .DS_Store

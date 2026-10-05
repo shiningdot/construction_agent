@@ -139,8 +139,11 @@ os.environ["CAIEMS_DB"] = str(main_db)      # 各脚本自己写
 ① 只核「**读的是哪一个文件**」，核不到「读得对不对」；
 ② 两副本合一（在主仓库里跑本脚本）时本节**无对象**，A 段会报红并说明——
    那是「该撤登记」的提示，**不是判据坏了**（§2.5.91 立的同款规矩）；
-③ 行数方向判据（`n_local <= n_main`）只能抓「本 checkout 领先」，
-   抓不到「两边各自被写过、只是本 checkout 恰好不领先」；
+③ 行数方向判据是**登记式**的（`KNOWN_AHEAD`，双向）：抓「领先了却没登记」
+   与「登记了却已不领先」两件事，抓不到「两边各自被写过、只是本 checkout
+   恰好不领先」。⚠ 2026-10-05 后续它由 `not ahead` 改成登记式——因为本 checkout
+   的 `caiems_staging.db` 被**真实使用**过（走 web 采集页跑了 `beijing_em`、26 条），
+   "本 checkout 不领先"这条**状态描述**被推翻、不是设计意图（§2.5.90）；
 ④ 差异表集合是**登记式**的——新表出现差异会报红，那是「该重新裁决」；
 ⑤ 差异的**量**只打印不判红（主库会长，量必变；§2.5.75：写死的固定值
    本身可能就是响应式的）；
@@ -185,7 +188,37 @@ LOCAL_ST = ROOT / "data" / ST_NAME
 EXPECT_SPLIT = {"v2": True, "staging": True}
 
 #: 登记：哪几张表有行数差。只登记**表名**不登记量（量是响应式的活值）。
-KNOWN_DIFF = {"v2": {"image_files"}, "staging": {"image_manifest"}}
+#:
+#: ⚠ 2026-10-05 后续：`staging` 一侧加了 4 张表——本 checkout 的
+#: `data/caiems_staging.db` 在 2026-10-05 20:20（本地）被**真跑过一次采集**
+#: （`collect_tasks.task_id=98af3c7e9f31`、`source_keys=["beijing_em"]`、
+#: `stats.collected=26/inserted=26`），于是 `collect_sources` / `collect_tasks` /
+#: `raw_accidents` / `raw_accident_assets` 四表在本 checkout 有行、主仓库那份仍是
+#: 10-01 的快照。**这是真实使用留下的，不是探针写库**（e2e 系列显式指向
+#: `mkdtemp()` 临时库、只读核查脚本无 `collect/tasks` 写入点，均已排除）。
+#: 本节不删这 26 条（是用户经 web 采集页产生的真实数据，且 WAL 库删除有风险），
+#: 而是把"领先"从**绝对不许**改成**须登记**——见 `KNOWN_AHEAD`。
+KNOWN_DIFF = {
+    "v2": {"image_files"},
+    "staging": {"image_manifest", "collect_sources", "collect_tasks",
+                "raw_accidents", "raw_accident_assets"},
+}
+
+#: 登记：**允许**本 checkout 领先主仓库的表（空集＝一张都不许领先，即本节写下时
+#: 对两份库的原判据）。B2/B2s 由「`not ahead`」改为**双向登记式**：
+#:   ①实测领先的表 ⊆ 登记 → 否则红（有人真在 worktree 里写库且没登记）
+#:   ②登记的表 ⊆ 实测领先 → 否则红（登记过期：那些表已不领先，该销账）
+#:
+#: 为什么 v2 仍是空集：主库 `caiems_v2.db` 是**论文数据资产**，在 worktree 里写它
+#: 会直接污染论文口径，这条"不许领先"没有过期。staging 是**工作库**、本就设计成
+#: 会被写入的（`00_总体架构与数据层.md` 的阶段③），"不许领先"在它身上是
+#: **§2.5.94 写下那一刻的状态描述**，不是设计意图——被真实使用推翻属预期之内
+#: （§2.5.75「写死的固定值本身可能就是响应式的」／§2.5.90「设计前提会过期」）。
+KNOWN_AHEAD = {
+    "v2": set(),
+    "staging": {"collect_sources", "collect_tasks",
+                "raw_accidents", "raw_accident_assets"},
+}
 
 #: 登记：14 个混用脚本里**显式把 app 指向主库**的那几个。
 #: 只断言 `KNOWN_EXPLICIT ⊆ 实测`（登记的须仍在，过期即红）；
@@ -267,9 +300,24 @@ def fe_files() -> list[Path]:
 # ── 判据本体抽成纯函数：主检与 --self-test 调同一份（§2.5.86：自测要真的
 #    锻炼判据，不能另写一遍意思相近的表达式） ──────────────────────────
 def ahead_tables(n_local: dict, n_main: dict) -> set:
-    """本 checkout **领先**主仓库的表（不该有；有=有人在 worktree 里写过库）。"""
+    """本 checkout **领先**主仓库的表（有人在 worktree 里写过库的**证据**）。
+
+    注意措辞：它只负责**指出**哪些表领先，**不判对错**——对错归 `ahead_registry_ok`。
+    """
     return {t for t in set(n_local) | set(n_main)
             if (n_local.get(t) or 0) > (n_main.get(t) or 0)}
+
+
+def ahead_registry_ok(ahead: set, known: set) -> tuple[bool, set, set]:
+    """允许领先的表集合 ↔ 登记，**双向**。返回 (是否通过, 未登记, 已过期)。
+
+    与 `diff_registry_ok` 同构，防的是**两件不同的事**：
+    - `未登记`：有人在 worktree 里写了一张没人知道的表（写库无记录）；
+    - `已过期`：登记着"这张表会领先"而它已不领先（主仓库追上来了／本 checkout
+      被重置了）——登记若不销账就成了**永久豁免**（§2.5.67 立的规矩）。
+    """
+    new, gone = ahead - known, known - ahead
+    return (not new and not gone), new, gone
 
 
 def diff_tables(n_local: dict, n_main: dict) -> set:
@@ -482,8 +530,12 @@ def part_b(rv: dict) -> list[str]:
         if not ok(same_schema, f"{lab} [{tag}] 表集合与逐表列集合相同（schema 未分叉）"):
             fails.append(lab)
         lab2 = "B2" if tag == "v2" else "B2s"
-        if not ok(not ahead, f"{lab2} [{tag}] 行数方向：本 checkout 不领先主仓库",
-                  f"领先的表 {sorted(ahead)}" if ahead else "无领先"):
+        kn_ahead = KNOWN_AHEAD[tag]
+        good_a, new_a, gone_a = ahead_registry_ok(ahead, kn_ahead)
+        if not ok(good_a, f"{lab2} [{tag}] 领先的表全部已登记（双向：未登记／登记过期都算红）",
+                  f"领先 {sorted(ahead)} ／ 登记 {sorted(kn_ahead)}"
+                  + (f" ／ 未登记 {sorted(new_a)}" if new_a else "")
+                  + (f" ／ 登记过期 {sorted(gone_a)}" if gone_a else "")):
             fails.append(lab2)
         lab3 = "B3" if tag == "v2" else "B3s"
         good, new, gone = diff_registry_ok(diff, KNOWN_DIFF[tag])
@@ -715,13 +767,25 @@ def self_test() -> int:
 
     eq = {"a": 5, "b": 9}
 
-    # ── ahead_tables：本 checkout 不得领先 ──
+    # ── ahead_tables：指出哪些表领先（**不判对错**，对错归 ahead_registry_ok） ──
     chk("行数全等 → 无领先", ahead_tables(eq, eq) == set(), True)
     chk("本 checkout 少 66 → 无领先", ahead_tables({"a": 1042}, {"a": 1108}) == set(), True)
-    chk("本 checkout 多 → 领先（须报红）",
-        ahead_tables({"a": 1108}, {"a": 1042}) == {"a"}, True)
+    chk("本 checkout 多 → 领先", ahead_tables({"a": 1108}, {"a": 1042}) == {"a"}, True)
     chk("领先的是**子集**而非全部", ahead_tables({"a": 9, "b": 1}, {"a": 5, "b": 9}) == {"a"}, True)
     chk("缺表的表视作 0", ahead_tables({"a": 1}, {}) == {"a"}, True)
+
+    # ── ahead_registry_ok：双向登记（未登记 → 红；登记过期 → 也红） ──
+    chk("领先 == 登记 → 过", ahead_registry_ok({"a"}, {"a"})[0], True)
+    chk("登记为空且无领先 → 过（v2 那一侧的原语义）",
+        ahead_registry_ok(set(), set())[0], True)
+    _g, _new, _gone = ahead_registry_ok({"a", "b"}, {"a"})
+    chk("未登记的领先 → 红，且**指得出是 b**", (not _g) and _new == {"b"} and _gone == set(), True)
+    _g, _new, _gone = ahead_registry_ok(set(), {"a"})
+    chk("登记的表已不领先 → 红，且**指得出是 a**",
+        (not _g) and _new == set() and _gone == {"a"}, True)
+    _g, _new, _gone = ahead_registry_ok({"a", "b"}, {"a", "c"})
+    chk("两半同时不成立 → 两半都指得出（不是只报第一半）",
+        (not _g) and _new == {"b"} and _gone == {"c"}, True)
 
     # ── diff_tables：差异面 ──
     chk("值不同 → 进差异集合", diff_tables({"a": 1}, {"a": 2}) == {"a"}, True)

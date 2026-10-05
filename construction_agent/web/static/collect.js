@@ -88,17 +88,22 @@
     if (t) t.textContent = text || '';
   }
 
+  // 后端把「工作库文件不存在」与「文件在、但还没建表」分成了两种诊断，各配了
+  // 不同的下一步动作（hint）。这里必须**原样透传**：写死一句话会把两种故障说成
+  // 同一种，而且「它还不存在」在后一种下与事实不符——文件明明在。
+  // 形参 `hint` 以前只出现在 `(hint ? '' : '')` 里，两个分支产出同一个空串，
+  // 参数等于没用（页面永远只显示写死的那句）。兜底文案保留给 hint 缺失的场合。
   function showDbNotice(hint) {
     var n = $('dbNotice');
     if (!n) return;
     n.hidden = false;
     clear(n);
-    n.appendChild(el('strong', { text: '工作库尚未建立。' }));
+    n.appendChild(el('strong', { text: '工作库不可用。' }));
     n.appendChild(el('span', {
-      text: ' 本页读写的是 caiems_staging.db，它还不存在。在项目根目录执行：' }));
-    n.appendChild(el('code', { text: 'python3 scripts/create_staging_db.py' }));
-    n.appendChild(el('span', { text: ' 然后刷新本页。' +
-      (hint ? '' : '') }));
+      text: ' ' + (hint ||
+        '本页读写的是 caiems_staging.db。在项目根目录执行：' +
+        'python3 scripts/create_staging_db.py，然后刷新本页。'),
+    }));
   }
 
   /* ── ① 源清单 ───────────────────────────────────────────── */

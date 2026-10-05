@@ -133,16 +133,20 @@
     return badge(label || q, cls);
   }
 
+  // 与 collect.js 的同名函数是同一份逻辑的第二份副本（本项目的老毛病）。
+  // 后端把「工作库文件不存在」与「文件在、但还没建表」分成两种诊断、各配不同的
+  // 下一步动作（hint），这里必须原样透传：写死「它还不存在」在后一种下与事实不符。
   function showDbNotice(hint) {
     var n = $('dbNotice');
     if (!n) return;
     n.hidden = false;
     clear(n);
-    n.appendChild(el('strong', { text: '工作库尚未建立。' }));
+    n.appendChild(el('strong', { text: '工作库不可用。' }));
     n.appendChild(el('span', {
-      text: ' 本页读写的是 caiems_staging.db，它还不存在。在项目根目录执行：' }));
-    n.appendChild(el('code', { text: 'python3 scripts/create_staging_db.py' }));
-    n.appendChild(el('span', { text: ' 然后刷新本页。' }));
+      text: ' ' + (hint ||
+        '本页读写的是 caiems_staging.db。在项目根目录执行：' +
+        'python3 scripts/create_staging_db.py，然后刷新本页。'),
+    }));
   }
 
   function emptyRow(tbody, cols, text) {

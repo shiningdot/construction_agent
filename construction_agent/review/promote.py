@@ -508,16 +508,36 @@ def last_promotion() -> dict[str, Any] | None:
     return row
 
 
-def rollback(db_path: Path | None = None) -> dict[str, Any]:
+def rollback(db_path: Path | None = None, *,
+             expect_id: int | str | None = None) -> dict[str, Any]:
     """撤销最近一次并入：按 `stage_ids` 反查写入的事故，事务内删主表+子表。
 
     **实现为逆操作而不是还原备份文件**：还原整个文件会连带丢掉这之后别人
     做的任何改动（采集、其他并入），而逆操作只动这次并入写进去的那几行。
     备份文件仍然保留，作为手工恢复的最后手段。
+
+    `expect_id`（**必填**）是调用方**指名**要回滚的那条并入记录的 id。
+    这是服务端的凭证：`promote` 靠一次性令牌证明"我知道自己在并入哪一批"，
+    回滚当时却是零凭证——实测在副本上一个不带任何参数的 `POST /api/review/
+    rollback` 就删掉了主库的 1 条事故与它下面的编码，见 §2.5.92。
+
+    指名还有第二个作用，与"有没有凭证"无关：`last_promotion()` 取的是
+    **当前**可回滚的那一条，而用户看到的是**页面渲染时**的那一条。两次点击
+    之间若发生了另一次并入，无名回滚会删掉用户没看着的那一批，且在界面上
+    看不出任何异常。比对一个 id 就堵住了这条路。
     """
     entry = last_promotion()
     if entry is None:
         raise PromoteError("没有可回滚的并入记录")
+    if expect_id is None:
+        raise PromoteError(
+            "缺少 promote_id：回滚会删除最终库里的事故与编码，必须先指明"
+            "要回滚哪一次并入（取 /api/review/history 里「生效中」那条的 id）")
+    if str(entry["id"]) != str(expect_id):
+        raise PromoteError(
+            f"要回滚的不是当前可回滚的那次并入：请求 id={expect_id}，"
+            f"当前是 id={entry['id']}（其间可能又发生过一次并入）。"
+            "请刷新审核页、看清「生效中」那条的编号后再确认。")
 
     stage_ids = json.loads(entry["stage_ids"])
 

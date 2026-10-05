@@ -441,6 +441,11 @@
   }
 
   function deleteTask(t, btn) {
+    /* 与采集段同构的删除在提取段有一句确认（extract.js 的 deleteTask），
+       这里原本一句都没有——同一个动作在两条链路上确认级别不同（§2.5.92）。
+       文案照 extract 那句的样子写：说清楚删的是什么、什么不受影响。 */
+    if (!window.confirm('删除任务 ' + t.task_id + '？\n\n'
+        + '已经采到的原文会保留，不受影响。')) return;
     btn.disabled = true;
     fetch('/api/collect/tasks/' + t.task_id, { method: 'DELETE' })
       .then(function (r) { return r.json().then(function (b) {

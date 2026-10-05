@@ -182,14 +182,23 @@
     });
   }
 
+  /* 当前可回滚的那条并入记录的 id。
+     服务端要求回滚**指名**（§2.5.92）：无名回滚删的是"当下最近的一次"，
+     而用户看着的是"页面渲染时的那一次"——两者之间若又发生过一次并入，
+     删掉的就不是用户以为是的那一批，且界面上看不出任何异常。 */
+  var activePromoId = null;
+
   function loadHistory() {
     return get('/api/review/history').then(function (b) {
       var rows = b.data || [];
       clear($('histBody'));
+      activePromoId = null;
       if (!rows.length) {
         $('histBody').appendChild(emptyRow(5, '还没有并入记录'));
       }
       rows.forEach(function (r) {
+        /* 后端按 id DESC 返回，第一条「生效中」的即 last_promotion() */
+        if (!r.rolled_back_at && activePromoId === null) activePromoId = r.id;
         var ids = [];
         try { ids = JSON.parse(r.stage_ids || '[]'); } catch (e) { ids = []; }
         var tr = el('tr');
@@ -885,9 +894,17 @@
   }
 
   function doRollback() {
-    if (!window.confirm('回滚将删除最近一次并入写入的事故与编码。继续？')) return;
+    if (activePromoId === null) {
+      $('rollbackHint').textContent =
+        '没有可回滚的并入记录（历史可能还没读到，请刷新后重试）。';
+      return;
+    }
+    /* 确认文案与请求体说的是同一条 —— 服务端校验的正是这个 id，
+       用户看到的编号若与它不符，说明页面已经过期 */
+    if (!window.confirm('回滚将删除并入记录 #' + activePromoId
+        + ' 写入最终库的事故与编码。继续？')) return;
     $('rollbackBtn').disabled = true;
-    post('/api/review/rollback', {})
+    post('/api/review/rollback', { promote_id: activePromoId })
       .then(function (b) {
         var d = b.data;
         $('rollbackHint').textContent = '已回滚 ' + d.removed_accidents

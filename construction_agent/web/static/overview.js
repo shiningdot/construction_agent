@@ -53,8 +53,9 @@
      换出文档）。故凡带协议头而不是 http(s)/mailto/tel/blob 的值，一律
      **不写该属性**：渲染成纯文本，与 textContent 那条纪律是同一件事的两面。
 
-     下面这段与另一份副本必须逐字相同（dom.js ↔ overview.js，两份 el() 是
-     历史遗留的等价拷贝，统一留到 M1 收尾时做）——check_2595 的 A4 段核它。 */
+     下面这段与另一份副本必须逐字相同（dom.js ↔ overview.js；两份 el() 是
+     历史遗留的等价拷贝，**且已双向分叉**，合并一事登记在蓝图 07 的 U1 表）
+     ——check_2595 的 A4 段核"逐字相同"这一条。 */
   const URL_ATTRS = ['href', 'src', 'srcset', 'action', 'formaction', 'poster',
                      'xlink:href', 'data', 'background', 'cite', 'ping',
                      'manifest', 'longdesc', 'usemap'];

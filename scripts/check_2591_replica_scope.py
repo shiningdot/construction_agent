@@ -121,16 +121,18 @@ REGISTER: dict[str, tuple[str | None, str, str]] = {
     ),
     "static/dom.js": (
         "163291f4a86f7e5e694ed9c6d7f09725",
-        "55d033e25ca4c1a50b2ab75a515b33d3",
+        "f5ffead6d96abf5e4783b695893267fc",
         "§2.5.95：`el()` 的属性写入循环加 URL 协议白名单"
-        "（`URL_ATTRS` + `safeUrlValue()`，危险协议不写该属性）",
+        "（`URL_ATTRS` + `safeUrlValue()`，危险协议不写该属性）；"
+        "§2.5.96：三处合并登记的注释由里程碑改挂 backlog（U1）",
     ),
     "static/overview.js": (
         "d1aedb7b4cca84a27acb96fe6589db69",
-        "19319b14cae325d8cac37398250b5a77",
+        "a62fe5eab033c32e8857702e1e0a9e85",
         "§2.5.83：图片统计补解 `data` 层（此前「现场图片」卡从没出现过）；"
         "§2.5.87：两处静默 catch 改为写进 DOM；"
-        "§2.5.95：本页内联 `el()` 副本同步加同一份守卫（A4 核两份逐字相同）",
+        "§2.5.95：本页内联 `el()` 副本同步加同一份守卫（A4 核两份逐字相同）；"
+        "§2.5.96：那处合并登记的注释与 `dom.js` 一起改挂 backlog",
     ),
     "factory.py": (
         "61a81671d981e20a14a18be5ea56096d",

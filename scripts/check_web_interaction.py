@@ -61,6 +61,7 @@ Tab 就跑到背景上（§2.5.70 实测到的真缺陷，已修），而类名�
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -656,6 +657,151 @@ def main() -> int:
                     pg.close()
             step("灯箱键盘与焦点", s14)
 
+            def s15():
+                """批量条：勾选 → 出现 → 计数 → 清除（§2.5.96）。
+
+                `CLAUDE.md` 与 `docs/web/01_在线采集.md` 各写着一句声明，
+                说批量条这条链由本脚本管——此前**本脚本里并没有**这条判据，
+                那两句是悬空的（§2.5.96 的 A 类判据抓出来的 2 条）。这一条
+                把它兑现。
+
+                ⚠️ 上面**不照抄那句声明的原话**：§2.5.96 的 A 类判据按固定
+                句式扫全仓，**分不出"作出声明"与"逐字引述声明"**——首版
+                docstring 抄了一遍，当场被判成一条自指的**新**声明（实测
+                A 类 6 条 vs 登记 5 条）。凡引述一律改写成描述。
+
+                ⚠️ 工作库 `raw_accidents` 实测 0 行（§2.5.86 记录），**没有
+                行可勾**，故用 `page.route` 拦 `/api/collect/raw` 注入两行。
+                注入行的字段名**照抄** `collect.py:335-340` 的真实 SELECT
+                （`raw_id`/`source_key`/`content_preview`/`has_assets` …），
+                不自己起名——否则测的是"前端容忍缺字段"，不是真实链路。
+                本判据测的是**前端「勾选→出现→计数→清除」这条链**，**不是**
+                "后端确实返回了行"（后者归 `check_2583` / `check_2584` 那一族）。
+
+                ⚠️ 读计数文本一律用 `text_content()` 而**不是** `inner_text()`
+                ——批量条默认带着 `hidden`，`innerText` 反映**渲染性**，闭合时
+                恒返回空串（§2.5.69 立的账）。这里要的是"JS 往 DOM 里写了
+                什么"，不是"用户此刻看不看得见"。
+                """
+                def row(rid, title):
+                    return {
+                        "raw_id": rid, "source_key": "mem", "task_id": None,
+                        "title": title, "source_url": "https://example.invalid/",
+                        "fetch_time": "2026-10-05 10:00:00",
+                        "publish_date": "2026-10-01", "status": "new",
+                        "gate_verdict": None, "gate_reason": None,
+                        "gate_stage": None, "gate_confidence": None,
+                        "ext_date": None, "ext_province": None, "ext_city": None,
+                        "ext_deaths": None, "ext_injuries": None,
+                        "ext_accident_type": None, "ext_severity": None,
+                        "content_preview": "探针用的正文片段。", "content_len": 9,
+                        "has_assets": False,
+                    }
+
+                payload = {
+                    "ok": True, "available": True,
+                    "meta": {"total": 2, "page": 1, "size": 50, "pages": 1},
+                    "data": [row("probe-a", "探针记录甲"),
+                             row("probe-b", "探针记录乙")],
+                }
+                pg = ctx.new_page()
+                try:
+                    # 正则而不是 glob：Playwright 的 `*` 不跨 `/`，但这条
+                    # 判据不能靠"猜 glob 语义"成立，写死 URL 形态最稳。
+                    pg.route(re.compile(r".*/api/collect/raw(\?.*)?$"),
+                             lambda route: route.fulfill(
+                                 status=200,
+                                 content_type="application/json",
+                                 body=json.dumps(payload, ensure_ascii=False)))
+                    pg.goto(f"{base}/collect", wait_until="networkidle",
+                            timeout=30000)
+                    pg.wait_for_timeout(1200)
+
+                    bar = pg.locator("#bulkBar")
+                    count = pg.locator("#bulkCount")
+                    boxes = pg.locator("#rawBody input[type=checkbox]")
+                    assert boxes.count() == 2, \
+                        (f"注入 2 行后列表应有 2 个勾选框，实测 {boxes.count()} 个"
+                         "——拦截没生效或行没渲染出来，下面每格都失去意义")
+
+                    def text() -> str:
+                        return (count.text_content() or "").strip()
+
+                    def shown() -> bool:
+                        return not bar.evaluate("e => e.hidden")
+
+                    # ① 起点：模板里那个容器带着 `hidden`，一行没勾就不该出现
+                    # （这里**故意不写出它的选择器**：`check_2596_handoff.py`
+                    # 拿那个 id 选择器当"这条声明兑现了没有"的探针，注释里
+                    # 再抄一遍等于给它一把假钥匙——§2.5.70 的坑）。
+                    if shown():
+                        raise AssertionError("还没勾选，批量条就显示了")
+                    # ⚠️ 计数初始**不是空串**而是「已选 0 条」——`renderBulkBar()`
+                    # 在页面初始化时跑过一次，把 0 写进了 DOM（容器还 hidden 着，
+                    # 用户看不见）。第一版把判据写成"应为空串"，报了一次假红：
+                    # **判据要照着实际形态写，不能照着我以为的形态写**
+                    # （§2.5.90：判据的设计前提也会错）。
+                    # 真正要抓的是"一行没勾就报了个非零数"，故只否掉非 0。
+                    m0 = re.search(r"已选\s*(\d+)\s*条", text())
+                    if m0 and m0.group(1) != "0":
+                        raise AssertionError(f"还没勾选，计数已写着「{text()}」")
+
+                    # ② 勾第一行 → 出现 + 计数 1
+                    boxes.nth(0).check()
+                    pg.wait_for_timeout(200)
+                    if not shown():
+                        raise AssertionError("勾了 1 行，批量条没出现")
+                    if text() != "已选 1 条":
+                        raise AssertionError(
+                            f"勾了 1 行，计数写着「{text()}」，应为「已选 1 条」")
+
+                    # ③ 勾第二行 → 计数跟着走（**只测"出现过"会漏掉这一格**：
+                    #    计数写死不更新时 ② 照样通过）
+                    boxes.nth(1).check()
+                    pg.wait_for_timeout(200)
+                    if text() != "已选 2 条":
+                        raise AssertionError(
+                            f"勾了 2 行，计数写着「{text()}」，应为「已选 2 条」"
+                            "——计数没跟着选择走")
+
+                    # ④ 取消勾第二行 → 回到 1（反方向；`checked.delete` 那一支）
+                    boxes.nth(1).uncheck()
+                    pg.wait_for_timeout(200)
+                    if text() != "已选 1 条" or not shown():
+                        raise AssertionError(
+                            f"取消勾 1 行后计数「{text()}」、显示={shown()}，"
+                            "应为「已选 1 条」且仍显示")
+
+                    # ⑤ 再取消勾第一行 → 清零即隐藏
+                    boxes.nth(0).uncheck()
+                    pg.wait_for_timeout(200)
+                    if shown():
+                        raise AssertionError(
+                            f"全部取消勾选后批量条还在（计数「{text()}」）")
+
+                    # ⑥ 「取消选择」按钮：条收起 + 勾选框一并复位（按钮走的是
+                    #    另一条通路 `checked.clear(); loadRaw()`，与 ⑤ 的
+                    #    checkbox 通路不是同一段代码）
+                    boxes.nth(0).check()
+                    boxes.nth(1).check()
+                    pg.wait_for_timeout(200)
+                    if text() != "已选 2 条":
+                        raise AssertionError("清除按钮用例的前置没成立")
+                    pg.locator("#bulkClear").click()
+                    pg.wait_for_timeout(900)
+                    if shown():
+                        raise AssertionError("点了「取消选择」，批量条没收起")
+                    left = pg.locator("#rawBody input[type=checkbox]:checked").count()
+                    if left:
+                        raise AssertionError(
+                            f"点了「取消选择」，仍有 {left} 个勾选框是勾上的"
+                            "——选择清空了但勾选框没复位")
+                    return ("默认隐藏；勾 1/2 行计数跟走；逐个取消回到隐藏；"
+                            "「取消选择」收起并复位勾选框")
+                finally:
+                    pg.close()
+            step("批量条勾选链路", s15)
+
             browser.close()
     finally:
         server.shutdown()
@@ -666,9 +812,9 @@ def main() -> int:
         for name, _, err in bad:
             print(f"  ✗ {name}：{err}")
         return 1
-    print("✓ 交互十七条全过：两页维度齐全 / 筛选 / 取消 / 翻页 / 分享链接 / "
+    print("✓ 交互十八条全过：两页维度齐全 / 筛选 / 取消 / 翻页 / 分享链接 / "
           "过期链接自愈 / 搜索 / 重置；详情页折叠真点 / 展开全文 / 灯箱 / "
-          "列表↔详情往返；键盘路径 / 灯箱焦点陷阱与归还。")
+          "列表↔详情往返；键盘路径 / 灯箱焦点陷阱与归还；批量条勾选链路。")
     return 0
 
 

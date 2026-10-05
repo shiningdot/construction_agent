@@ -356,7 +356,10 @@ class CollectorPipeline:
         # 自动推导派生字段
         accident.auto_derive_fields()
 
-        # 将 trapped_count 等信息存入 extra（TODO: 扩展 Accident 模型）
+        # `trapped_count` 已是 `Accident` 的正式字段（models/accident.py:143），
+        # 从 `extra` 取过来直接填，不再借 `extra` 占位。
+        # 这里原先写着「将 trapped_count 等信息存入 extra（待扩展 Accident 模型）」——
+        # 字段落地后那笔账就还清了，只是标记一直没销；2026-10-05 销（§2.5.96）。
         if item.extra.get("trapped_count"):
             accident.trapped_count = item.extra["trapped_count"]
 

@@ -440,7 +440,12 @@
     return jsonGet('/api/filters').then((opts) => {
       pruneUnknown(opts);
       renderFilters(opts);
-    }).catch(() => {});
+    }).catch((e) => {
+      // 筛选器选项是辅助功能，失败不该拦住列表——但也不能一声不吭：chips
+      // 空着时用户分不清"这里本来就没有可选值"和"加载挂了"。写进 chips 区，
+      // 与本页列表侧的失败提示（init 末端的 chartArea）同一范式。
+      $('filterChips').textContent = '筛选选项加载失败：' + e.message;
+    });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -709,7 +714,11 @@
       jsonGet('/api/images/stats').then((r) => (r && r.data) || null)
         .catch(() => null),
     ]).then(([a, img]) => renderQuality(ov, a, img))
-      .catch(() => {});
+      .catch((e) => {
+        // 走到这里只剩 `/api/province/audit` 失败（图片统计那一路已被上面单独
+        // 接成 null）。同样不能静默：面板空白分不清"没有数据"和"加载失败"。
+        $('qualityBody').textContent = '质量面板加载失败：' + e.message;
+      });
   }
 
   // ══════════════════════════════════════════════════════════

@@ -39,9 +39,12 @@
 逐条读实现核实后补进对应蓝图（都是真实功能，不是实现多写），双向清零。
 正文提及未注册的只剩上面那两条对照提及。
 
-## 2026-10-05：3 条假缺口，与它背后那个已经过期的前提
+## 2026-10-05：两批假缺口，根因在两个不同的层
 
-回归批跑（§2.5.90）报出 3 条「正文提及、代码没有、且没有否定词」：
+回归批跑（§2.5.90）先后报出**两批**「正文提及、代码没有、且没有否定词」，
+**两批的根因完全不同**，各自修在判据的不同层。
+
+### 第一批：字符类里的 `[` `]`
 
     /api/collect/sources]}   01_在线采集.md:12690
     /api/review/stats]}      01_在线采集.md:12691
@@ -53,25 +56,45 @@
 自然查不到。**每写一条自证记录就多一条假缺口**。修法是把 `[` `]` 移出字符类
 （`]` 成了终止符），3 条同时消失，退 0。
 
-**但更值得记的是根因**：`BLUEPRINT_MAX` 按**文件名**划线，前提是
-「文件名 = 文档角色」——00–08 是蓝图、09/10 是核查记录。这个前提
-**已经部分过期了**：`01_在线采集.md` 现在**同时是蓝图与核查记录**，
-§2.5.x 各节的实测记录、注入自证表、错误分支真值面**全部写在 01 号里**。
+### 第二批：扫描面把核查记录当成了规格
 
-今天它没造成误判，纯属结构巧合：只有**标题行**进 spec，而 §2.5.x 的标题是
-`### 2.5.90 …`、不含路由；那些报告行落进 prose，而它们提的路径都是**真实
-路由**、被 `set(prose) - set(real)` 滤掉了。但这层巧合有两个具体的破法：
+修完第一批、写完 §2.5.90 那一节**之后再复跑，又红了**，换了一批：
 
-1. 若某节的三级标题写成 ``### `GET /api/xxx` ``（描述某个接口），它会被当**规格**；
-2. 若报告里出现一个**不存在**的路径（如「`GET /api/foo` 不存在于实现」），
-   只要同页没有否定词就会被报成缺口。
+    /api/old/legacy      01_在线采集.md:14923
+    /api/x               01_在线采集.md:14944
+    /api/x${suffix}      01_在线采集.md:14993
 
-**不改代码去修它**——把「01 号只取某几节」写进判据会非常脆（节号会增、
-标题会改）。改为在边界里明写，让下一次报红的人先想到这一层。
+三条全是**那一节刚写进去的诊断举例**（「给一个不存在的接口写标题会判成幽灵」、
+「`case_7` 核 `]` 之后的东西不被吃进路径」）。根因在**扫描面**：
+`BLUEPRINT_MAX` 按**文件名**划线，前提是「文件名 = 文档角色」——而
+`01_在线采集.md` 现在**同时是蓝图与核查记录**：`### 2.5.1` 到 `### 2.5.90`
+共 **50 节**嵌在 `## 二、现状诊断` 之下（实测占 708–15022 行），
+而 `## 三、目标架构`/`## 四、接口设计`/`## 五、页面结构与交互逻辑` 才是规格。
+**判据的设计前提会过期**——这次是它当场发作。
+
+修法：按**标题结构**排除核查记录区（`scan_lines`）——级别 ≤2 的标题离开该区、
+级别 3 的标题看是否 `2.5.` 开头、级别 ≥4 沿用当前状态（是 2.5.x 的子标题）。
+不猜语义、不写死节号。
+
+**为什么这次改代码，而第一批时说过「不改」**：当时设想的修法是「01 号只取某几节」，
+要写死节号（节号会增、标题会改，脆），而且**会把 01 号 §三/§四 那批真实接口一起
+放过**。现在排除的是**子章节**、保留 §三/§四/§五，实测 **spec 少 0 条**——没有放过
+任何真实接口。这一格是选这个方案的前提，所以 `--drift-test` 用 **D5/D6 一对**钉住它：
+同一个探针注入**区外**必须报红（D5）、注入**区内**必须不报红（D6）。
+
+### 这层巧合原来靠什么撑着
+
+第一批之前之所以没出事，是**结构巧合**：只有**标题行**进 spec，而 §2.5.x 的标题是
+`### 2.5.90 …`、不含路由；那些报告行落进 prose，而它们提的路径都是**真实路由**、
+被 `set(prose) - set(real)` 滤掉了。巧合有两个破法：①某节的三级标题若写成
+``### `GET /api/xxx` `` 就会被当**规格**；②报告里出现一个**不存在**的路径
+（正如第二批），只要同页没有否定词就会被报成缺口。
 
 ## 判据边界（别把退 0 当免检）
 
-- **`BLUEPRINT_MAX` 的前提已部分过期**，见上一节；当前不影响结论。
+- **`BLUEPRINT_MAX` 的前提（文件名 = 文档角色）已部分过期**，由 `NOTES_PREFIX`
+  在文档内部补上一刀（见上节）。**`BLUEPRINT_MAX` 本身仍按文件名划线**——
+  若将来别的蓝图文档（02–08）也开始混装核查记录，得同样处理。
 - **`<int:accident_id>` 这种带类型标注的 Flask 变量段不被支持**：`:` 不在字符类里，
   会被截成 `/api/accidents/<int`、在 real 里查不到。实测 00–08 **0 处**使用这种写法
   （文档统一写 `<accident_id>`），故今天不发作。**刻意不加 `:`**——加了会引入另一种
@@ -108,6 +131,50 @@ from check_web_alignment import collect_routes, norm  # noqa: E402
 # 000–08 是蓝图；09 是核查记录、10 是待执行清单，它们提到路由是在**报告**，
 # 不是在规定，混进来会把核查结论本身当成规格。
 BLUEPRINT_MAX = 8
+
+# **但 01 号内部也混着核查记录**（2026-10-05 补）：它既是蓝图（§一 目标 / §三 目标
+# 架构 / §四 接口设计 / §五 页面结构），又是 50 节核查记录的挂载点——`### 2.5.1`
+# 到 `### 2.5.90` 嵌在 `## 二、现状诊断` 之下，实测占 708–15022 行。核查记录里
+# 写「给一个不存在的接口写标题会判成幽灵」时的**举例路径**，会被当成「蓝图规定了
+# 这个接口」⇒ 每写一条诊断举例就多一条假缺口。
+#
+# 识别只按**标题结构**（章节编号），不猜语义：级别 ≤2 的标题一律离开核查区，
+# 级别 3 的标题看它是不是 `2.5.` 开头，级别 ≥4 沿用当前状态（是 2.5.x 的子标题）。
+NOTES_PREFIX = "2.5."
+
+#: 标题行：``(井号个数, 标题文本)``。带前导空白（md 允许至多 3 空格）但**不认
+#: 引用块**（`> ### x` 的 `>` 先出现，不匹配）。
+HEADING = re.compile(r"^(#{1,6})\s+(\S)")
+
+
+def heading_kind(line: str) -> tuple[int, str] | None:
+    """标题行返回 ``(级别, 标题文本)``，否则 ``None``。"""
+    m = HEADING.match(line.lstrip())
+    if not m:
+        return None
+    return len(m.group(1)), line.lstrip()[len(m.group(1)):].lstrip()
+
+
+def scan_lines(lines: list[str]) -> list[tuple[str, bool]]:
+    """给每行打上「是否处于核查记录区」的标记。
+
+    抽成纯函数是为了 `--self-test` 能直接喂行列表验证状态转移——
+    「排除生效」这件事不能只看最后那个退出码。
+    """
+    out = []
+    in_notes = False
+    for line in lines:
+        hk = heading_kind(line)
+        if hk is not None:
+            lvl, title = hk
+            if lvl <= 2:
+                in_notes = False
+            elif lvl == 3:
+                in_notes = title.startswith(NOTES_PREFIX)
+            # lvl >= 4：沿用当前状态（是 ### 2.5.x 的子标题，不是新的分区）
+        out.append((line, in_notes))
+    return out
+
 
 # 正文提及路径时，同一行出现这些词说明是在说「已经没有了」或「旧的怎么错」。
 RETIRED_WORDS = ("删除", "已删", "旧实现", "已废弃", "废弃", "原有", "移除", "不再")
@@ -156,12 +223,17 @@ def collect_doc_routes(
         （第一版在这里就 `[:90]` 截断了，结果 `/api/process` 那行末尾的「旧实现」
         正好落在 90 字之外，否定词过滤看不见它，一条对照提及被报成了缺口。
         判断用完整文本、显示才截断，这个分寸不能图省事。）
+
+        核查记录区（`### 2.5.x`）整段跳过——见 `NOTES_PREFIX` 的注释。
     """
     spec: dict[str, list[str]] = {}
     prose: dict[str, list[str]] = {}
 
     for f in (blueprint_files() if files is None else files):
-        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+        lines = f.read_text(encoding="utf-8").splitlines()
+        for i, (line, in_notes) in enumerate(scan_lines(lines), 1):
+            if in_notes:
+                continue
             for path, is_heading in parse_line(line):
                 slot = spec if is_heading else prose
                 slot.setdefault(path, []).append(f"{f.name}:{i}  {line.strip()}")
@@ -288,9 +360,29 @@ SELF_CASES: list[tuple[str, list[tuple[str, bool]]]] = [
     ("这一段只是说明文字，不含任何端点。", []),
 ]
 
+#: 状态机用例：``(行列表, 期望的「是否处于核查记录区」序列)``。
+#: 证明「排除核查记录」是按**标题结构**生效的，不是按行内容猜、也不是整份跳过。
+SCAN_CASES: list[tuple[list[str], list[bool]]] = [
+    # scan_1 区内的标题行与正文行都不扫（`#### ` 是 2.5.x 的子标题，沿用状态）
+    (["## 二、现状诊断", "### 2.5.1 第一轮", "见 GET /api/a", "#### 子标题"],
+     [False, True, True, True]),
+    # scan_2 二级标题离开（§三/§四/§五 才是规格）
+    (["### 2.5.9 第九轮", "## 三、目标架构", "### `GET /api/b`"],
+     [True, False, False]),
+    # scan_3 **同级**的非 2.5 标题也离开——不能只看井号个数
+    (["### 2.5.9", "### 附录", "正文"], [True, False, False]),
+    # scan_4 区外的四级标题只是普通子标题，不改变状态
+    (["## 三、目标架构", "#### GET /api/c"], [False, False]),
+    # scan_5 引用块里的 `### 2.5.x` 不算标题（md 语义），不会误触发进入
+    (["## 三、目标架构", "> ### 2.5.2 假标题", "正文"], [False, False, False]),
+    # scan_6 前缀必须带点：`2.50` 不是 `2.5.`（防将来编号扩到 2.50 时误判）
+    (["### 2.50 将来的一节"], [False]),
+]
+
 
 def self_test() -> int:
     fails = 0
+    print("  [parse_line 提取]")
     for n, (line, want) in enumerate(SELF_CASES, 1):
         got = parse_line(line)
         if got == want:
@@ -300,7 +392,17 @@ def self_test() -> int:
             print(f"  ✗ case_{n}  输入 {line!r}")
             print(f"      期望 {want}")
             print(f"      实得 {got}")
-    total = len(SELF_CASES)
+    print("  [scan_lines 状态机]")
+    for n, (lines, want) in enumerate(SCAN_CASES, 1):
+        got = [flag for _, flag in scan_lines(lines)]
+        if got == want:
+            print(f"  ✓ scan_{n}")
+        else:
+            fails += 1
+            print(f"  ✗ scan_{n}  输入 {lines!r}")
+            print(f"      期望 {want}")
+            print(f"      实得 {got}")
+    total = len(SELF_CASES) + len(SCAN_CASES)
     if fails:
         print(f"\n✗ --self-test：{total - fails}/{total} 通过，{fails} 条失败。")
         return 1
@@ -386,29 +488,51 @@ def drift_test() -> int:
             print(f"  ✗ D{n} {name}\n      期望 红={want} retired含={want_retired}"
                   f"\n      实得 红={got} retired={retired}")
 
-    # D5：真实文件 + main() 全流程。锚点用「追加」而非「改写」，不给匹配留余地。
+    # D5/D6 是一对：同一个探针、同一个文件，**只差注入位置**。
+    # 区外（文件末尾，§五 之后）必须报红；区内（`### 2.5.x` 核查记录）必须不报红。
+    # 配对的意义：单有 D5 时，「整份 01 号被放过」这种错误实现也能通过——那会让
+    # D6 静默失效；单有 D6 时，「判据根本没扫 01 号」同样是绿的。
+    # 两条一起，才证明「排除」是按标题结构精确生效的（§2.5.90）。
     tgt = ROOT / "docs" / "web" / "01_在线采集.md"
     orig = tgt.read_text(encoding="utf-8")
     try:
+        # D5 区外：追加到文件末尾（§五 页面结构之后，不在任何 2.5.x 节里）
         tgt.write_text(orig + "\n\n> 探针段落：见 `GET /api/zzz_probe` 接口。\n",
                        encoding="utf-8")
         rc, marks = _run_main()
         want = {"suspicious": ["/api/zzz_probe"]}
         if rc == 1 and _red(marks) == want:
-            print("  ✓ D5 真实 01 号注入 → 退出码 0→1，红的恰好是那一条")
+            print("  ✓ D5 真实 01 号**区外**注入 → 退出码 0→1，红的恰好是那一条")
         else:
             fails += 1
-            print(f"  ✗ D5 真实 01 号注入\n      rc={rc}（期望 1）"
+            print(f"  ✗ D5 真实 01 号区外注入\n      rc={rc}（期望 1）"
                   f"\n      期望 {want}\n      实得 {_red(marks)}")
+
+        # D6 区内：插到第一个 `### 2.5.` 标题之后
+        lines = orig.splitlines()
+        idx = next((i for i, ln in enumerate(lines) if ln.startswith("### 2.5.")), None)
+        if idx is None:
+            fails += 1
+            print("  ✗ D6 在 01 号里找不到 `### 2.5.` 核查记录区——用例前提不成立")
+        else:
+            lines.insert(idx + 1, "> 探针：见 `GET /api/zzz_probe_notes` 接口。")
+            tgt.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            rc6, marks6 = _run_main()
+            if rc6 == 0 and not _red(marks6):
+                print("  ✓ D6 真实 01 号**核查记录区内**注入 → 被排除，退出码不变")
+            else:
+                fails += 1
+                print(f"  ✗ D6 真实 01 号区内注入\n      rc={rc6}（期望 0）"
+                      f"\n      期望 红={{}}\n      实得 {_red(marks6)}")
     finally:
         tgt.write_text(orig, encoding="utf-8")
         if tgt.read_text(encoding="utf-8") != orig:
             print("  ✗ 恢复失败：01_在线采集.md 与原文不一致！")
             fails += 1
         else:
-            print("  ✓ D5 现场已逐字恢复")
+            print("  ✓ D5/D6 现场已逐字恢复")
 
-    total = len(DRIFT_DOC_CASES) + 2  # 基线 + D5
+    total = len(DRIFT_DOC_CASES) + 3  # 基线 + D5 + D6
     if fails:
         print(f"\n✗ --drift-test：{total - fails}/{total} 通过，{fails} 条失败。")
         return 1

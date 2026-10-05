@@ -407,9 +407,27 @@ def inject_test() -> int:
     # （§2.5.68：两个注入面都要测，只测一面时另一面被改坏了不会有任何用例转红）。
     # 改的是真实 README，`try/finally` 恢复；先断言"注入确实做进去了"，
     # 否则替换落空会与"判据没报"长得一模一样（§2.5.89）。
+    #
+    # 注入形态**本身也是现算的**（2026-10-05 §2.5.94 改）：首版把待替换串写成
+    # 字面量 `二十八条里 **27 条只读不写**`，§2.5.94 加一行脚本、计数句一改，
+    # 替换就落空 ⇒ C5 报"注入未生效"，而**这是用例过期、不是判据坏了**（§2.5.90：
+    # 判据的设计前提会过期）。改为**读出现有的两个数、把第一个 +1**——它永远是
+    # "一句与表行数对不上的计数句"，D7 必红，且不随表行数漂。
     print("  ── C5 文档面：e2e/README 计数句被改 ──")
+    import re as _re
     orig = E2E.read_text(encoding="utf-8")
-    injected = orig.replace("二十八条里 **27 条只读不写**", "二十九条里 **28 条只读不写**")
+    m5 = _re.search(
+        r"[一二三四五六七八九十]+条里 \*\*\d+ 条只读不写\*\*、跑几次都行", orig)
+    n_rows = _readonly_rows()
+    injected = orig
+    if m5 is not None and n_rows > 0:
+        # 尾巴 `、跑几次都行` 必须原样带上：① 变更记录里另有七句同形的历史值，
+        # 不锚尾巴时 `str.replace`（无 count ⇒ **全部**替换）会把它们一起改掉；
+        # ② 替换后 `_count_sentence` 还得认得出这句，否则 D7 报的是"锚点未命中"
+        # 而不是"计数句与表行数不符"，红的来由就不唯一了。
+        bad = (f"{cn_num(n_rows + 1)}条里 **{n_rows - 1} 条只读不写**"
+               f"、跑几次都行")
+        injected = orig.replace(m5.group(0), bad)
     if injected == orig:
         print("  ✗ C5 注入未生效：README 里找不到待替换的计数句")
         rc = 1
@@ -464,17 +482,158 @@ def self_test() -> int:
             r, ok = repr(e), False
         print(f"  {'✓' if ok else '✗'} md5_of({p.name}) → {r!r}")
         bad += 0 if ok else 1
-    print(f"self-test：{len(cases) + 2 - bad}/{len(cases) + 2}")
+    total = len(cases) + 2
+
+    # ---- D7 那台机器自己的正反用例（2026-10-05 §2.5.94 加）------------------
+    # D7 从字面锚点改成现算判据后，"判据自己不灵"就没有别的东西兜着了——它
+    # 报绿只说明"我没报错"。下面五条里，**第 3 与第 4 条各自钉住一个真实
+    # 踩过的坑**（都是先写错、跑出来才发现）。§2.5.64：「退出码 0 只有在
+    # 脚本有能力报 1 时才可信」。
+    print("  ── D7 计数机（中文数字 / 句子解析 / 表行数）──")
+
+    def _chk(tag: str, got, want) -> int:
+        ok = got == want
+        print(f"  {'✓' if ok else '✗'} {tag}：{got!r}")
+        if not ok:
+            print(f"      want {want!r}")
+        return 0 if ok else 1
+
+    # 1) cn_num：边界三段（个位 / 十 / 二十）——README 的规模是二十几到三十几
+    bad += _chk("cn_num(5)", cn_num(5), "五")
+    bad += _chk("cn_num(10)", cn_num(10), "十")
+    bad += _chk("cn_num(29)", cn_num(29), "二十九")
+    total += 3
+    # 2) 往返：实时那两句写法必须解析得回同一对数
+    bad += _chk("解析实时句", _count_sentence(
+        "二十九条里 **28 条只读不写**、跑几次都行；唯一的例外是"), (29, 28))
+    total += 1
+    # 3) **反例**：变更记录里的历史句（同形、但不带 `、跑几次都行` 尾巴）必须
+    #    取不到。不锚尾巴时 `re.search` 命中的是"文件里第一句"，今天恰好是
+    #    实时句、重排一次就会去核一句历史记录（判据仍绿）。
+    bad += _chk("历史句不匹配", _count_sentence(
+        '正文句仍写"二十三条里 22 条只读不写"（现改为'), None)
+    total += 1
+    # 4) **反例**：一份同时含两张表的文本，须数**只读表**的行、不是 e2e 表。
+    #    首版认错了表头（认成 `| 脚本 | 阶段 | 覆盖 |`），对真实 README 数出
+    #    10 行、报「29 条 ≠ 表行数 10」——这条用例就是那个 bug 的回归保护。
+    fixture = "\n".join([
+        "| 脚本 | 阶段 | 覆盖 |",
+        "|---|---|---|",
+        "| `e2e_collect.py` | ① 在线采集 | 源清单 |",
+        "| `e2e_extract.py` | ② 审核与提取 | 闸门 |",
+        "",
+        "## 另有一组只读核查脚本",
+        "",
+        "| 脚本 | 查什么 | 端口 |",
+        "|---|---|---|",
+        "| `scripts/check_a.py` | 甲 | 5099 |",
+        "| `scripts/check_b.py` | 乙 | 5100 |",
+        "",
+        "| `scripts/check_c.py` | 丙（表中间夹了空行） | 5101 |",
+        "",
+        "二十九条里 **28 条只读不写**、跑几次都行；唯一的例外是",
+    ])
+    bad += _chk("两张表时只数只读表", _readonly_rows(fixture), 3)
+    total += 1
+    # 5) 表头没了的文本须返回 -1（判红），不得降级成 0（§2.5.67）
+    bad += _chk("无表头 → -1", _readonly_rows("# 没有表\n\n什么也没有\n"), -1)
+    total += 1
+
+    print(f"self-test：{total - bad}/{total}")
     return 1 if bad else 0
 
 
 # ---------------------------------------------------------------- D 段
+def _readonly_rows(text: str | None = None) -> int:
+    """`e2e/README.md` **只读脚本表**的**数据行数**（`text` 省略时读真实文件）。
+
+    表头认 `| 脚本 | 查什么 | 端口 |`（**不是**上面那张 `| 脚本 | 阶段 | 覆盖 |`
+    的 `e2e_*.py` 表——首版认错了表，把 10 行的 e2e 表当成只读表，
+    于是报「29 条 ≠ 表行数 10」；§2.5.87：**名字来自 grep，不来自印象**）。
+    数据行的形状是 `| \\`路径\\` | …`（首格永远是反引号包住的脚本路径），
+    故按这个形状逐行数，而不是"数到第一个非 `|` 行"——**表中间夹了一个空行**
+    （第 86 行把 `check_2583` 与 `check_2585` 分隔开），按行块数法会只数到一半。
+    扫描范围到**下一个标题行**为止，防止越界吃进别的表格。
+
+    认不到表头返回 `-1`（**判红，不降级成 0**——§2.5.67 立过：解析失败不得
+    静默降级成空集合，否则"表没了"会算成"表是空的"）。
+    """
+    src = E2E.read_text(encoding="utf-8") if text is None else text
+    lines = src.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if line.startswith("| 脚本 | 查什么 | 端口 |"):
+            start = i
+            break
+    if start is None:
+        return -1
+    n = 0
+    for row in lines[start + 1:]:
+        if row.startswith("#"):             # 越出本节，停
+            break
+        if row.startswith("| `"):           # 数据行：首格是反引号包住的路径
+            n += 1
+    return n
+
+
+#: 中文数字（0–99 足够——这张表的规模不会到三位数）。README 那句写的是
+#: **汉字数字**（「二十九条里」），不是阿拉伯数字，故不能直接 `int()`。
+#: 本项目在 `check_2561` 上踩过同一个坑（那边的锚点只认中文数字 ⇒ 判据走错分支），
+#: 故这里显式把两套写法都写出来，并让自测覆盖。
+_CN_DIGIT = "零一二三四五六七八九"
+
+
+def cn_num(n: int) -> str:
+    """把 0–99 的整数写成汉字数字（28 → 「二十八」）。"""
+    if n < 10:
+        return _CN_DIGIT[n]
+    tens, ones = divmod(n, 10)
+    head = "" if tens == 1 else _CN_DIGIT[tens]
+    return head + "十" + ("" if ones == 0 else _CN_DIGIT[ones])
+
+
+def _count_sentence(text: str):
+    """取「N 条里 **M 条只读不写**、跑几次都行」里的 (N, M)。
+
+    N 是汉字数字、M 是阿拉伯数字（README 的实际写法）。取不到返回 `None`
+    ——**调用方须把它判红**，不能当成"没有这句就没事"（§2.5.67）。
+
+    正则**必须带 `、跑几次都行` 这个尾巴**：同一份 README 的变更记录里还留着
+    七句同形的历史值（「二十三条里 22 条只读不写」…「二十八条里 27 条只读不写」，
+    见 119–134 行），只按「N 条里 M 条只读不写」查，命中的是哪一句取决于**行的
+    先后**——今天恰好正文句在前，重排一次就会去核一句历史记录，判据仍绿。
+    §2.5.76：「同一个源同一字段不写第二遍解析」的反面——**找到了不算完，
+    要确认找到的是那一句**。
+    """
+    import re
+    m = re.search(
+        r"([一二三四五六七八九十]+)条里 \*\*(\d+) 条只读不写\*\*、跑几次都行", text)
+    if not m:
+        return None
+    cn = m.group(1)
+    # 反向解析：与 cn_num 互为逆（20–99 这一段；表规模不会到 100 条）。
+    if "十" in cn:
+        head, _, tail = cn.partition("十")
+        n = (10 if head == "" else _CN_DIGIT.index(head) * 10) + \
+            (0 if tail == "" else _CN_DIGIT.index(tail))
+    else:
+        n = _CN_DIGIT.index(cn)
+    return (n, int(m.group(2)))
+
+
 def part_d() -> list[str]:
     """D 段：文档对账（核标题行与关键数字，核不到就当锚点未命中报红）。
 
     每条失败带编号 `D1`–`D7`：C 段用 `x.split()[0]` 取失败标识，若不编号
     就全塌成 `D`，用例只能断言"报了红"、断言不出"**恰好**是哪一条"
     （§2.5.68 立的规矩）。
+
+    **D7 是计算式判据、不是字面锚点**（2026-10-05 §2.5.94 改）：它核的是
+    「README 那句计数里的 N == 只读脚本表的实际行数」。原先写成字面量
+    `二十八条里 **27 条只读不写**`，而 §2.5.94 给表里加了一行
+    `check_2594_data_replica.py` ⇒ **当场转红**。写死的计数值本身就是响应式的
+    （§2.5.75），且"加一行要记得改别人的脚本"正是 §2.5.71 要避免的那种约定
+    ——故改成现算：表行数一变，D7 立刻跟着判，不需要任何人记得。
     """
     import re
     fails: list[str] = []
@@ -485,7 +644,6 @@ def part_d() -> list[str]:
         (SNAP, r"§2\.5\.91", "11 号快照登记本节"),
         (CM, r"§2\.5\.91", "CLAUDE.md 登记本节"),
         (E2E, r"check_2591_replica_scope\.py", "e2e/README 只读脚本表登记本节脚本"),
-        (E2E, r"二十八条里 \*\*27 条只读不写\*\*", "e2e/README 计数已随表行数递增"),
     ]
     for i, (path, pat, what) in enumerate(checks, start=1):
         if not path.is_file():
@@ -494,8 +652,24 @@ def part_d() -> list[str]:
         src = path.read_text(encoding="utf-8")
         if not re.search(pat, src, flags=re.M):
             fails.append(f"D{i} {what}：锚点未命中 {pat}")
+
+    # D7：计数句 ↔ 表行数（现算，理由见 docstring）
+    n_rows = _readonly_rows()
+    sent = _count_sentence(E2E.read_text(encoding="utf-8")) if E2E.is_file() else None
+    if n_rows < 0:
+        fails.append("D7 e2e/README 只读脚本表：表头未命中（判红，不按 0 行算）")
+    elif sent is None:
+        fails.append("D7 e2e/README 计数句：锚点未命中")
+    elif sent[0] != n_rows:
+        fails.append(f"D7 e2e/README 计数句 {sent[0]} 条 ≠ 表行数 {n_rows}")
+    elif sent[1] != n_rows - 1:
+        # 表里唯一会写库的是 check_2586（写 tempfile 副本），故 M == N − 1。
+        # 这条不是"顺手多写的"：它抓的是「改了 N 忘改 M」这类半截编辑。
+        fails.append(f"D7 e2e/README 只读数 {sent[1]} ≠ 表行数 − 1 = {n_rows - 1}")
+
     if not fails:
-        print(f"  D 段 {len(checks)} 处文档锚点全中 ✓")
+        print(f"  D 段 {len(checks) + 1} 处文档锚点全中 ✓  "
+              f"（D7 现算：{n_rows} 行 / 只读 {n_rows - 1}）")
     return fails
 
 

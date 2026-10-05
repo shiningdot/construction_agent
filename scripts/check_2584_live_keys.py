@@ -38,7 +38,13 @@
 `staging_accidents` / `staging_causes` / `collect_sources` / `collect_tasks` /
 `extract_tasks` / `promote_log` / `promote_plans` / `raw_accident_assets`），
 有数据的只有 `image_manifest` 1,771 行、`staging_metadata` 2 行与 SQLite 内部的
-`sqlite_sequence` 1 行。所以
+`sqlite_sequence` 1 行。
+
+⚠️ 那个 **1,771 是 `STAGING_DB`（下方 `main_repo_root()` 派生 ⇒ 主仓库）** 的数，
+而本脚本**驱动的是 `create_app()`**，它按 `settings.DATA_DIR`（`__file__` 相对）
+解析 ⇒ 读的是**本 checkout** 那份工作库（`image_manifest` 693 行，§2.5.94）。
+本节不用 `image_manifest` 取值造参数，故两个数差 1,078 行**不影响任何判据**；
+写在这里是为了不让下一个读它的人以为两边是同一个文件。所以
 `/api/collect/raw`、
 `/api/review/queue` 这类接口真返回的 `data` 就是个空数组——**它元素的键无从核起**。
 这类路径进 B1 **显式列出**，不判红、也不算通过（§2.5.73：宿主取不到要判红、

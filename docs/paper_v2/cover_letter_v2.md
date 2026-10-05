@@ -1,12 +1,16 @@
 # Cover Letter（V2 版草案）
 
 > **与 V1 版的差异**：V1 版（`docs/paper/cover_letter.md`）写于 V2 修订之前，
-> 有 3 处论断在 V2 正文中**已不存在**，直接沿用会与正文不符——
+> 有 3 处论断须处置，直接沿用会与正文不符——
 > ①"Liu et al. 的排序被我们反转"（V2 仅将 Liu et al. 用作维度级匹配的指标
 > 定义与表 10 对比项，已删去"挑战已发表工作"的表述）；
-> ②"Fleiss' Kappa 0.859–1.000"（V2 通篇未使用 Fleiss κ）；
+> ②"verified expert applicability (Fleiss' Kappa 0.859–1.000 across layers)"
+> ——**这一处与①③性质不同**：该数字 V2 正文中英**各 2 处确在**（§3.3/§4.1），
+> 问题不在数字而在措辞，见③后一句；
 > ③"MECE 的 other 类从 18.9% 降到 2.9%"（V2 中的 2.9% 是 WT02 字段占比，
-> 与此无关）。另有"the first controlled decomposition""causally isolates"
+> 与此无关）。**②单独的缘由**：把**标注者之间的一致性**（inter-annotator
+> agreement）说成了**体系已被验证为可用**，属过度解读，对应导师第 8 条。
+> 另有"the first controlled decomposition""causally isolates"
 > "verified expert applicability" 等禁用措辞。故重写。
 >
 > 本文件不参与 `build_v2_docs.py` 的四格式构建。

@@ -47,9 +47,9 @@ sys.path.insert(0, str(ROOT))
 PAPER = ROOT / 'docs' / 'paper_v2'
 FILES = {'EN': PAPER / 'eswa_paper_v2.md', 'ZH': PAPER / 'eswa_paper_v2_zh.md'}
 DOC = PAPER / '修订对账记录.md'
-# 本节在对账记录里的标题行。C 段的扫描面**收窄到这一节之后**（见 anchors() docstring）：
+# 本节在对账记录里的标题行。C 段的扫描面**收窄到本节**（见 anchors() docstring）：
 # 全文档搜索会让第一节对照表的旧文顶包（实测 `17 条查询模板` 就是被它命中的）。
-# 节号写死必然脆，故 part_c 配了一条元判据——本节一旦不再是末节即报红。
+# 截取范围由 `section_body()` 按**二级标题**切段，与本节在文档里的先后无关。
 SECTION = '## 第三十七节　采集侧定量声明的逐条实测（2026-10-06）'
 SRC = ROOT / 'construction_agent' / 'collector'
 
@@ -633,6 +633,21 @@ def anchors(m):
     ]
 
 
+def section_body(t, head):
+    """从文档全文里取出 `head` 这一节的正文（到**下一个二级标题**为止；末节取到末尾）。
+
+    ⚠️ 抽成纯函数是为了能被 `--self-test` 直接喂合成文本验——旧版把切片写死在
+    `part_c` 里，只能靠"改真实文档"来验，而那条路径正是本轮被证伪的
+    （它要求本节是文档末节）。
+
+    ⚠️ `'\\n## '` 不会误匹配 `'\\n### '`（后者第三个字符是 `#` 而不是空格），
+    故子标题不会把本节提前截断。
+    """
+    i0 = t.index(head)
+    nxt = t.find('\n## ', i0 + 1)
+    return t[i0:] if nxt < 0 else t[i0:nxt]
+
+
 def part_c(m):
     reds = []
     if not DOC.exists():
@@ -644,13 +659,17 @@ def part_c(m):
     if SECTION not in heads:
         return [f'修订对账记录里没有 `{SECTION}` 标题 —— 本节尚未登记'
                 f'（当前末节：{heads[-1] if heads else "无"}）']
-    if heads[-1] != SECTION:
-        # 节号写死是脆的，故配这条**会过期**的元判据：本节一旦不再是末节，
-        # 截取范围就会漏掉新节，报红提示"改 SECTION"（§2.5.67：
-        # 登记不判红 ≠ 永久豁免，须可证伪）。
-        return [f'`{SECTION}` 不再是末节（其后还有 {heads[-1]}）'
-                '—— 判据的截取范围会漏掉新节，须同步更新 SECTION']
-    body = t[t.index(SECTION):]
+    # 截取范围 = **本节内容**，到下一个二级标题为止（见 section_body()）。
+    #
+    # ⚠️ 旧版写 `t[t.index(SECTION):]`（截到文件末尾），另配一条元判据要求
+    # 「SECTION 必须是末节」。那条元判据的**前提本身**是脆的：它把"本节恰好
+    # 排在文档最后"这个**偶然的文档位置**当成了判据成立的必要条件，于是每加
+    # 一个新节都要回头改一次 SECTION 常量（2026-10-07 写第三十八节时正是如此）。
+    # 病根在截取方式：截到末尾会把**后面的新节**一起扫进 body（新节若也写了
+    # 「N 个采集器」就会假绿），而元判据只是提醒人去改常量、没治病。
+    # 按二级标题切段后 body 恒等于本节内容，与它的位置无关
+    # （§2.5.75「写死的固定值本身可能就是响应式的」）。
+    body = section_body(t, SECTION)
     for label, val in anchors(m):
         if val not in body:
             reds.append(f'第三十七节缺锚点：{label} ⇒ 期望串「{val}」')
@@ -834,6 +853,27 @@ def self_test():
                   na_first_elem('SEARCH_QUERIES: list[tuple[str, str]] = []\n') is None, None))
     cases.append(('反例 去掉类型注解仍可定位（注解不是必要条件）',
                   na_first_elem('SEARCH_QUERIES = [\n    ("a", "b"),\n]\n') == 1, None))
+
+    # ── section_body：C 段的截取范围（2026-10-07 加）─────────────────────
+    # ⚠️ 这一组用例的由来：旧版写 `t[t.index(SECTION):]`（截到文件末尾），另配
+    # 一条元判据要求「SECTION 必须是末节」。2026-10-07 往对账记录追加第三十八节
+    # 时，那条元判据当场转红——病根是**把偶然的文档位置当成了判据的必要条件**：
+    # 判据该管的是"本节写了什么"，与它排在第几个无关（§2.5.75「写死的固定值
+    # 本身可能就是响应式的」）。改用二级标题切段后，这类脆性不复存在。
+    _t = ('## 甲节\n甲的字面串 24 个采集器\n### 甲.1 子标题\n子标题下的字\n'
+          '## 乙节\n乙的字面串 24 个采集器\n')
+    cases.append(('正例 section_body 取到本节，且三级子标题不截断',
+                  '甲的字面串' in section_body(_t, '## 甲节')
+                  and '子标题下的字' in section_body(_t, '## 甲节'), None))
+    cases.append(('正例 后一节的内容不进 body（旧版截到末尾，正是被它污染的）',
+                  '乙的字面串' not in section_body(_t, '## 甲节'), None))
+    cases.append(('正例 本节是末节 ⇒ 取到文档末尾',
+                  section_body(_t, '## 乙节').endswith('乙的字面串 24 个采集器\n'), None))
+    # 对照组：旧写法在**同一段文本**上确实会把乙节扫进来 —— 证明上面那条
+    # 「不含乙」不是恒真。少了这一条，用例可能因锚点写错而空转（§2.5.89
+    # 「注入没做与判据没报在输出上一模一样」）。
+    cases.append(('对照 旧写法 t[t.index(head):] 在同一文本上确实含乙节',
+                  '乙的字面串' in _t[_t.index('## 甲节'):], None))
 
     okn = sum(1 for _, ok, _ in cases if ok)
     for name, ok, got in cases:

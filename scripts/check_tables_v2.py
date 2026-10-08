@@ -887,8 +887,15 @@ def main(verbose=False):
               f'不符 {issues}')
         for k in missing[:8]:
             print(f'      ✗ 正文缺 {k}')
-        for k, g, e in mismatch[:8]:
-            print(f'      ✗ {k}：正文 {g} ≠ 源 {e:.6g}')
+        for it in mismatch[:8]:
+            # 两种形状：diff() 存 (键, 正文值, 源值) 元组；t4_compare() 表 4 存的是
+            # 已格式化的字符串。原先无条件按 3 元组解包，表 4 一报红就在打印处崩
+            # （ValueError: too many values to unpack），看不见任何差异。
+            if isinstance(it, tuple):
+                k, g, e = it
+                print(f'      ✗ {k}：正文 {g} ≠ 源 {e:.6g}')
+            else:
+                print(f'      ✗ {it}')
         if verbose and extra:
             print(f'      （正文多出 {len(extra)} 格，未在源中找到）')
 

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基础特征一致性 · flash vs pro · 300 条</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#1a1d23; --ink2:#5b6370; --ink3:#8b929e;
+    --line:#e4e7ec; --line2:#eef0f4;
+    --agree:#0f7b4f; --agreebg:#e8f6ef;
+    --soft:#8a6d1f;  --softbg:#fbf3dd;
+    --bad:#c0392b;   --badbg:#fdecea;
+    --null:#8b929e;  --nullbg:#f2f3f6;
+    --flash:#1d5fd0; --pro:#7a3bbf; --db:#5b6370;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14.5px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:30px 20px 80px}
+  h1{font-size:23px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--ink2);font-size:13.5px;margin-bottom:20px}
+  .note{background:#fff8e6;border:1px solid #f0dfae;border-radius:8px;padding:10px 14px;
+        font-size:13px;color:#7a5c10;margin:0 0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:18px 20px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 14px;font-weight:650}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .kpi{background:#fbfcfd;border:1px solid var(--line2);border-radius:9px;padding:12px 14px}
+  .kpi .v{font-size:23px;font-weight:680;letter-spacing:-.02em}
+  .kpi .l{font-size:12px;color:var(--ink3);margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--ink3);font-weight:600;font-size:12px;padding:0 8px 8px;
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:6px 8px;border-bottom:1px solid var(--line2);font-variant-numeric:tabular-nums}
+  tr:hover td{background:#fafbfc}
+  .barbg{display:inline-block;width:150px;height:9px;background:var(--nullbg);
+         border-radius:3px;overflow:hidden;vertical-align:middle}
+  .bar{display:block;height:100%}
+  .badge{display:inline-block;padding:1px 8px;border-radius:11px;font-size:11.5px;font-weight:600}
+  .b-auto{background:var(--agreebg);color:var(--agree)}
+  .b-meta{background:#e7effc;color:var(--flash)}
+  .b-free{background:#f3ecfb;color:var(--pro)}
+  .b-manual{background:var(--badbg);color:var(--bad)}
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .tools input{flex:1;min-width:190px;padding:8px 12px;border:1px solid var(--line);
+               border-radius:8px;font-size:13.5px}
+  .chip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:#fff;
+        font-size:12.5px;cursor:pointer;color:var(--ink2);user-select:none}
+  .chip.on{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  .row{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:8px}
+  .rh{display:flex;align-items:baseline;gap:10px;cursor:pointer}
+  .rh .t{flex:1;font-weight:600;font-size:14px}
+  .rh .c{font-size:12px;color:var(--bad);background:var(--badbg);padding:1px 8px;border-radius:11px}
+  .rh .c.ok{color:var(--agree);background:var(--agreebg)}
+  .rh .caret{color:var(--ink3);font-size:11px;width:12px}
+  .dt{display:none;margin-top:11px;border-top:1px dashed var(--line);padding-top:11px}
+  .row.open .dt{display:block}
+  .row.open .caret{transform:rotate(90deg)}
+  table.f{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+  table.f th{padding:4px 8px;font-size:11.5px}
+  table.f td{padding:5px 8px;vertical-align:top;word-break:break-word}
+  table.f td.fn{width:132px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.f td.v{width:auto}
+  tr.s-agree{background:transparent}
+  tr.s-soft{background:var(--softbg)}
+  tr.s-disagree{background:var(--badbg)}
+  tr.s-one_null{background:#fdfaf3}
+  .tag{font-size:10.5px;padding:0 6px;border-radius:9px;font-weight:600;margin-left:6px}
+  .t-agree{background:var(--agreebg);color:var(--agree)}
+  .t-soft{background:#f6ecd0;color:var(--soft)}
+  .t-disagree{background:#f9d9d5;color:var(--bad)}
+  .t-one_null{background:#f7eddc;color:#a4761a}
+  .t-both_null{background:var(--nullbg);color:var(--null)}
+  .na{color:var(--ink3)}
+  .legend{display:flex;gap:16px;font-size:12.5px;color:var(--ink2);flex-wrap:wrap;margin-bottom:10px}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px}
+  .empty{text-align:center;color:var(--ink3);padding:36px}
+  .foot{color:var(--ink3);font-size:12.5px;margin-top:20px}
+  code{background:#f2f3f6;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>基础特征一致性：flash <span style="color:var(--ink3);font-weight:400">vs</span> pro</h1>
+  <div class="sub">同一批 300 条事故 · 31 个基础特征逐字段比对 · 库内 Step1 作为第三参考</div>
+
+  <div class="note">
+    <b>三方都不是真值</b>，本表只回答「两个档位在哪些字段上一致」，一致度高的字段可直接采纳为 GT，
+    低的必须人工裁决。严格一致 = 去掉空白/标点后完全相同；有效一致 = 仅在双方都非空时计算。
+  </div>
+
+  <div class="card"><h2>总览</h2><div class="kpis" id="kpis"></div></div>
+
+  <div class="card">
+    <h2>逐字段一致性（点表头可排序）</h2>
+    <table id="ftbl"></table>
+  </div>
+
+  <div class="card">
+    <h2>逐条裁决（默认只显示有分歧的字段）</h2>
+    <div class="tools">
+      <input id="q" placeholder="搜索标题…">
+      <span class="chip on" id="onlyDiff">只看有分歧的字段</span>
+      <span class="chip" id="sortHard">按冲突字段数排序</span>
+      <span class="chip" id="expandAll">全部展开</span>
+      <span class="chip" id="filterHard">只看有冲突的事故</span>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--agree)"></i>一致</span>
+      <span><i style="background:#c8a344"></i>模糊一致</span>
+      <span><i style="background:#a4761a"></i>一方为空</span>
+      <span><i style="background:var(--bad)"></i>冲突</span>
+      <span><i style="background:#dfe2e8"></i>双方为空</span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="foot">
+    数据：<code>golden_standard/S1_golden_results.jsonl</code>（flash）·
+    <code>golden_standard/pro/S1_golden_results.jsonl</code>（pro）· <code>caiems_v2.db</code>（库内 Step1）<br>
+    生成：<code>scripts/golden_s1/analyze_basic_features.py</code>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+const S = /*__STATS__*/;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const LABEL = {
+  accident_type:'事故类型', severity:'严重程度', deaths:'死亡人数', injuries:'受伤人数',
+  trapped_count:'被困人数', direct_economic_loss:'直接经济损失(万)', fall_height:'坠落高度(m)',
+  date:'日期', accident_time:'时刻', location:'省', city:'市', district:'区县',
+  accident_location_detail:'具体部位', weather:'天气', project_name:'工程名称',
+  project_type:'工程类型', building_structure:'结构类型', construction_phase:'施工阶段',
+  work_task:'作业类型', developer:'建设单位', contractor:'施工单位',
+  contractor_type:'承包类型', supervision_company:'监理单位', equipment_involved:'设备',
+  material_involved:'材料', worker_type:'工种', report_type:'报告类型',
+  collapse_subtype:'坍塌子类', title:'标题', summary:'摘要', direct_cause:'直接原因'
+};
+const GROUP = {};
+S.enum.forEach(f=>GROUP[f]='枚举'); S.num.forEach(f=>GROUP[f]='数值');
+S.numTol.forEach(f=>GROUP[f]='数值'); S.date.forEach(f=>GROUP[f]='日期');
+S.text.forEach(f=>GROUP[f]='文本');
+
+const STN = {agree:'一致', soft:'模糊一致', disagree:'冲突', one_null:'一方为空', both_null:'双方为空'};
+const VERDICT = {
+  auto:['可直接采纳','b-auto'], meta:['取库内元数据','b-meta'],
+  free:['自由文本·需定规范','b-free'], manual:['需人工裁决','b-manual']
+};
+
+// ── KPI ──
+document.getElementById('kpis').innerHTML = [
+  [S.n, '对比事故数'],
+  [S.fullAgree, '31 字段全一致的事故'],
+  [S.anyHard, '存在硬冲突的事故'],
+  [Object.values(S.verdict).filter(v=>v==='auto').length, '可自动采纳的字段'],
+  [Object.values(S.verdict).filter(v=>v==='manual').length, '需人工裁决的字段'],
+].map(([v,l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+// ── 字段表 ──
+let sortKey = 'order', sortAsc = true;
+function fieldRows(){
+  return S.fieldOrder.map(f => {
+    const c = S.fields[f] || {};
+    const agree = c.agree||0, soft = c.soft||0, dis = c.disagree||0,
+          one = c.one_null||0, nul = c.both_null||0;
+    const denom = agree + soft + dis;
+    const valid = denom ? (agree+soft)/denom : 0;
+    const strict = (agree + nul) / S.n;
+    return {f, g:GROUP[f]||'', agree, soft, dis, one, nul, valid, strict,
+            v:S.verdict[f]||'manual',
+            order:S.fieldOrder.indexOf(f)};
+  });
+}
+function renderTable(){
+  let rows = fieldRows();
+  const key = sortKey==='order' ? 'order' : sortKey;
+  rows.sort((a,b)=> sortAsc ? (a[key]>b[key]?1:a[key]<b[key]?-1:0)
+                            : (a[key]<b[key]?1:a[key]>b[key]?-1:0));
+  document.getElementById('ftbl').innerHTML =
+   `<thead><tr>
+      <th data-k="order">字段</th><th>组</th>
+      <th data-k="agree">一致</th><th data-k="soft">模糊</th>
+      <th data-k="one">一方空</th><th data-k="dis">冲突</th><th data-k="nul">双方空</th>
+      <th data-k="valid">有效一致率</th><th data-k="strict">严格一致率</th><th>裁决建议</th>
+    </tr></thead><tbody>` + rows.map(r=>`
+    <tr><td><b>${LABEL[r.f]||r.f}</b><div style="color:var(--ink3);font-size:11px">${r.f}</div></td>
+      <td style="color:var(--ink3)">${r.g}</td>
+      <td>${r.agree}</td><td>${r.soft||''}</td><td>${r.one||''}</td>
+      <td style="${r.dis?'color:var(--bad);font-weight:640':''}">${r.dis||''}</td>
+      <td style="color:var(--ink3)">${r.nul||''}</td>
+      <td><span class="barbg"><i class="bar" style="width:${(r.valid*100).toFixed(0)}%;
+          background:${r.valid>=.95?'var(--agree)':r.valid>=.85?'#c8a344':'var(--bad)'}"></i></span>
+          ${(r.valid*100).toFixed(1)}%</td>
+      <td>${(r.strict*100).toFixed(1)}%</td>
+      <td><span class="badge ${VERDICT[r.v][1]}">${VERDICT[r.v][0]}</span></td></tr>`).join('') +
+   '</tbody>';
+  document.querySelectorAll('#ftbl th[data-k]').forEach(th=>th.onclick=()=>{
+    const k = th.dataset.k;
+    if(sortKey===k) sortAsc=!sortAsc; else {sortKey=k; sortAsc = (k==='order');}
+    renderTable();
+  });
+}
+renderTable();
+
+// ── 逐条 ──
+let onlyDiff = true, kw = '', sortHard = false, hardOnly = false;
+function val(v){ return (v===null||v===undefined||v==='') ? '<span class="na">—</span>' : esc(v); }
+function render(){
+  let items = DATA.slice();
+  if(kw) items = items.filter(r=>r.t.includes(kw));
+  if(hardOnly) items = items.filter(r=>r.hard>0);
+  if(sortHard) items.sort((a,b)=>b.hard-a.hard);
+  const el = document.getElementById('list');
+  if(!items.length){ el.innerHTML='<div class="empty">没有符合条件的条目</div>'; return; }
+  el.innerHTML = items.map(r=>{
+    const show = onlyDiff ? r.fields.filter(x=>x.st!=='agree' && x.st!=='both_null') : r.fields;
+    return `<div class="row" data-id="${r.id}">
+      <div class="rh"><span class="caret">▶</span><span class="t">${esc(r.t)}</span>
+        <span class="c ${r.hard?'':'ok'}">${r.hard? r.hard+' 个冲突字段':'无硬冲突'}</span></div>
+      <div class="dt"><table class="f">
+        <thead><tr><th>字段</th><th>flash</th><th>pro</th><th>库内 Step1</th><th style="width:78px">判定</th></tr></thead>
+        <tbody>${show.map(x=>`<tr class="s-${x.st}">
+          <td class="fn" title="${LABEL[x.f]||x.f}">${LABEL[x.f]||x.f}</td>
+          <td class="v">${val(x.flash)}</td><td class="v">${val(x.pro)}</td><td class="v">${val(x.db)}</td>
+          <td><span class="tag t-${x.st}">${STN[x.st]}</span></td></tr>`).join('')}</tbody>
+      </table>${onlyDiff?'<div style="color:var(--ink3);font-size:12px;margin-top:8px">已隐藏一致的字段，可点上方“只看有分歧的字段”切换</div>':''}</div>
+    </div>`;
+  }).join('');
+}
+render();
+document.getElementById('list').addEventListener('click', e=>{
+  const h = e.target.closest('.rh'); if(h) h.parentElement.classList.toggle('open');
+});
+document.getElementById('q').oninput = e=>{ kw=e.target.value.trim(); render(); };
+document.getElementById('onlyDiff').onclick = e=>{
+  onlyDiff=!onlyDiff; e.target.classList.toggle('on',onlyDiff); render(); };
+document.getElementById('sortHard').onclick = e=>{
+  sortHard=!sortHard; e.target.classList.toggle('on',sortHard); render(); };
+document.getElementById('filterHard').onclick = e=>{
+  hardOnly=!hardOnly; e.target.classList.toggle('on',hardOnly); render(); };
+document.getElementById('expandAll').onclick = e=>{
+  const on = !e.target.classList.contains('on');
+  e.target.classList.toggle('on', on);
+  document.querySelectorAll('.row').forEach(r=>r.classList.toggle('open', on));
+};
+</script>
+</body>
+</html>

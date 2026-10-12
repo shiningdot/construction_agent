@@ -13,6 +13,7 @@
 | `S1_golden_review_vs_db.csv` | 审核辅助：与库内既有 `caics_causes`（主管道产出）的逐条编码差异（**差异信号，非真值**） |
 | `S1_vs_db_diff.html` | **可视化逐条差异**：一致度分档、19 类编码逐类差异、300 条逐条对照（可搜索/筛选/排序，展开看 5 层编码全景与原文）。生成：`scripts/golden_s1/analyze_vs_db.py` |
 | `S1_pro_vs_flash.html` | **pro vs flash** 跨模型逐条对照（同一提示词、同一样本，只有模型不同） |
+| `basic_features_flash_vs_pro.html` | **基础特征 GT 裁决表**：31 字段 × 300 条，flash/pro/库内三方并排，默认只显示分歧字段 |
 | `pro/` | **同 300 条的 pro 结果**，结构与本目录一致（结果 jsonl + 审核表 + vs 库内对照 CSV/HTML） |
 
 筛选中间态、首轮含多事故合并块的版本等过程文件已全部删除；需要时用下方脚本重跑生成
@@ -63,6 +64,42 @@ S1 原提示词的输出只有 6 个字段，本方案把 schema 扩成【基础
 .venv/bin/python3 scripts/golden_s1/repair_S1_golden.py               # 补跑异常条
 .venv/bin/python3 scripts/golden_s1/analyze_S1_golden.py              # 出审核表 + 打印统计
 ```
+
+## 基础特征 GT 敲定：flash vs pro 逐字段一致性
+
+脚本 `scripts/golden_s1/analyze_basic_features.py` → `basic_features_flash_vs_pro.html`
+（31 字段 × 300 条的 flash/pro/库内三方逐条对照，默认只显示有分歧的字段）。
+
+**没有任何一条事故的 31 个字段全部一致；292/300 条存在至少 1 个硬冲突**，
+典型条目一致 23–27 个字段。
+
+### 可自动采纳（有效一致率 ≥95% 且冲突 ≤10）——12 个字段
+
+`severity`(100%) `deaths`(100%) `injuries`(100%) `direct_economic_loss`(100%) `date`(99.3%)
+`accident_time`(99.6%) `location`(98.7%) `city`(97.5%) `fall_height`(96%) `district`(95.2%)
+`developer`(100%) `supervision_company`(100%)
+—— 后两个的 100% 是"双方都判为空"导致的虚高（非空样本仅 87 / 8 条），采纳时要留意。
+
+### 取库内元数据，不要让模型抽 —— 1 个字段
+
+`report_type`：冲突 85 条（第二高）。它是**来源属性不是提取任务**，库内 300 条统一为"教材案例"，
+两个模型却按行文风格去猜，纯属自找分歧。
+
+### 自由文本，需先定书写规范 —— 7 个字段
+
+`summary`(有效一致 46.3%) `direct_cause`(54.7%) `accident_location_detail`(48.3%)
+`project_name`(80%) `title`(81.7%) `contractor`(94.4%) `weather`(52.4%)
+—— 严格一致率普遍为 0，必须规定"照抄原文 / 允许概括 / 长度上限"，否则无法判定对错。
+
+### 需人工逐条裁决 —— 11 个字段
+
+按硬冲突数排序：`work_task` 40、`worker_type` 49、`equipment_involved` 41、`material_involved` 41、
+`construction_phase` 31、`contractor_type` 25、`project_type` 18、`accident_type` 14、
+`collapse_subtype` 14、`building_structure` 5、`trapped_count` 30。
+`accident_type` / `collapse_subtype` 虽一致率 95%+，但各 14 条冲突，建议优先手工过一遍。
+
+> 附注：库内 Step1 存在零星字段错位（300 条中 1 条 `supervision_company` 取了"教材/案例"、
+> 2 条 `contractor` 取了"总包/无资质挂靠"这类承包类型取值），作第三参考时需留意。
 
 ## 结果
 

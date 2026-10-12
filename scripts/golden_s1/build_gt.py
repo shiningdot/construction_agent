@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
 
 from count_threeway import (FIELDS, EXCLUDED, ENUM, NUM, NUM_TOL, DATE, TEXT,
                             load_results, load_db, three_way, norm)  # noqa: E402
+from resolve_rules import resolve as rule_resolve  # noqa: E402
 
 FIELD_CN = {
     "accident_type": "事故类型", "severity": "严重程度", "project_type": "工程类型",
@@ -69,7 +70,7 @@ def main():
 
     out_rows, items, per_field = [], [], defaultdict(Counter)
     for i in ids:
-        bf, prov, need = {}, {}, []
+        bf, prov, need, notes = {}, {}, [], {}
         for f in FIELDS:
             a, b, c = flash[i].get(f), pro[i].get(f), db[i].get(f)
             same, val, cands = three_way(f, a, b, c)
@@ -86,16 +87,24 @@ def main():
                     prov[f] = "majority_auto"
                     per_field[f]["auto"] += 1
                 else:
-                    # 三方互异 → 值留空，交人工裁决
-                    bf[f] = None
-                    prov[f] = "needs_human"
-                    per_field[f]["human"] += 1
-                    need.append({"field": f, "cands": cands})
-                    items.append({"id": i, "title": cand[i]["title"], "field": f,
-                                  "cands": cands})
+                    # 三方互异 → 先试规则判定（时刻/城市可机械判）
+                    rv, note = rule_resolve(f, cands)
+                    if note is not None:
+                        bf[f] = rv                      # rv 为 None 表示应置空
+                        prov[f] = "rule_resolved"
+                        notes[f] = note
+                        per_field[f]["rule"] += 1
+                    else:
+                        bf[f] = None                    # 真正需要人读原文
+                        prov[f] = "needs_human"
+                        per_field[f]["human"] += 1
+                        need.append({"field": f, "cands": cands})
+                        items.append({"id": i, "title": cand[i]["title"], "field": f,
+                                      "cands": cands})
         out_rows.append({"id": i, "title": cand[i]["title"], "tier": cand[i]["tier"],
                          "source_name": cand[i]["source_name"],
                          "basic_features": bf, "provenance": prov,
+                         "resolution_notes": notes,
                          "needs_human": [n["field"] for n in need]})
 
     GT.mkdir(parents=True, exist_ok=True)
@@ -112,10 +121,12 @@ def main():
                        for it in items if it["id"] == r["id"]]}
             for r in out_rows if r["needs_human"]]
 
-    n_items = len(items)                                   # 只剩三方互异的
+    n_items = len(items)                                   # 只剩真正需要人读原文的
     n_three = sum(per_field[f]["same"] for f in FIELDS)
     n_auto = sum(per_field[f].get("auto", 0) for f in FIELDS)
+    n_rule = sum(per_field[f].get("rule", 0) for f in FIELDS)
     stats = {"nAcc": len(ids), "nItems": n_items, "nThree": n_three, "nAuto": n_auto,
+             "nRule": n_rule,
              "fields": FIELDS, "fieldCn": FIELD_CN,
              "enum": {f: enum_of(f) for f in ENUM},
              "perField": {f: dict(per_field[f]) for f in FIELDS}}
@@ -132,9 +143,13 @@ def main():
          f"- 事故 {len(ids)} 条 × 客观特征 {len(FIELDS)} 个 = {len(FIELDS)*len(ids)} 格",
          f"- **三方一致，直接确定 {n_three} 格**（`three_agree`）",
          f"- **三方中有两方相同，采用众数值自动确定 {n_auto} 格**（`majority_auto`）",
-         f"- **三方互异，需人工裁决 {n_items} 格**（`needs_human`），涉及 {len(page)} / {len(ids)} 条事故",
-         f"- 自动确定合计 {n_three + n_auto} / {len(FIELDS)*len(ids)} 格"
-         f"（{(n_three+n_auto)/(len(FIELDS)*len(ids))*100:.1f}%）", "",
+         f"- **三方互异但规则可判 {n_rule} 格**（`rule_resolved`）："
+         f"`accident_time` 取三方中唯一合法 HH:MM 值，无合法值置空（库内有把\"下午\"填进时刻字段的）；"
+         f"`city` 取规范地级名称（自治州/地区/盟优先，同级取信息最全），脱敏占位符（××县）与县级名置空。"
+         f"每格的判定说明记在 `resolution_notes`。",
+         f"- **三方互异且规则判不了，需人工裁决 {n_items} 格**（`needs_human`），涉及 {len(page)} / {len(ids)} 条事故",
+         f"- 自动确定合计 {n_three + n_auto + n_rule} / {len(FIELDS)*len(ids)} 格"
+         f"（{(n_three+n_auto+n_rule)/(len(FIELDS)*len(ids))*100:.1f}%）", "",
          "## 剔除的字段（不在本次 GT 范围）", "",
          "**名称类文本**：工程名称 `project_name`、建设单位 `developer`、施工单位 `contractor`、"
          "监理单位 `supervision_company` —— 这 4 个在 24 字段口径下贡献 151 条三方互异（占 39%）。",
@@ -145,14 +160,15 @@ def main():
          "被剔除字段的模型输出仍保留在 `S1_golden_results.jsonl` / `pro/S1_golden_results.jsonl`，"
          "需要时可随时取用。字段取舍依据见 `scripts/golden_s1/inventory_fields.py` 的全字段清点。", "",
          "## 各字段情况", "",
-         "| 字段 | 三方一致 | 两方一致(自动) | 三方互异(人工) | 自动率 |",
-         "|---|---:|---:|---:|---:|"]
+         "| 字段 | 三方一致 | 两方一致(自动) | 规则判定 | 三方互异(人工) | 自动率 |",
+         "|---|---:|---:|---:|---:|---:|"]
     for f in FIELDS:
         c = per_field[f]
         t = c["same"] + c["diff"]
         auto = c.get("auto", 0)
-        L.append(f"| {FIELD_CN[f]} `{f}` | {c['same']} | {auto} | {c.get('human', 0)} "
-                 f"| {(c['same']+auto)/t*100:.1f}% |")
+        rule = c.get("rule", 0)
+        L.append(f"| {FIELD_CN[f]} `{f}` | {c['same']} | {auto} | {rule} | {c.get('human', 0)} "
+                 f"| {(c['same']+auto+rule)/t*100:.1f}% |")
     L += ["", "## 用法", "",
           "打开 `annotation.html`：左侧是原始语料（带查找高亮），右侧是每个待定字段的三方候选值。",
           "点候选值即选中；三方都不对时在输入框自填（枚举字段为限定下拉）。",
@@ -163,7 +179,8 @@ def main():
     tot = len(FIELDS) * len(ids)
     print(f"三方一致自动确定 {n_three} / {tot}")
     print(f"两方一致自动确定 {n_auto} / {tot}")
-    print(f"三方互异待人工   {n_items} / {tot}，涉及 {len(page)} 条事故")
+    print(f"规则判定确定     {n_rule} / {tot}")
+    print(f"仍需人工         {n_items} / {tot}，涉及 {len(page)} 条事故")
     print(f"产出 → {GT}/gt_draft.jsonl, annotation.html, GT_REPORT.md")
 
 

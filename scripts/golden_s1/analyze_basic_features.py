@@ -205,6 +205,26 @@ def main():
                      ("manual", "需人工逐条裁决")]:
         fs = [f for f in ALL if verdict[f] == v]
         print(f"  {label}: {len(fs)} 个 —— {', '.join(fs)}")
+
+    # 需人工裁决的字段里，有多少条分歧可由「三方（flash/pro/库内）多数」直接定
+    manual_fields = [f for f in ALL if verdict[f] == "manual"]
+    print("\n人工裁决字段的分歧可解性（三方多数 = flash/pro/库内中至少两方相同）：")
+    print(f"  {'字段':24s}{'分歧条数':>9s}{'多数可定':>9s}{'仍需人工':>9s}")
+    tot_res = tot_need = 0
+    for f in manual_fields:
+        dis = res = 0
+        for i in ids:
+            if cmp_value(f, flash[i].get(f), pro[i].get(f)) != "disagree":
+                continue
+            dis += 1
+            vals = Counter(v for v in (norm(flash[i].get(f)), norm(pro[i].get(f)),
+                                       norm(db[i].get(f))) if v is not None)
+            if vals and vals.most_common(1)[0][1] >= 2:
+                res += 1
+        tot_res += res
+        tot_need += dis - res
+        print(f"  {f:24s}{dis:9d}{res:9d}{dis-res:9d}")
+    print(f"  {'合计':24s}{tot_res+tot_need:9d}{tot_res:9d}{tot_need:9d}")
     tpl = (Path(__file__).parent / "basic_feat_template.html").read_text(encoding="utf-8")
     out = (tpl.replace("/*__DATA__*/", json.dumps(payload, ensure_ascii=False))
               .replace("/*__STATS__*/", json.dumps(stats, ensure_ascii=False)))

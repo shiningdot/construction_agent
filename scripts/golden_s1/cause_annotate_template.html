@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>致因 GT 人工裁决 · CAICS 三方分歧</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d23; --ink2:#5b6370; --ink3:#8b929e;
+    --line:#e3e6eb; --line2:#eef0f4;
+    --flash:#1d5fd0; --flashbg:#e9f0fc;
+    --pro:#7a3bbf;   --probg:#f3ecfb;
+    --db:#0f7b4f;    --dbbg:#e8f6ef;
+    --yes:#0f7b4f;   --yesbg:#e8f6ef;
+    --no:#c0392b;    --nobg:#fdecea;
+    --hard:#c2540a;  --hardbg:#fdefe3;
+    --pick:#b8860b;
+    --M:#1d5fd0; --F:#0f7b4f; --T:#8a6d1f; --H:#c0392b; --C:#7a3bbf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1480px;margin:0 auto;padding:26px 18px 90px}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:var(--ink2);font-size:13px;margin-bottom:16px}
+  .note{background:#fff8e6;border:1px solid #f0dfae;border-radius:8px;padding:9px 13px;
+        font-size:12.5px;color:#7a5c10;margin:0 0 14px}
+  .bar{position:sticky;top:0;z-index:20;background:rgba(246,247,249,.96);backdrop-filter:blur(6px);
+       border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:14px;
+       display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .prog{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .prog b{color:var(--ink);font-size:15px}
+  .pbar{width:160px;height:8px;background:#e3e6eb;border-radius:4px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--yes);width:0}
+  button{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--line);
+         border-radius:8px;background:#fff;cursor:pointer;color:var(--ink2)}
+  button:hover{border-color:#c3cbd6}
+  button.pri{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  button.on{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  input.q{padding:6px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px}
+  .acc{background:var(--card);border:1px solid var(--line);border-radius:11px;margin-bottom:9px;overflow:hidden}
+  .acc.done{border-color:#bfe3d2}
+  .ah{display:flex;gap:11px;align-items:center;padding:11px 14px;cursor:pointer}
+  .ah:hover{background:#fafbfc}
+  .ah .t{flex:1;font-weight:600;font-size:13.8px}
+  .pill{font-size:11.5px;padding:1px 9px;border-radius:11px;background:#f2f3f6;color:var(--ink2);white-space:nowrap}
+  .pill.ok{background:var(--yesbg);color:var(--yes)}
+  .pill.miss{background:var(--nobg);color:var(--no)}
+  .pill.hard{background:var(--hardbg);color:var(--hard);font-weight:600}
+  .abody{display:none;border-top:1px solid var(--line)}
+  .acc.open .abody{display:grid;grid-template-columns:minmax(330px,40%) 1fr;gap:0}
+  @media (max-width:1000px){.abody{grid-template-columns:1fr !important}}
+  .pane{padding:13px 15px}
+  .pane.left{border-right:1px solid var(--line2);background:#fcfdfe}
+  .pane h4{margin:0 0 8px;font-size:12px;color:var(--ink3);font-weight:650}
+  .raw{font-size:12.5px;line-height:1.72;white-space:pre-wrap;word-break:break-word;
+       max-height:360px;overflow:auto;background:#fff;border:1px solid var(--line2);
+       border-radius:8px;padding:10px 12px}
+  .raw mark{background:#ffe9a8;border-radius:2px}
+  .it{padding:10px 0;border-bottom:1px dashed var(--line2)}
+  .it:last-child{border-bottom:none}
+  .it.dec{background:linear-gradient(90deg,rgba(232,246,239,.55),transparent);
+          border-radius:8px;padding-left:8px}
+  .it.dec-no{background:linear-gradient(90deg,rgba(253,236,234,.6),transparent)}
+  .it .h{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .it .h b{font-size:13.5px}
+  .code{font-weight:700;font-size:13.5px;padding:0 7px;border-radius:6px;color:#fff}
+  .lv-M{background:var(--M)} .lv-F{background:var(--F)} .lv-T{background:var(--T)}
+  .lv-H{background:var(--H)} .lv-C{background:var(--C)}
+  .vote{font-size:11.5px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);color:var(--ink3)}
+  .vote.y-flash{background:var(--flashbg);border-color:var(--flashbg);color:var(--flash);font-weight:600}
+  .vote.y-pro{background:var(--probg);border-color:var(--probg);color:var(--pro);font-weight:600}
+  .vote.y-db{background:var(--dbbg);border-color:var(--dbbg);color:var(--db);font-weight:600}
+  .ev{font-size:12.5px;background:#fafbfc;border:1px solid var(--line2);border-radius:7px;
+      padding:7px 10px;margin:6px 0;color:var(--ink2);line-height:1.6}
+  .ev .lb{font-size:11px;padding:0 6px;border-radius:8px;margin-right:6px;font-weight:600}
+  .lb-s{background:var(--yesbg);color:var(--yes)} .lb-m{background:#fbf3dd;color:#8a6d1f}
+  .lb-w{background:#f7eddc;color:#a4761a} .lb-h{background:var(--hardbg);color:var(--hard)}
+  .lb-n{background:#f2f3f6;color:var(--ink3)}
+  .acts{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .btn-y,.btn-n{padding:4px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:600}
+  .btn-y{border:1px solid var(--yes);color:var(--yes);background:#fff}
+  .btn-n{border:1px solid var(--no);color:var(--no);background:#fff}
+  .btn-y.sel{background:var(--yes);color:#fff}
+  .btn-n.sel{background:var(--no);color:#fff}
+  .extra{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line2);font-size:12.5px}
+  select.add{padding:5px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px}
+  .xtag{display:inline-block;background:#f3ecfb;color:#7a3bbf;border-radius:7px;
+        padding:2px 8px;margin:3px 4px 0 0;font-size:12px}
+  .xtag b{cursor:pointer;margin-left:6px}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1a1d23;color:#fff;
+         padding:9px 18px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .25s;
+         pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+  .foot{color:var(--ink3);font-size:12px;margin-top:18px}
+  code{background:#f2f3f6;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>致因 GT 人工裁决</h1>
+  <div class="sub">CAICS 5 层 19 类 · flash / pro / 库内三方投票 · <b>只裁决三方非全一致的格子</b></div>
+
+  <div class="note">
+    三方都选（3/3）与三方都不选（0/3）的格子已自动确定，本页只剩三方分歧的格子。
+    每个编码显示三方各自是否选中；右侧「库内证据」是库内 Step2 为该编码写的证据，
+    后附与原文的 10-gram 重叠度——<b>重叠 &lt;0.2 说明该证据在原文里基本找不到，标为「重点核对」并排在最前</b>。
+    请对照左侧原文，判断该编码<b>采纳</b>还是<b>否决</b>。三方都没提到但原文支持的，可在下方「补充编码」自填。
+  </div>
+
+  <div class="bar">
+    <span class="prog">已裁决 <b id="nDone">0</b> / <b id="nAll">0</b></span>
+    <span class="pbar"><i id="pbar"></i></span>
+    <button class="pri" id="btnExport">导出 JSONL</button>
+    <button id="btnExportFull">导出完整 GT</button>
+    <button id="btnNext">下一个未完成</button>
+    <input class="q" id="q" placeholder="搜索事故标题…" style="min-width:170px">
+    <button id="fPend" class="on">只看未裁决</button>
+    <button id="fHard">只看重点核对</button>
+    <button id="btnExpand">全部展开</button>
+    <button id="btnClear">清空</button>
+  </div>
+
+  <div id="list"></div>
+  <div class="foot">
+    数据：<code>gt_causes_draft.jsonl</code> 的待裁项 + <code>golden_candidates.jsonl</code> 原文 ·
+    生成：<code>scripts/golden_s1/build_cause_gt.py</code>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = /*__DATA__*/;
+const S = /*__STATS__*/;
+const DRAFT = /*__DRAFT__*/;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY = 'golden_cause_annotations_v1';
+const ALL = S.allCodes, NAME = S.codeName;
+
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+const kOf = (id, c) => id + '::' + c;
+const isDone = (id, c) => Object.prototype.hasOwnProperty.call(state, kOf(id, c));
+const itemsOf = id => (DATA.find(x => x.id === id)?.items || []);
+const allPairs = () => DATA.flatMap(a => a.items.map(it => [a.id, it.c]));
+const extras = id => (state[id + '::__extra'] || []);
+const nAll = allPairs().length;
+document.getElementById('nAll').textContent = nAll;
+
+const LBL = {flash:'flash', pro:'pro', db:'库内'};
+const LB = {'≥0.8 基本原句':'lb-s','0.5-0.8 有改写':'lb-m','0.2-0.5 部分重合':'lb-w',
+            '<0.2 重点核对':'lb-h','无证据':'lb-n'};
+
+function renderText(txt, needle){
+  if(!needle) return esc(txt);
+  return txt.split(needle).map(p => esc(p)).join('<mark>' + esc(needle) + '</mark>');
+}
+function accDone(a){ return a.items.every(it => isDone(a.id, it.c)); }
+function accCount(a){ return a.items.filter(it => isDone(a.id, it.c)).length; }
+
+let kw = '', onlyPend = true, onlyHard = false;
+
+function render(){
+  let list = DATA.slice();
+  if(kw) list = list.filter(a => a.t.includes(kw));
+  if(onlyPend) list = list.filter(a => !accDone(a));
+  if(onlyHard) list = list.filter(a => a.hard > 0);
+  const el = document.getElementById('list');
+  if(!list.length){ el.innerHTML = '<div style="text-align:center;color:#8b929e;padding:40px">没有符合条件的条目 🎉</div>'; updateProgress(); return; }
+  el.innerHTML = list.map(a => {
+    const d = accCount(a), tot = a.items.length;
+    return `<div class="acc ${accDone(a)?'done':''}" data-id="${a.id}">
+      <div class="ah">
+        <span class="pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
+        <span class="t">${esc(a.t)}</span>
+        ${a.hard ? '<span class="pill hard">'+a.hard+' 格重点核对</span>' : ''}
+      </div>
+      <div class="abody">
+        <div class="pane left">
+          <h4>原始语料 <input class="q" style="margin-left:6px;font-size:11.5px;padding:2px 7px"
+                placeholder="在语料中查找…" data-find="${a.id}"></h4>
+          <div class="raw" id="raw-${a.id}">${esc(a.txt)}</div>
+        </div>
+        <div class="pane right">
+          ${a.items.map(it => row(a.id, it)).join('')}
+          <div class="extra">
+            <b>补充编码</b>（三方都没提但原文支持的）：
+            <select class="add" id="add-${a.id}"><option value="">选择编码…</option>${
+              ALL.map(c => `<option value="${c}">${c} ${NAME[c]||''}</option>`).join('')}</select>
+            <button data-add="${a.id}">添加</button>
+            <div id="xs-${a.id}">${extras(a.id).map(c =>
+              `<span class="xtag">${c} ${NAME[c]||''}<b data-xdel="${a.id}" data-xc="${c}">×</b></span>`).join('')}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('input[data-find]').forEach(inp => inp.addEventListener('input', e => {
+    const a = DATA.find(x => x.id === e.target.dataset.find);
+    document.getElementById('raw-' + a.id).innerHTML = renderText(a.txt, e.target.value.trim());
+  }));
+  updateProgress();
+}
+
+function row(id, it){
+  const k = kOf(id, it.c), cur = state[k];
+  const votes = ['flash','pro','db'].map(s =>
+    `<span class="vote ${it.v[s]?'y-'+s:''}">${LBL[s]}${it.v[s]?' ✓':''}</span>`).join('');
+  const ev = it.ev
+    ? `<div class="ev"><span class="lb ${LB[it.lab]||'lb-n'}">${it.lab}</span>${esc(it.ev)}</div>`
+    : `<div class="ev"><span class="lb lb-n">无证据</span>库内未给该编码，无证据可比对</div>`;
+  const cls = cur === 'include' ? 'dec' : cur === 'exclude' ? 'dec-no' : '';
+  return `<div class="it ${cls}">
+    <div class="h"><span class="code lv-${it.c[0]}">${it.c}</span><b>${NAME[it.c]||''}</b>
+      ${votes}${it.hard?'<span class="pill hard">重点核对</span>':''}</div>
+    ${ev}
+    <div class="acts">
+      <span class="btn-y ${cur==='include'?'sel':''}" data-k="${k}" data-d="include">采纳</span>
+      <span class="btn-n ${cur==='exclude'?'sel':''}" data-k="${k}" data-d="exclude">否决</span>
+    </div>
+  </div>`;
+}
+
+function updateProgress(){
+  const n = allPairs().filter(([id,c]) => isDone(id,c)).length;
+  document.getElementById('nDone').textContent = n;
+  document.getElementById('pbar').style.width = (n/nAll*100).toFixed(1) + '%';
+}
+
+document.getElementById('list').addEventListener('click', e => {
+  const b = e.target.closest('[data-d]');
+  if(b){ state[b.dataset.k] = b.dataset.d; save(); render(); return; }
+  const add = e.target.closest('[data-add]');
+  if(add){
+    const id = add.dataset.add, sel = document.getElementById('add-' + id);
+    if(sel.value){
+      const arr = extras(id).slice(); if(!arr.includes(sel.value)) arr.push(sel.value);
+      state[id + '::__extra'] = arr; save(); render();
+    }
+    return;
+  }
+  const del = e.target.closest('[data-xdel]');
+  if(del){
+    const id = del.dataset.xdel;
+    state[id + '::__extra'] = extras(id).filter(x => x !== del.dataset.xc);
+    save(); render(); return;
+  }
+  const h = e.target.closest('.ah');
+  if(h) h.parentElement.classList.toggle('open');
+});
+document.getElementById('q').oninput = e => { kw = e.target.value.trim(); render(); };
+document.getElementById('fPend').onclick = e => { onlyPend = !onlyPend; e.target.classList.toggle('on', onlyPend); render(); };
+document.getElementById('fHard').onclick = e => { onlyHard = !onlyHard; e.target.classList.toggle('on', onlyHard); render(); };
+document.getElementById('btnExpand').onclick = e => {
+  const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on);
+  document.querySelectorAll('.acc').forEach(a => a.classList.toggle('open', on));
+};
+document.getElementById('btnNext').onclick = () => {
+  const a = document.querySelector('.acc:not(.done)');
+  if(a){ a.classList.add('open'); a.scrollIntoView({block:'start', behavior:'smooth'}); }
+};
+document.getElementById('btnClear').onclick = () => {
+  if(confirm('清空全部本地裁决？')){ state = {}; save(); render(); }
+};
+function toast(m){ const t = document.getElementById('toast'); t.textContent = m;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+function download(name, text){
+  const b = new Blob([text], {type:'application/x-ndjson;charset=utf-8'});
+  const u = URL.createObjectURL(b), a = document.createElement('a');
+  a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u);
+}
+
+document.getElementById('btnExport').onclick = () => {
+  const lines = [];
+  DATA.forEach(a => {
+    a.items.forEach(it => {
+      if(isDone(a.id, it.c))
+        lines.push(JSON.stringify({accident_id: a.id, code: it.c,
+                                   decision: state[kOf(a.id, it.c)],
+                                   source: 'adjudicate', title: a.t}));
+    });
+    extras(a.id).forEach(c => lines.push(JSON.stringify({
+      accident_id: a.id, code: c, decision: 'include', source: 'extra', title: a.t})));
+  });
+  if(!lines.length){ toast('还没有裁决内容'); return; }
+  download('cause_annotations.jsonl', lines.join('\n') + '\n');
+  toast(`已导出 ${lines.length} 条裁决`);
+};
+
+document.getElementById('btnExportFull').onclick = () => {
+  const lines = [];
+  DATA.forEach(a => {
+    const rec = DRAFT[a.id];
+    const set = new Set(rec.base_codes || []);
+    const prov = Object.assign({}, rec.provenance);
+    a.items.forEach(it => {
+      if(isDone(a.id, it.c)){
+        const d = state[kOf(a.id, it.c)];
+        if(d === 'include') set.add(it.c); else set.delete(it.c);
+        prov[it.c] = 'human_' + d;
+      } else {
+        prov[it.c] = 'UNRESOLVED';       // 三方分歧且人工未裁决 → 保持未定
+      }
+    });
+    extras(a.id).forEach(c => { set.add(c); prov[c] = 'human_extra'; });
+    lines.push(JSON.stringify({accident_id: a.id, title: rec.title,
+                               codes: ALL.filter(c => set.has(c)), provenance: prov}));
+  });
+  download('gt_causes_full.jsonl', lines.join('\n') + '\n');
+  toast(`已导出完整致因 GT ${lines.length} 条`);
+};
+
+render();
+</script>
+</body>
+</html>

@@ -13,19 +13,24 @@ GOLD = ROOT / "experiments/golden_standard"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
 
-# 剔除 7 个非客观/书写类字段：摘要 直接原因 天气 具体部位 区县 标题 报告类型
-EXCLUDED = {"summary", "direct_cause", "weather", "accident_location_detail",
-            "district", "title", "report_type"}
-
-ENUM = ["accident_type", "severity", "project_type", "building_structure",
-        "construction_phase", "work_task", "contractor_type", "collapse_subtype",
-        "equipment_involved", "material_involved", "worker_type"]
+# 纳入 GT 的 13 个核心客观事故特征。
+# 取舍依据见 inventory_fields.py 的全字段清点：成本几乎全在文本类字段，
+# 其中 工程名称/建设单位/施工单位/监理单位 4 个名称类字段就贡献 151 条三方互异
+# （占 24 字段下的 39%），故一并剔除。
+ENUM = ["accident_type", "severity", "project_type", "collapse_subtype"]
 NUM = ["deaths", "injuries", "trapped_count"]
 NUM_TOL = {"direct_economic_loss": 0.05, "fall_height": 0.5}
 DATE = ["date", "accident_time"]
-TEXT = ["location", "city", "project_name", "developer", "contractor", "supervision_company"]
-FIELDS = ENUM + NUM + list(NUM_TOL) + DATE + TEXT          # 24
-assert len(FIELDS) == 24, len(FIELDS)
+TEXT = ["location", "city"]
+FIELDS = ENUM + NUM + list(NUM_TOL) + DATE + TEXT          # 13
+assert len(FIELDS) == 13, len(FIELDS)
+
+# 不纳入 GT 的字段（模型输出仍保留在 S1_golden_results.jsonl / pro/ 里，随时可取）
+EXCLUDED = {"summary", "direct_cause", "weather", "accident_location_detail",
+            "district", "title", "report_type",                       # 书写类
+            "project_name", "developer", "contractor", "supervision_company",  # 名称类文本
+            "severity", "building_structure", "construction_phase", "work_task",
+            "contractor_type", "equipment_involved", "material_involved", "worker_type"}
 
 EMPTY = {None, "", "未知", "未提及", "null"}
 DB_COL = {"location": "province"}

@@ -27,14 +27,10 @@ from count_threeway import (FIELDS, EXCLUDED, ENUM, NUM, NUM_TOL, DATE, TEXT,
 
 FIELD_CN = {
     "accident_type": "事故类型", "severity": "严重程度", "project_type": "工程类型",
-    "building_structure": "建筑结构类型", "construction_phase": "施工阶段",
-    "work_task": "作业类型", "contractor_type": "承包类型", "collapse_subtype": "坍塌子类",
-    "equipment_involved": "涉及设备", "material_involved": "涉及材料", "worker_type": "伤亡人员工种",
-    "deaths": "死亡人数", "injuries": "受伤人数", "trapped_count": "被困人数",
-    "direct_economic_loss": "直接经济损失(万元)", "fall_height": "坠落高度(米)",
-    "date": "发生日期", "accident_time": "发生时刻", "location": "省",
-    "city": "市", "project_name": "工程名称", "developer": "建设单位",
-    "contractor": "施工单位", "supervision_company": "监理单位",
+    "collapse_subtype": "坍塌子类", "deaths": "死亡人数", "injuries": "受伤人数",
+    "trapped_count": "被困人数", "direct_economic_loss": "直接经济损失(万元)",
+    "fall_height": "坠落高度(米)", "date": "发生日期", "accident_time": "发生时刻",
+    "location": "省", "city": "市",
 }
 
 
@@ -83,14 +79,20 @@ def main():
                 per_field[f]["same"] += 1
             else:
                 maj = majority(cands)
-                bf[f] = maj                      # 有则预填众数值，无则留空待人工
-                prov[f] = "majority_prefill" if maj is not None else "blank"
                 per_field[f]["diff"] += 1
-                need.append({"field": f, "cands": cands, "prefill": maj,
-                             "has_majority": maj is not None})
-                items.append({"id": i, "title": cand[i]["title"], "field": f,
-                              "cands": cands, "prefill": maj,
-                              "has_majority": maj is not None})
+                if maj is not None:
+                    # 三方中有两方相同 → 采用众数值，自动确定，不进人工
+                    bf[f] = maj
+                    prov[f] = "majority_auto"
+                    per_field[f]["auto"] += 1
+                else:
+                    # 三方互异 → 值留空，交人工裁决
+                    bf[f] = None
+                    prov[f] = "needs_human"
+                    per_field[f]["human"] += 1
+                    need.append({"field": f, "cands": cands})
+                    items.append({"id": i, "title": cand[i]["title"], "field": f,
+                                  "cands": cands})
         out_rows.append({"id": i, "title": cand[i]["title"], "tier": cand[i]["tier"],
                          "source_name": cand[i]["source_name"],
                          "basic_features": bf, "provenance": prov,
@@ -106,16 +108,16 @@ def main():
     page = [{"id": r["id"], "t": r["title"],
              "txt": _re.sub(r"\n{2,}", "\n", "\n".join(
                  l.rstrip() for l in (cand[r["id"]]["raw_text"] or "").splitlines())).strip(),
-             "items": [{"f": it["field"], "c": it["cands"], "p": it["prefill"],
-                        "m": it["has_majority"]}
+             "items": [{"f": it["field"], "c": it["cands"]}
                        for it in items if it["id"] == r["id"]]}
             for r in out_rows if r["needs_human"]]
 
-    n_items = len(items)
-    n_maj = sum(1 for it in items if it["has_majority"])
-    stats = {"nAcc": len(ids), "nItems": n_items, "nMajority": n_maj,
-             "nBlank": n_items - n_maj, "fields": FIELDS,
-             "fieldCn": FIELD_CN, "enum": {f: enum_of(f) for f in ENUM},
+    n_items = len(items)                                   # 只剩三方互异的
+    n_three = sum(per_field[f]["same"] for f in FIELDS)
+    n_auto = sum(per_field[f].get("auto", 0) for f in FIELDS)
+    stats = {"nAcc": len(ids), "nItems": n_items, "nThree": n_three, "nAuto": n_auto,
+             "fields": FIELDS, "fieldCn": FIELD_CN,
+             "enum": {f: enum_of(f) for f in ENUM},
              "perField": {f: dict(per_field[f]) for f in FIELDS}}
 
     draft = {r["id"]: {"title": r["title"], "basic_features": r["basic_features"],
@@ -128,27 +130,40 @@ def main():
 
     L = ["# GT 初稿与人工标注报告", "",
          f"- 事故 {len(ids)} 条 × 客观特征 {len(FIELDS)} 个 = {len(FIELDS)*len(ids)} 格",
-         f"- **三方一致直接确定 {len(FIELDS)*len(ids) - n_items} 格**",
-         f"- **待人工 {n_items} 格**（其中 {n_maj} 格三方中有两方相同，网页已预填众数值可直接确认；"
-         f"{n_items-n_maj} 格三方互异需实判）",
-         f"- 涉及事故 {len(page)} / {len(ids)} 条", "",
+         f"- **三方一致，直接确定 {n_three} 格**（`three_agree`）",
+         f"- **三方中有两方相同，采用众数值自动确定 {n_auto} 格**（`majority_auto`）",
+         f"- **三方互异，需人工裁决 {n_items} 格**（`needs_human`），涉及 {len(page)} / {len(ids)} 条事故",
+         f"- 自动确定合计 {n_three + n_auto} / {len(FIELDS)*len(ids)} 格"
+         f"（{(n_three+n_auto)/(len(FIELDS)*len(ids))*100:.1f}%）", "",
          "## 剔除的字段（不在本次 GT 范围）", "",
-         "摘要、直接原因、天气、具体部位、区县、标题、报告类型", "",
-         "## 各字段情况", "", "| 字段 | 三方一致 | 待人工 | 其中可预填 | 自动率 |", "|---|---:|---:|---:|---:|"]
+         "**名称类文本**：工程名称 `project_name`、建设单位 `developer`、施工单位 `contractor`、"
+         "监理单位 `supervision_company` —— 这 4 个在 24 字段口径下贡献 151 条三方互异（占 39%）。",
+         "**书写类**：摘要 `summary`、直接原因 `direct_cause`、天气 `weather`、"
+         "具体部位 `accident_location_detail`、区县 `district`、标题 `title`、报告类型 `report_type`。",
+         "**其他客观但零收益**：施工阶段/作业类型/伤亡工种/承包类型/涉及设备/涉及材料/建筑结构类型"
+         "（保留会各增 11–70 条互异）。", "",
+         "被剔除字段的模型输出仍保留在 `S1_golden_results.jsonl` / `pro/S1_golden_results.jsonl`，"
+         "需要时可随时取用。字段取舍依据见 `scripts/golden_s1/inventory_fields.py` 的全字段清点。", "",
+         "## 各字段情况", "",
+         "| 字段 | 三方一致 | 两方一致(自动) | 三方互异(人工) | 自动率 |",
+         "|---|---:|---:|---:|---:|"]
     for f in FIELDS:
         c = per_field[f]
         t = c["same"] + c["diff"]
-        nm = sum(1 for it in items if it["field"] == f and it["has_majority"])
-        L.append(f"| {FIELD_CN[f]} `{f}` | {c['same']} | {c['diff']} | {nm} | {c['same']/t*100:.1f}% |")
+        auto = c.get("auto", 0)
+        L.append(f"| {FIELD_CN[f]} `{f}` | {c['same']} | {auto} | {c.get('human', 0)} "
+                 f"| {(c['same']+auto)/t*100:.1f}% |")
     L += ["", "## 用法", "",
           "打开 `annotation.html`：左侧是原始语料（带查找高亮），右侧是每个待定字段的三方候选值。",
-          "点候选值即选中；三方都不对时在输入框自填。底部「导出 JSONL」下载标注结果。",
-          "「一键采纳多数」可把三方中有两方相同的格子批量填入众数值，只需复核剩下的。",
+          "点候选值即选中；三方都不对时在输入框自填（枚举字段为限定下拉）。",
+          "顶部「导出 JSONL」下载标注结果；「导出完整 GT」把自动确定值与人工决策合并导出。",
           "进度存在浏览器本地，刷新不丢。", ""]
     (GT / "GT_REPORT.md").write_text("\n".join(L), encoding="utf-8")
 
-    print(f"三方一致直接确定 {len(FIELDS)*len(ids)-n_items} / {len(FIELDS)*len(ids)}")
-    print(f"待人工 {n_items} 格（{n_maj} 可预填，{n_items-n_maj} 三方互异），涉及 {len(page)} 条事故")
+    tot = len(FIELDS) * len(ids)
+    print(f"三方一致自动确定 {n_three} / {tot}")
+    print(f"两方一致自动确定 {n_auto} / {tot}")
+    print(f"三方互异待人工   {n_items} / {tot}，涉及 {len(page)} 条事故")
     print(f"产出 → {GT}/gt_draft.jsonl, annotation.html, GT_REPORT.md")
 
 

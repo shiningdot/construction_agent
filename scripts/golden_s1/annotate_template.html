@@ -87,12 +87,13 @@
 <body>
 <div class="wrap">
   <h1>基础特征 GT 人工标注</h1>
-  <div class="sub">24 个客观事故特征 · flash / pro / 库内 Step1 三方比对 · 只标注三方有异的格子</div>
+  <div class="sub">13 个核心客观事故特征 · flash / pro / 库内 Step1 三方比对 · <b>只标注三方完全互异的格子</b></div>
 
   <div class="note">
-    左侧是<b>原始语料</b>（可用查找框高亮定位）；右侧每个待定字段给出三方取值。
-    点候选值即选中；三方都不对时在最右侧输入框自填。<b>枚举字段的下拉框已限定合法取值。</b>
-    标注进度存在浏览器本地，刷新不丢；完成后点「导出 JSONL」下载。
+    三方一致与「三方中有两方相同」的格子已在装配阶段自动确定（分别记为
+    <code>three_agree</code> / <code>majority_auto</code>），本页只剩<b>三方各不相同的格子</b>。
+    左侧是<b>原始语料</b>（可用查找框高亮定位）；点右侧候选值即选中，三方都不对时在输入框自填
+    （<b>枚举字段为限定下拉</b>）。进度存在浏览器本地，刷新不丢；完成后点「导出 JSONL」下载。
   </div>
 
   <div class="bar">
@@ -100,7 +101,6 @@
     <span class="pbar"><i id="pbar"></i></span>
     <button class="pri" id="btnExport">导出 JSONL</button>
     <button id="btnExportFull">导出完整 GT</button>
-    <button id="btnMajority">一键采纳多数</button>
     <button id="btnNext">下一个未完成</button>
     <input class="q" id="q" placeholder="搜索事故标题…" style="min-width:180px">
     <button id="fPend" class="on">只看未标注</button>
@@ -200,8 +200,7 @@ function fieldRow(id, it){
   const mark = cur ? `<span class="mark-ok">✓ 已选：${esc(String(cur.value===''?'（空）':cur.value))}</span>` : '';
   return `<div class="it">
     <div class="lab"><b>${S.fieldCn[it.f]||it.f}</b><code>${it.f}</code>
-      ${it.m ? '<span class="pill" style="background:#fff4d6;color:#b8860b">两方一致·已预填</span>' : '<span class="pill miss">三方互异</span>'}
-      ${mark}</div>
+      <span class="pill miss">三方互异</span>${mark}</div>
     <div class="opts">${opts}${custom}</div>
   </div>`;
 }
@@ -243,14 +242,6 @@ document.getElementById('btnNext').onclick = () => {
   const acc = document.querySelector('.acc:not(.done)');
   if(acc){ acc.classList.add('open'); acc.scrollIntoView({block:'start', behavior:'smooth'}); }
 };
-document.getElementById('btnMajority').onclick = () => {
-  let n = 0;
-  DATA.forEach(a => a.items.forEach(it => {
-    const k = itemKey(a.id, it.f);
-    if(it.m && !isDone(a.id, it.f)){ state[k] = {value: it.p, source: 'majority'}; n++; }
-  }));
-  save(); render(); toast(`已采纳 ${n} 个多数值`);
-};
 document.getElementById('btnClear').onclick = () => {
   if(confirm('清空全部本地标注？')){ state = {}; save(); render(); }
 };
@@ -283,10 +274,11 @@ document.getElementById('btnExportFull').onclick = () => {
     const rec = DRAFT[id];
     const bf = Object.assign({}, rec.basic_features);
     const src = Object.assign({}, rec.provenance);
+    // DRAFT 里 needs_human 的格子值为空，用人工决策填回；未填则标 UNRESOLVED
     (DATA.find(x => x.id === id)?.items || []).forEach(it => {
       const k = itemKey(id, it.f);
       if(isDone(id, it.f)){ bf[it.f] = state[k].value; src[it.f] = 'human:' + state[k].source; }
-      else { bf[it.f] = it.p; src[it.f] = it.m ? 'majority_prefill' : 'UNRESOLVED'; }
+      else { src[it.f] = 'UNRESOLVED'; }          // 三方互异且人工未填 → 保持空值
     });
     lines.push(JSON.stringify({accident_id: id, title: rec.title,
                                basic_features: bf, provenance: src}));

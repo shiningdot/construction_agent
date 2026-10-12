@@ -14,7 +14,7 @@
 | `S1_vs_db_diff.html` | **可视化逐条差异**：一致度分档、19 类编码逐类差异、300 条逐条对照（可搜索/筛选/排序，展开看 5 层编码全景与原文）。生成：`scripts/golden_s1/analyze_vs_db.py` |
 | `S1_pro_vs_flash.html` | **pro vs flash** 跨模型逐条对照（同一提示词、同一样本，只有模型不同） |
 | `basic_features_flash_vs_pro.html` | **基础特征一致性分析**：31 字段 × 300 条，flash/pro/库内三方并排，默认只显示分歧字段 |
-| `gt/` | **基础特征 GT 构建**：`gt_draft.jsonl`（24 个客观特征的当前取值 + 每格来源）、`annotation.html`（**人工标注页**，含原始语料与导出 JSONL）、`GT_REPORT.md` |
+| `gt/` | **基础特征 GT**：`gt_draft.jsonl`（300 条 × **13 个核心客观特征** + 每格 provenance）、`annotation.html`（**人工标注页**，只剩 14 格待裁决，含原始语料与导出 JSONL）、`GT_REPORT.md` |
 | `pro/` | **同 300 条的 pro 结果**，结构与本目录一致（结果 jsonl + 审核表 + vs 库内对照 CSV/HTML） |
 
 筛选中间态、首轮含多事故合并块的版本等过程文件已全部删除；需要时用下方脚本重跑生成

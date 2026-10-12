@@ -35,6 +35,14 @@ from prompt_build import build_system_prompt  # noqa: E402
 CAICS_CODES = {f"M{i}" for i in range(1, 6)} | {f"F{i}" for i in range(1, 5)} | \
               {f"T{i}" for i in range(1, 5)} | {f"H{i}" for i in range(1, 5)} | {"C1", "C2"}
 
+# 多供应商：都走 Anthropic 兼容端点，故请求封装与 deepseek 完全同构，可比性一致。
+# 值 = (API_KEY 环境变量名, BASE_URL 环境变量名, 默认模型名)
+PROVIDERS = {
+    "deepseek": ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", None),
+    "glm": ("GLM_API_KEY", "GLM_BASE_URL", "glm-5.3"),
+    "hunyuan": ("HUNYUAN_API_KEY", "HUNYUAN_BASE_URL", "hy3"),
+}
+
 USER_PREFIX = "请参照示例，为以下事故同时提取【基础特征】与【CAICS 致因编码】：\n\n"
 
 _print_lock = threading.Lock()
@@ -85,16 +93,25 @@ def validate(parsed: dict) -> list[str]:
     return errs
 
 
-def call_one(client, model, system, rec, max_tokens) -> dict:
+def call_one(client, model, system, rec, max_tokens, use_stream=False) -> dict:
     user = USER_PREFIX + f"事故文本：\n{rec['raw_text']}"
     last_err = ""
     for attempt in range(3):
         t0 = time.time()
         try:
-            resp = client.messages.create(
-                model=model, max_tokens=max_tokens, temperature=0.0,
-                system=system, messages=[{"role": "user", "content": user}],
-            )
+            if use_stream:
+                # 流式：绕过 SDK「非流式 max_tokens 上限 ~21333」的限制，
+                # 也让推理模型（GLM-5.3 / 混元 hy3 会先吐 thinking）不会因预算被截断。
+                with client.messages.stream(
+                    model=model, max_tokens=max_tokens, temperature=0.0,
+                    system=system, messages=[{"role": "user", "content": user}],
+                ) as st:
+                    resp = st.get_final_message()
+            else:
+                resp = client.messages.create(
+                    model=model, max_tokens=max_tokens, temperature=0.0,
+                    system=system, messages=[{"role": "user", "content": user}],
+                )
             raw = "".join(getattr(b, "text", "") for b in resp.content)
             parsed = extract_json(raw)
             u = getattr(resp, "usage", None)
@@ -124,8 +141,15 @@ def main():
     ap.add_argument("--out-tag", default="")
     ap.add_argument("--only-ids", default="",
                     help="逗号分隔的事故 id，或指向每行一个 id 的文件；只跑这些")
+    ap.add_argument("--provider", default="deepseek", choices=list(PROVIDERS),
+                    help="供应商；决定用哪组 API_KEY/BASE_URL 环境变量与默认模型名")
     ap.add_argument("--model", default="",
-                    help="覆盖模型名；留空则读 .env 的 ANTHROPIC_MODEL")
+                    help="覆盖模型名；留空则用该 provider 的默认模型名")
+    ap.add_argument("--api-key", default="", help="临时覆盖 API key（一般不用）")
+    ap.add_argument("--base-url", default="", help="临时覆盖 base_url（一般不用）")
+    ap.add_argument("--stream", action="store_true",
+                    help="用流式请求；推理模型需大输出预算时必开"
+                         "（SDK 限制非流式 max_tokens 约 21333）")
     ap.add_argument("--out-dir", default="",
                     help="结果输出目录；留空则写到 experiments/golden_standard/")
     ap.add_argument("--candidates", default="golden_candidates.jsonl",
@@ -159,18 +183,24 @@ def main():
     todo = [r for r in recs if r["id"] not in done]
 
     system = build_system_prompt()
-    model = args.model or os.getenv("ANTHROPIC_MODEL")
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"),
-                       base_url=os.getenv("ANTHROPIC_BASE_URL"))
-    print(f"模型 {model} | system {len(system)} 字符 | 待跑 {len(todo)} 条 "
-          f"(已完成 {len(done)}) | workers={args.workers} max_tokens={args.max_tokens}", flush=True)
+    key_env, url_env, def_model = PROVIDERS[args.provider]
+    model = args.model or def_model or os.getenv("ANTHROPIC_MODEL")
+    api_key = args.api_key or os.getenv(key_env, "")
+    base_url = args.base_url or os.getenv(url_env, "")
+    if not api_key:
+        sys.exit(f"缺 API key：环境变量 {key_env} 未设置（可在 .env 里补，或用 --api-key）")
+    client = Anthropic(api_key=api_key, base_url=base_url)
+    print(f"provider={args.provider} | 模型 {model} | base_url {base_url} | "
+          f"system {len(system)} 字符 | 待跑 {len(todo)} 条 (已完成 {len(done)}) | "
+          f"workers={args.workers} max_tokens={args.max_tokens}", flush=True)
 
     t_start = datetime.now()
     results = []
     lock = threading.Lock()
     with jsonl_path.open("a", encoding="utf-8") as fout, \
             ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(call_one, client, model, system, r, args.max_tokens): r for r in todo}
+        futs = {ex.submit(call_one, client, model, system, r, args.max_tokens,
+                          args.stream): r for r in todo}
         for n, fut in enumerate(as_completed(futs), 1):
             res = fut.result()
             results.append(res)

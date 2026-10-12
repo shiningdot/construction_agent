@@ -31,6 +31,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=str(GOLD), help="结果所在目录（可指向 pro/ 等子目录）")
     ap.add_argument("--model", default="", help="覆盖模型名；留空读 .env")
+    ap.add_argument("--provider", default="deepseek",
+                    choices=["deepseek", "glm", "hunyuan"],
+                    help="供应商；决定用哪组 API_KEY/BASE_URL 环境变量")
+    ap.add_argument("--stream", action="store_true", help="用流式请求（推理模型需大预算时开）")
     args = ap.parse_args()
     out_dir = Path(args.dir)
 
@@ -43,17 +47,27 @@ def main():
     print(f"共 {len(rows)} 条，异常 {len(bad)} 条，开始补跑")
 
     system = build_system_prompt()
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"),
-                       base_url=os.getenv("ANTHROPIC_BASE_URL"))
-    model = args.model or os.getenv("ANTHROPIC_MODEL")
+    _P = {"deepseek": ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", None),
+          "glm": ("GLM_API_KEY", "GLM_BASE_URL", "glm-5.2"),
+          "hunyuan": ("HUNYUAN_API_KEY", "HUNYUAN_BASE_URL", "hy3")}
+    key_env, url_env, def_model = _P[args.provider]
+    client = Anthropic(api_key=os.getenv(key_env, ""),
+                       base_url=os.getenv(url_env, ""))
+    model = args.model or def_model or os.getenv("ANTHROPIC_MODEL")
 
     fixed = {}
     for r in bad:
         user = USER_PREFIX + f"事故文本：\n{raw_text[r['id']]}"
         try:
-            resp = client.messages.create(
-                model=model, max_tokens=16384, temperature=0.0, system=system,
-                messages=[{"role": "user", "content": user}])
+            if args.stream:
+                with client.messages.stream(
+                        model=model, max_tokens=32768, temperature=0.0, system=system,
+                        messages=[{"role": "user", "content": user}]) as st:
+                    resp = st.get_final_message()
+            else:
+                resp = client.messages.create(
+                    model=model, max_tokens=16384, temperature=0.0, system=system,
+                    messages=[{"role": "user", "content": user}])
             out = "".join(getattr(b, "text", "") for b in resp.content)
             parsed = extract_json(out)
             errs = validate(parsed)

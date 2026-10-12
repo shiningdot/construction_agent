@@ -1,11 +1,25 @@
-# GT 初稿与人工标注报告
+# 基础特征 GT 报告（已完成）
+
+> **状态：全部 3900 格已确定，无待人工项。`gt_draft.jsonl` 即最终 GT。**
 
 - 事故 300 条 × 客观特征 13 个 = 3900 格
 - **三方一致，直接确定 3690 格**（`three_agree`）
 - **三方中有两方相同，采用众数值自动确定 196 格**（`majority_auto`）
 - **三方互异但规则可判 10 格**（`rule_resolved`）：`accident_time` 取三方中唯一合法 HH:MM 值，无合法值置空（库内有把"下午"填进时刻字段的）；`city` 取规范地级名称（自治州/地区/盟优先，同级取信息最全），脱敏占位符（××县）与县级名置空。每格的判定说明记在 `resolution_notes`。
-- **三方互异且规则判不了，需人工裁决 4 格**（`needs_human`），涉及 4 / 300 条事故
-- 自动确定合计 3896 / 3900 格（99.9%）
+- **三方互异且规则判不了，人工裁决 4 格**（`human_decision`），来源已记入 `resolution_notes`：
+  安徽防汛调度大楼 `collapse_subtype`=脚手架坍塌（自填）、武进县马杭小学 `accident_type`=高处坠落（取 pro）、
+  安康县商业局 3 号住宅楼 `accident_type`=高处坠落（取 pro）、秦山核电站 `project_type`=其他/未知（取库内）
+
+| provenance | 格数 | 占比 |
+|---|---:|---:|
+| `three_agree` | 3690 | 94.6% |
+| `majority_auto` | 196 | 5.0% |
+| `rule_resolved` | 10 | 0.3% |
+| `human_decision` | 4 | 0.1% |
+| **合计** | **3900** | **100%** |
+
+> ⚠️ 重跑 `scripts/golden_s1/build_gt.py` 会**从零重建 `gt_draft.jsonl`，覆盖掉人工裁决的 4 格**。
+> 如需重跑，先备份本文件；或保留标注文件后用 `apply_annotations.py` 合回。
 
 ## 剔除的字段（不在本次 GT 范围）
 

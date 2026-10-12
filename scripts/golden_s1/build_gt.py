@@ -6,9 +6,12 @@
   - 三方有异 → 生成人工标注项（网页里给候选值 + 原始语料，可选可自填）
 
 产出（experiments/golden_standard/gt/）：
-  gt_draft.jsonl      300 条，24 字段的当前取值 + 每格来源标记
+  gt_draft.jsonl      300 条，13 字段的当前取值 + 每格来源标记
   annotation.html     人工标注页（含原始语料、导出 JSONL 按钮）
   GT_REPORT.md        本轮口径、统计、待人工清单
+
+⚠️ 本脚本从零重建 gt_draft.jsonl，会覆盖已有的人工裁决（human_decision）。
+   重跑前请先备份；或用 apply_annotations.py 把人工标注合回。
 """
 from __future__ import annotations
 

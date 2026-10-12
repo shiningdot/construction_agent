@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基础特征 GT 人工标注 · 300 条</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d23; --ink2:#5b6370; --ink3:#8b929e;
+    --line:#e3e6eb; --line2:#eef0f4;
+    --flash:#1d5fd0; --flashbg:#e9f0fc;
+    --pro:#7a3bbf;   --probg:#f3ecfb;
+    --db:#0f7b4f;    --dbbg:#e8f6ef;
+    --pick:#b8860b;  --pickbg:#fff4d6;
+    --done:#0f7b4f;  --warn:#c2540a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1420px;margin:0 auto;padding:26px 18px 90px}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:var(--ink2);font-size:13px;margin-bottom:16px}
+  .note{background:#fff8e6;border:1px solid #f0dfae;border-radius:8px;padding:9px 13px;
+        font-size:12.5px;color:#7a5c10;margin:0 0 14px}
+  /* 顶部工具条 */
+  .bar{position:sticky;top:0;z-index:20;background:rgba(246,247,249,.96);backdrop-filter:blur(6px);
+       border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:14px;
+       display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .prog{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .prog b{color:var(--ink);font-size:15px}
+  .pbar{width:170px;height:8px;background:#e3e6eb;border-radius:4px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--done);width:0}
+  button{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--line);
+         border-radius:8px;background:#fff;cursor:pointer;color:var(--ink2)}
+  button:hover{border-color:#c3cbd6}
+  button.pri{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  button.on{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  input.q{padding:6px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px}
+  /* 事故卡 */
+  .acc{background:var(--card);border:1px solid var(--line);border-radius:11px;margin-bottom:9px;overflow:hidden}
+  .acc.done{border-color:#bfe3d2}
+  .ah{display:flex;gap:12px;align-items:center;padding:11px 14px;cursor:pointer}
+  .ah:hover{background:#fafbfc}
+  .ah .t{flex:1;font-weight:600;font-size:13.8px}
+  .pill{font-size:11.5px;padding:1px 9px;border-radius:11px;background:#f2f3f6;color:var(--ink2)}
+  .pill.ok{background:#e8f6ef;color:var(--done)}
+  .pill.miss{background:#fdecea;color:var(--warn)}
+  .abody{display:none;border-top:1px solid var(--line)}
+  .acc.open .abody{display:grid;grid-template-columns:minmax(340px,44%) 1fr;gap:0}
+  @media (max-width:980px){.abody{grid-template-columns:1fr !important}}
+  .pane{padding:13px 15px}
+  .pane.left{border-right:1px solid var(--line2);background:#fcfdfe}
+  .pane h4{margin:0 0 8px;font-size:12px;color:var(--ink3);font-weight:650;letter-spacing:.02em}
+  .raw{font-size:12.5px;line-height:1.72;white-space:pre-wrap;word-break:break-word;
+       max-height:340px;overflow:auto;background:#fff;border:1px solid var(--line2);
+       border-radius:8px;padding:10px 12px}
+  .raw mark{background:#ffe9a8;padding:0 1px;border-radius:2px}
+  /* 字段行 */
+  .it{padding:9px 0;border-bottom:1px dashed var(--line2)}
+  .it:last-child{border-bottom:none}
+  .it .lab{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}
+  .it .lab b{font-size:13px}
+  .it .lab code{font-size:11px;color:var(--ink3)}
+  .opts{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .opt{border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12.5px;
+       cursor:pointer;background:#fff;max-width:340px;overflow:hidden;text-overflow:ellipsis;
+       white-space:nowrap}
+  .opt:hover{border-color:#b9c2cf}
+  .opt .src{font-size:10.5px;font-weight:700;margin-right:5px;padding:0 5px;border-radius:7px}
+  .opt.flash .src{background:var(--flashbg);color:var(--flash)}
+  .opt.pro  .src{background:var(--probg);color:var(--pro)}
+  .opt.db   .src{background:var(--dbbg);color:var(--db)}
+  .opt.sel{border-color:var(--pick);background:var(--pickbg);box-shadow:0 0 0 1px var(--pick) inset}
+  .opt .empty{color:var(--ink3);font-style:italic}
+  .cust{padding:5px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px;
+        min-width:170px;max-width:320px}
+  select.cust{min-width:130px}
+  .mark-ok{color:var(--done);font-size:11.5px;font-weight:650}
+  .foot{color:var(--ink3);font-size:12px;margin-top:18px}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1a1d23;color:#fff;
+         padding:9px 18px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .25s;
+         pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>基础特征 GT 人工标注</h1>
+  <div class="sub">24 个客观事故特征 · flash / pro / 库内 Step1 三方比对 · 只标注三方有异的格子</div>
+
+  <div class="note">
+    左侧是<b>原始语料</b>（可用查找框高亮定位）；右侧每个待定字段给出三方取值。
+    点候选值即选中；三方都不对时在最右侧输入框自填。<b>枚举字段的下拉框已限定合法取值。</b>
+    标注进度存在浏览器本地，刷新不丢；完成后点「导出 JSONL」下载。
+  </div>
+
+  <div class="bar">
+    <span class="prog">已标注 <b id="nDone">0</b> / <b id="nAll">0</b></span>
+    <span class="pbar"><i id="pbar"></i></span>
+    <button class="pri" id="btnExport">导出 JSONL</button>
+    <button id="btnExportFull">导出完整 GT</button>
+    <button id="btnMajority">一键采纳多数</button>
+    <button id="btnNext">下一个未完成</button>
+    <input class="q" id="q" placeholder="搜索事故标题…" style="min-width:180px">
+    <button id="fPend" class="on">只看未标注</button>
+    <button id="fHard">只看三方互异</button>
+    <button id="btnExpand">全部展开</button>
+    <button id="btnClear">清空标注</button>
+  </div>
+
+  <div id="list"></div>
+  <div class="foot">
+    数据：<code>gt_draft.jsonl</code> 的待人工项 + <code>golden_candidates.jsonl</code> 原文 ·
+    生成：<code>scripts/golden_s1/build_gt.py</code>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = /*__DATA__*/;
+const S = /*__STATS__*/;
+const DRAFT = /*__DRAFT__*/;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SRC = {flash:'flash', pro:'pro', db:'库内'};
+const KEY = 'golden_gt_annotations_v1';
+
+// 状态：{ "id::field": {value, source} }
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+const itemKey = (id, f) => id + '::' + f;
+const isDone = (id, f) => Object.prototype.hasOwnProperty.call(state, itemKey(id, f));
+const allItems = () => DATA.flatMap(a => a.items.map(it => [a.id, it.f]));
+const nAll = allItems().length;
+document.getElementById('nAll').textContent = nAll;
+
+// ── 语料渲染（支持高亮） ──
+function renderText(txt, needle){
+  if(!needle) return esc(txt);
+  return txt.split(needle).map(p => esc(p)).join('<mark>' + esc(needle) + '</mark>');
+}
+
+// ── 渲染 ──
+let kw = '', onlyPend = true, onlyHard = false;
+function accDone(a){ return a.items.every(it => isDone(a.id, it.f)); }
+function accCount(a){ return a.items.filter(it => isDone(a.id, it.f)).length; }
+
+function render(){
+  let list = DATA.slice();
+  if(kw) list = list.filter(a => a.t.includes(kw));
+  if(onlyPend) list = list.filter(a => !accDone(a));
+  if(onlyHard) list = list.filter(a => a.items.some(it => !it.m));
+  const el = document.getElementById('list');
+  if(!list.length){ el.innerHTML = '<div style="text-align:center;color:#8b929e;padding:40px">没有符合条件的条目 🎉</div>'; updateProgress(); return; }
+  el.innerHTML = list.map(a => {
+    const d = accCount(a), tot = a.items.length;
+    return `<div class="acc ${accDone(a)?'done':''}" data-id="${a.id}">
+      <div class="ah">
+        <span class="pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
+        <span class="t">${esc(a.t)}</span>
+        <span class="pill">${a.items.map(it=>S.fieldCn[it.f]||it.f).join(' · ')}</span>
+      </div>
+      <div class="abody">
+        <div class="pane left">
+          <h4>原始语料 <input class="q" style="margin-left:6px;font-size:11.5px;padding:2px 7px"
+                placeholder="在语料中查找…" data-find="${a.id}"></h4>
+          <div class="raw" id="raw-${a.id}">${esc(a.txt)}</div>
+        </div>
+        <div class="pane right">${a.items.map(it => fieldRow(a.id, it)).join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('input[data-find]').forEach(inp => inp.addEventListener('input', e => {
+    const a = DATA.find(x => x.id === e.target.dataset.find);
+    document.getElementById('raw-' + a.id).innerHTML = renderText(a.txt, e.target.value.trim());
+  }));
+  updateProgress();
+}
+
+function fieldRow(id, it){
+  const k = itemKey(id, it.f);
+  const cur = state[k];
+  const enumv = S.enum[it.f];
+  const val = v => (v===null||v===undefined||v==='') ? '<span class="empty">（空）</span>' : esc(String(v));
+  const opts = ['flash','pro','db'].map((s,idx) => {
+    const v = it.c[idx];
+    const isSel = cur && cur.source === s;
+    return `<span class="opt ${s} ${isSel?'sel':''}" data-k="${k}" data-s="${s}">
+      <span class="src">${SRC[s]}</span>${val(v)}</span>`;
+  }).join('');
+  const custom = enumv && enumv.length
+    ? `<select class="cust" data-k="${k}" data-custom="1"><option value="">自定义…</option>${
+        enumv.map(o => `<option value="${esc(o)}" ${cur&&cur.source==='custom'&&cur.value===o?'selected':''}>${esc(o)}</option>`).join('')
+      }</select>`
+    : `<input class="cust" data-k="${k}" data-custom="1" placeholder="自定义…"
+        value="${cur&&cur.source==='custom'?esc(String(cur.value)):''}">`;
+  const mark = cur ? `<span class="mark-ok">✓ 已选：${esc(String(cur.value===''?'（空）':cur.value))}</span>` : '';
+  return `<div class="it">
+    <div class="lab"><b>${S.fieldCn[it.f]||it.f}</b><code>${it.f}</code>
+      ${it.m ? '<span class="pill" style="background:#fff4d6;color:#b8860b">两方一致·已预填</span>' : '<span class="pill miss">三方互异</span>'}
+      ${mark}</div>
+    <div class="opts">${opts}${custom}</div>
+  </div>`;
+}
+
+function updateProgress(){
+  const n = allItems().filter(([id,f]) => isDone(id,f)).length;
+  document.getElementById('nDone').textContent = n;
+  document.getElementById('pbar').style.width = (n/nAll*100).toFixed(1) + '%';
+}
+
+// ── 交互 ──
+document.getElementById('list').addEventListener('click', e => {
+  const opt = e.target.closest('.opt');
+  if(opt){
+    const k = opt.dataset.k, s = opt.dataset.s;
+    const [id, f] = k.split('::');
+    const a = DATA.find(x => x.id === id), it = a.items.find(x => x.f === f);
+    const idx = {flash:0, pro:1, db:2}[s];
+    state[k] = {value: it.c[idx], source: s};
+    save(); render(); return;
+  }
+  const head = e.target.closest('.ah');
+  if(head) head.parentElement.classList.toggle('open');
+});
+document.getElementById('list').addEventListener('change', e => {
+  const t = e.target.closest('.cust'); if(!t) return;
+  const k = t.dataset.k; const v = t.value.trim();
+  if(v === '') { delete state[k]; } else { state[k] = {value: v, source: 'custom'}; }
+  save(); render();
+});
+document.getElementById('q').oninput = e => { kw = e.target.value.trim(); render(); };
+document.getElementById('fPend').onclick = e => { onlyPend = !onlyPend; e.target.classList.toggle('on', onlyPend); render(); };
+document.getElementById('fHard').onclick = e => { onlyHard = !onlyHard; e.target.classList.toggle('on', onlyHard); render(); };
+document.getElementById('btnExpand').onclick = e => {
+  const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on);
+  document.querySelectorAll('.acc').forEach(a => a.classList.toggle('open', on));
+};
+document.getElementById('btnNext').onclick = () => {
+  const acc = document.querySelector('.acc:not(.done)');
+  if(acc){ acc.classList.add('open'); acc.scrollIntoView({block:'start', behavior:'smooth'}); }
+};
+document.getElementById('btnMajority').onclick = () => {
+  let n = 0;
+  DATA.forEach(a => a.items.forEach(it => {
+    const k = itemKey(a.id, it.f);
+    if(it.m && !isDone(a.id, it.f)){ state[k] = {value: it.p, source: 'majority'}; n++; }
+  }));
+  save(); render(); toast(`已采纳 ${n} 个多数值`);
+};
+document.getElementById('btnClear').onclick = () => {
+  if(confirm('清空全部本地标注？')){ state = {}; save(); render(); }
+};
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+
+// ── 导出 ──
+function download(name, text){
+  const b = new Blob([text], {type:'application/x-ndjson;charset=utf-8'});
+  const u = URL.createObjectURL(b), a = document.createElement('a');
+  a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u);
+}
+document.getElementById('btnExport').onclick = () => {
+  const lines = [];
+  DATA.forEach(a => a.items.forEach(it => {
+    const k = itemKey(a.id, it.f);
+    if(isDone(a.id, it.f)){
+      const s = state[k];
+      lines.push(JSON.stringify({accident_id: a.id, field: it.f, value: s.value,
+                                 source: s.source, title: a.t}));
+    }
+  }));
+  if(!lines.length){ toast('还没有标注内容'); return; }
+  download('gt_annotations.jsonl', lines.join('\n') + '\n');
+  toast(`已导出 ${lines.length} 条标注`);
+};
+document.getElementById('btnExportFull').onclick = () => {
+  const lines = [];
+  Object.keys(DRAFT).forEach(id => {
+    const rec = DRAFT[id];
+    const bf = Object.assign({}, rec.basic_features);
+    const src = Object.assign({}, rec.provenance);
+    (DATA.find(x => x.id === id)?.items || []).forEach(it => {
+      const k = itemKey(id, it.f);
+      if(isDone(id, it.f)){ bf[it.f] = state[k].value; src[it.f] = 'human:' + state[k].source; }
+      else { bf[it.f] = it.p; src[it.f] = it.m ? 'majority_prefill' : 'UNRESOLVED'; }
+    });
+    lines.push(JSON.stringify({accident_id: id, title: rec.title,
+                               basic_features: bf, provenance: src}));
+  });
+  download('gt_full.jsonl', lines.join('\n') + '\n');
+  toast(`已导出完整 GT ${lines.length} 条`);
+};
+
+render();
+DATA.slice(0,3).forEach(a => {});
+</script>
+</body>
+</html>

@@ -177,9 +177,14 @@ def main():
     if jsonl_path.exists():                      # 断点续跑
         for line in jsonl_path.open(encoding="utf-8"):
             try:
-                done.add(json.loads(line)["id"])
+                r = json.loads(line)
             except Exception:
-                pass
+                continue
+            # 只把「成功的」当作已完成：失败的（API 错误 / 解析失败 / schema 违规）
+            # 必须在重跑时重试——否则额度中断后充值重跑会把这些条永久跳过。
+            if r.get("error") or r.get("parse_error") or r.get("schema_errors"):
+                continue
+            done.add(r["id"])
     todo = [r for r in recs if r["id"] not in done]
 
     system = build_system_prompt()

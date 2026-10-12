@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1′ 编码 vs 库内既有编码 · 300 条逐条差异</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#1a1d23; --ink2:#5b6370; --ink3:#8b929e;
+    --line:#e4e7ec; --line2:#eef0f4;
+    --both:#0f7b4f; --bothbg:#e8f6ef;
+    --s1:#1d5fd0;   --s1bg:#e7effc;
+    --db:#c2540a;   --dbbg:#fdefe3;
+    --none:#f2f3f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--ink2);font-size:13.5px;margin-bottom:26px}
+  .note{background:#fff8e6;border:1px solid #f0dfae;border-radius:8px;
+        padding:10px 14px;font-size:13px;color:#7a5c10;margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px 22px;margin-bottom:18px}
+  .card h2{font-size:15px;margin:0 0 16px;font-weight:650;letter-spacing:.01em}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px}
+  .kpi{background:#fbfcfd;border:1px solid var(--line2);border-radius:9px;padding:12px 14px}
+  .kpi .v{font-size:24px;font-weight:680;letter-spacing:-.02em}
+  .kpi .l{font-size:12px;color:var(--ink3);margin-top:2px}
+  /* 分档条 */
+  .bucket{display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;
+          padding:5px 8px;border-radius:7px}
+  .bucket:hover{background:#f4f6f9}
+  .bucket .nm{width:172px;font-size:13.5px;flex:none}
+  .bucket .bar{flex:1;height:16px;background:var(--none);border-radius:4px;overflow:hidden}
+  .bucket .bar i{display:block;height:100%;border-radius:4px}
+  .bucket .ct{width:66px;text-align:right;font-size:13px;color:var(--ink2);
+              font-variant-numeric:tabular-nums}
+  /* 编码差异表 */
+  table.code{width:100%;border-collapse:collapse;font-size:13px}
+  table.code th{text-align:left;color:var(--ink3);font-weight:600;font-size:12px;
+                padding:0 8px 8px;border-bottom:1px solid var(--line)}
+  table.code td{padding:6px 8px;border-bottom:1px solid var(--line2);
+                font-variant-numeric:tabular-nums}
+  table.code td.c{font-weight:640}
+  table.code tr:hover td{background:#fafbfc}
+  .mini{display:inline-block;height:9px;border-radius:3px;vertical-align:middle}
+  /* 图例 */
+  .legend{display:flex;gap:18px;font-size:12.5px;color:var(--ink2);margin-bottom:14px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  /* 工具条 */
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .tools input{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--line);
+               border-radius:8px;font-size:13.5px;background:#fff;color:var(--ink)}
+  .tools input:focus{outline:2px solid #cfe0fb;border-color:#9dbdf0}
+  .chip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:#fff;
+        font-size:12.5px;cursor:pointer;color:var(--ink2);user-select:none}
+  .chip:hover{border-color:#c3cbd6}
+  .chip.on{background:#1a1d23;color:#fff;border-color:#1a1d23}
+  /* 逐条 */
+  .row{background:#fff;border:1px solid var(--line);border-radius:11px;
+       padding:14px 16px;margin-bottom:9px}
+  .row.hit{border-color:#9dbdf0}
+  .rhead{display:flex;align-items:baseline;gap:12px;cursor:pointer}
+  .ttl{flex:1;font-size:14.5px;font-weight:600;line-height:1.45}
+  .jbar{flex:none;width:112px;display:flex;align-items:center;gap:8px}
+  .jbar .track{flex:1;height:8px;background:var(--none);border-radius:4px;overflow:hidden}
+  .jbar .track i{display:block;height:100%}
+  .jbar .num{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums;width:34px}
+  .caret{flex:none;color:var(--ink3);font-size:12px;width:12px;text-align:center}
+  .diffs{display:flex;gap:22px;flex-wrap:wrap;margin-top:9px}
+  .diffs .grp{font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .diffs .lbl{color:var(--ink3);font-size:12px}
+  .code{display:inline-block;padding:1px 7px;border-radius:5px;font-size:12.5px;
+        font-weight:640;margin:1px 0}
+  .c-both{background:var(--bothbg);color:var(--both)}
+  .c-s1{background:var(--s1bg);color:var(--s1)}
+  .c-db{background:var(--dbbg);color:var(--db)}
+  .none-txt{color:var(--ink3);font-size:12.5px}
+  .detail{display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+  .row.open .detail{display:block}
+  .row.open .caret{transform:rotate(90deg)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+  .layer{border:1px solid var(--line2);border-radius:8px;padding:9px 11px;background:#fcfdfe}
+  .layer .lh{font-size:11.5px;color:var(--ink3);margin-bottom:6px;font-weight:600}
+  .raw{font-size:12.5px;color:var(--ink2);background:#fafbfc;border:1px solid var(--line2);
+       border-radius:8px;padding:10px 12px;max-height:190px;overflow:auto;line-height:1.65}
+  .empty{text-align:center;color:var(--ink3);padding:40px;font-size:14px}
+  .foot{color:var(--ink3);font-size:12.5px;margin-top:22px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>S1′ 编码 <span style="color:var(--ink3);font-weight:400">vs</span> 库内既有编码</h1>
+  <div class="sub">同一批 300 条事故，两套标注逐条对照 · 共 19 类 CAICS 编码</div>
+
+  <div class="note">
+    <b>库内编码来自本项目自己的 Step2 管道，不是真值。</b>下面所有"差异"只表示两套标注体系不一致，
+    不代表 S1′ 或库内谁更正确 —— 判定需要回原文核对。绿=两边都有，蓝=仅 S1′ 有，橙=仅库内有。
+  </div>
+
+  <div class="card">
+    <h2>总体</h2>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="card">
+    <h2>一致度分布（Jaccard = 交集 / 并集）</h2>
+    <div id="buckets"></div>
+  </div>
+
+  <div class="card">
+    <h2>19 类编码逐类差异</h2>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--both)"></i>两边都有</span>
+      <span><i class="dot" style="background:var(--s1)"></i>仅 S1′ 有</span>
+      <span><i class="dot" style="background:var(--db)"></i>仅库内有</span>
+    </div>
+    <table class="code" id="codeTbl"></table>
+  </div>
+
+  <div class="card">
+    <h2>逐条对照（点击标题展开编码全景与原文）</h2>
+    <div class="tools">
+      <input id="q" placeholder="搜索标题…">
+      <span class="chip on" data-f="all">全部</span>
+      <span class="chip" data-f="1.0">完全一致</span>
+      <span class="chip" data-f="hi">高度一致</span>
+      <span class="chip" data-f="mid">中等差异</span>
+      <span class="chip" data-f="lo">差异较大</span>
+      <span class="chip" data-f="verylo">严重分歧</span>
+      <span class="chip" data-f="s1more">S1 编码更多</span>
+      <span class="chip" data-f="dbmore">库内编码更多</span>
+      <span class="chip" data-sort="j">按一致度排序</span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="foot">
+    数据：<code>golden_candidates.jsonl</code>（300 条输入）· <code>S1_golden_results.jsonl</code>（S1′ 结果）·
+    <code>S1_golden_review_vs_db.csv</code>（库内既有编码）<br>
+    生成：<code>scripts/golden_s1/analyze_vs_db.py</code>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+const CODES = /*__CODES__*/;
+const STATS = /*__STATS__*/;
+const NAME = Object.fromEntries(CODES.map(c => [c.c, c.n]));
+// 原文/标题含 OCR 产物（如 "<" ">" "&"），插进 innerHTML 前必须转义
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ── KPI ──
+const kpis = [
+  [STATS.n, '对比事故数'],
+  [STATS.jmed.toFixed(3), '一致度中位 (Jaccard)'],
+  [STATS.ident + ' / ' + STATS.n, '完全一致'],
+  [STATS.s1avg, 'S1′ 平均编码数'],
+  [STATS.dbavg, '库内平均编码数'],
+  [STATS.dboost, '仅库内有的编码数'],
+  [STATS.s1extra, '仅 S1′ 有的编码数'],
+];
+document.getElementById('kpis').innerHTML = kpis.map(([v,l]) =>
+  `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+// ── 分档 ──
+const BUCKETS = [
+  ['完全一致', r => r.j === 1, '#0f7b4f'],
+  ['高度一致 (0.8–1)', r => r.j >= .8 && r.j < 1, '#3f9e6f'],
+  ['中等差异 (0.6–0.8)', r => r.j >= .6 && r.j < .8, '#d9a441'],
+  ['差异较大 (0.4–0.6)', r => r.j >= .4 && r.j < .6, '#d97b2b'],
+  ['严重分歧 (<0.4)', r => r.j < .4, '#c0392b'],
+];
+document.getElementById('buckets').innerHTML = BUCKETS.map(([nm,f,col]) => {
+  const n = DATA.filter(f).length, pct = n / DATA.length * 100;
+  return `<div class="bucket" data-f="${nm}">
+    <span class="nm">${nm}</span>
+    <span class="bar"><i style="width:${pct}%;background:${col}"></i></span>
+    <span class="ct">${n} 条 (${pct.toFixed(1)}%)</span></div>`;
+}).join('');
+
+// ── 19 类编码表 ──
+const maxTot = Math.max(...CODES.map(c => c.both + c.o1 + c.o2));
+document.getElementById('codeTbl').innerHTML =
+  '<thead><tr><th style="width:52px">编码</th><th style="width:150px">名称</th>' +
+  '<th>分布（按该类出现总数）</th><th style="width:64px">两边都有</th>' +
+  '<th style="width:70px">仅S1′</th><th style="width:70px">仅库内</th><th style="width:70px">一致率</th></tr></thead><tbody>' +
+  CODES.map(c => {
+    const tot = c.both + c.o1 + c.o2 || 1, w = tot / maxTot * 100;
+    return `<tr><td class="c">${c.c}</td><td>${c.n}</td>
+      <td><span class="mini" style="width:${c.both/maxTot*100}%;background:var(--both)"></span
+        ><span class="mini" style="width:${c.o1/maxTot*100}%;background:var(--s1)"></span
+        ><span class="mini" style="width:${c.o2/maxTot*100}%;background:var(--db)"></span></td>
+      <td>${c.both}</td><td>${c.o1}</td><td>${c.o2}</td>
+      <td>${c.agree}%</td></tr>`;
+  }).join('') + '</tbody>';
+
+// ── 逐条 ──
+const LAYERS = STATS.layers;
+const list = document.getElementById('list');
+function jcolor(j){ return j>=.8?'#0f7b4f':j>=.6?'#d9a441':j>=.4?'#d97b2b':'#c0392b'; }
+function chips(arr, cls){
+  return arr.length ? arr.map(c => `<span class="code ${cls}" title="${NAME[c]||''}">${c}</span>`).join(' ')
+                    : '<span class="none-txt">（无）</span>';
+}
+function render(items){
+  if(!items.length){ list.innerHTML = '<div class="empty">没有符合条件的条目</div>'; return; }
+  list.innerHTML = items.map((r,i) => `
+    <div class="row" data-i="${r.id}">
+      <div class="rhead">
+        <span class="caret">▶</span>
+        <span class="ttl">${esc(r.t)}</span>
+        <span class="jbar">
+          <span class="track"><i style="width:${(r.j*100).toFixed(0)}%;background:${jcolor(r.j)}"></i></span>
+          <span class="num">${r.j.toFixed(2)}</span>
+        </span>
+      </div>
+      <div class="diffs">
+        <span class="grp"><span class="lbl">仅 S1′ 有</span>${chips(r.bonly,'c-s1')}</span>
+        <span class="grp"><span class="lbl">仅库内有</span>${chips(r.donly,'c-db')}</span>
+        <span class="grp"><span class="lbl">共有 ${r.s1.filter(c=>r.db.includes(c)).length} 类 · S1′ ${r.s1.length} · 库 ${r.db.length}</span></span>
+      </div>
+      <div class="detail">
+        <div class="grid">${LAYERS.map(L => `
+          <div class="layer"><div class="lh">${L.k} · ${L.n}</div>
+          ${L.cs.map(c => {
+            const b = r.s1.includes(c), d = r.db.includes(c);
+            const cls = (b&&d)?'c-both':b?'c-s1':d?'c-db':'';
+            const st = cls ? '' : 'opacity:.28;background:var(--none);color:var(--ink3)';
+            return `<span class="code ${cls}" style="${st}" title="${NAME[c]}">${c}</span>`;
+          }).join(' ')}</div>`).join('')}</div>
+        <div class="raw">${r.txt ? esc(r.txt) : '（无原文节选）'}</div>
+      </div>
+    </div>`).join('');
+}
+render(DATA);
+
+list.addEventListener('click', e => {
+  const head = e.target.closest('.rhead');
+  if(head) head.parentElement.classList.toggle('open');
+});
+
+// ── 过滤/排序 ──
+let filter = 'all', kw = '', sorted = false, curBucket = null;
+document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+  if(ch.dataset.sort){ sorted = !sorted; ch.classList.toggle('on', sorted);
+    ch.textContent = sorted ? '按一致度排序 ✓' : '按一致度排序'; apply(); return; }
+  if(ch.dataset.f === 'all'){ curBucket = null; }
+  else if(BUCKETS.some(b => b[0] === ch.dataset.f)){ curBucket = ch.dataset.f; }
+  filter = ch.dataset.f;
+  document.querySelectorAll('.chip[data-f]').forEach(x =>
+    x.classList.toggle('on', x.dataset.f === filter));
+  apply();
+}));
+document.querySelectorAll('.bucket').forEach(b => b.addEventListener('click', () => {
+  curBucket = b.dataset.f; filter = 'bucket';
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f==='all'));
+  apply();
+}));
+document.getElementById('q').addEventListener('input', e => { kw = e.target.value.trim(); apply(); });
+
+function apply(){
+  let items = DATA.slice();
+  if(curBucket){ const f = BUCKETS.find(b => b[0] === curBucket)[1]; items = items.filter(f); }
+  else if(filter === 's1more') items = items.filter(r => r.s1.length > r.db.length);
+  else if(filter === 'dbmore') items = items.filter(r => r.db.length > r.s1.length);
+  else if(filter === 'verylo') items = items.filter(r => r.j < .4);
+  if(kw) items = items.filter(r => r.t.includes(kw));
+  if(sorted) items.sort((a,b) => a.j - b.j);
+  render(items);
+}
+</script>
+</body>
+</html>

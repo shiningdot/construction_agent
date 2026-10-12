@@ -65081,9 +65081,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -65333,9 +65335,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66157,9 +66161,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66219,9 +66225,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66281,9 +66289,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66438,9 +66448,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66564,9 +66576,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -66594,9 +66608,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -67070,9 +67086,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T1_core",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -67258,9 +67276,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -67288,9 +67308,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -69548,9 +69570,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -69832,9 +69856,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -69926,9 +69952,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -70340,9 +70368,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -70370,9 +70400,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T1_core",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -70842,9 +70874,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -71368,9 +71402,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -72176,9 +72212,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -72876,9 +72914,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -73126,9 +73166,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T1_core",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 5,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -73188,9 +73230,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -73218,9 +73262,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -74572,9 +74618,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -74758,9 +74806,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -75164,9 +75214,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T1_core",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -75600,9 +75652,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -75724,9 +75778,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -75756,9 +75812,10 @@
   "source_class": "book",
   "tier": "T3_hold",
   "fails": [
+   "D_merged",
    "D_book_matter"
   ],
-  "multi_acc": 1,
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": true,
@@ -75818,9 +75875,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -77146,9 +77205,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -77206,9 +77267,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -78666,9 +78729,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -78696,9 +78761,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -81700,9 +81767,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -82144,9 +82213,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -82396,9 +82467,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -82552,9 +82625,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -83394,9 +83469,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -83580,9 +83657,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -83642,9 +83721,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -83928,9 +84009,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -83988,9 +84071,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T1_core",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -84050,9 +84135,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -84334,9 +84421,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -84874,9 +84963,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -85600,9 +85691,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 3,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -86172,9 +86265,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -86264,9 +86359,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -86294,9 +86391,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -86546,9 +86645,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,
@@ -86762,9 +86863,11 @@
   "source_url": "/home/suntianhao/construction_agent/asset/ebook/建筑施工重大伤亡事故800例 (樊锡仁主编, 樊锡仁主编, 樊锡仁) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
   "report_type": "教材案例",
   "source_class": "book",
-  "tier": "T2_short",
-  "fails": [],
-  "multi_acc": 1,
+  "tier": "T3_hold",
+  "fails": [
+   "D_merged"
+  ],
+  "multi_acc": 2,
   "truncated": false,
   "trunc_ratio": null,
   "book_matter": false,

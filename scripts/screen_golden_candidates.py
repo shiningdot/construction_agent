@@ -84,6 +84,9 @@ CASE_MARKERS = [
     (re.compile(r"案例\s*([一二三四五六七八九十百\d]+)"), 1),          # 住建部：案例十六
     (re.compile(r"##+\s*(\d{1,2}\.\d{1,2}\.\d{1,2})\s*案例"), 1),     # 住建部：## 5.1.16 案例
 ]
+# 每起事故一条的正文标记。注意 800 例里有「发生简况:」和「事故发生简况:」两种写法，
+# 只匹配带「事故」前缀的会漏掉前者，导致多起事故合并块被放行。
+BRIEF_MARK = re.compile(r"发生(?:事故)?[简高]况\s*[:：]")
 MIN_TAIL_AFTER_2ND = 300   # 第二起事故后面至少这么多字才算「真的合并了」
 
 # ── B / 打分 ───────────────────────────────────────────────────
@@ -154,6 +157,12 @@ def count_multi_accidents(t: str) -> int:
     n_unit = len(re.findall(r"发生单位\s*[:：]", t))
     if n_unit:
         best = max(best, n_unit)
+
+    # 「发生简况 / 事故发生简况」是 800 例里每起事故一条的字段标签：出现 ≥2 次即多起事故。
+    # 实测第二起可能很短（214~294 字），故不再要求尾部长度。
+    n_brief = len(BRIEF_MARK.findall(t))
+    if n_brief >= 2:
+        best = max(best, n_brief)
     return best
 
 

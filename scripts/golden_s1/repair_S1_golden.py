@@ -14,7 +14,6 @@ from pathlib import Path
 
 ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
 GOLD = ROOT / "experiments/golden_standard"
-RES = GOLD / "S1_result"
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
 
 from dotenv import load_dotenv  # noqa: E402
@@ -27,7 +26,7 @@ from run_S1_golden import USER_PREFIX, extract_json, validate  # noqa: E402
 
 
 def main():
-    path = RES / "S1_golden_full.jsonl"
+    path = GOLD / "S1_golden_results.jsonl"
     rows = [json.loads(l) for l in path.open(encoding="utf-8")]
     raw_text = {json.loads(l)["id"]: json.loads(l)["raw_text"]
                 for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}
@@ -66,9 +65,6 @@ def main():
     merged = [fixed.get(r["id"], r) for r in rows]
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in merged),
                     encoding="utf-8")
-    (RES / "S1_golden_repair_raw.json").write_text(
-        json.dumps({k: v.get("raw_output", "") for k, v in fixed.items()},
-                   ensure_ascii=False, indent=1), encoding="utf-8")
     ok = sum(1 for r in merged if not r.get("error") and not r.get("parse_error"))
     print(f"补跑完成：现在 {ok}/{len(merged)} 条 JSON 可解析")
 

@@ -1,7 +1,7 @@
 import csv, json, statistics as st
 from collections import Counter
 
-p = "experiments/golden_standard/S1_result/S1_golden_v2_vs_db.csv"
+p = "experiments/golden_standard/S1_golden_review_vs_db.csv"
 rows = list(csv.DictReader(open(p, encoding="utf-8")))
 j = [float(r["Jaccard"]) for r in rows if r["Jaccard"]]
 print(f"与库内既有标注对照 n={len(rows)}，可比 {len(j)}")
@@ -19,7 +19,7 @@ print("  S1 漏掉但库内有的编码 top:", only_db.most_common(6))
 
 # 死亡人数一致性：S1 vs 库内
 recs = {json.loads(l)["id"]: json.loads(l) for l in
-        open("experiments/golden_standard/S1_result/S1_golden_v2.jsonl", encoding="utf-8")}
+        open("experiments/golden_standard/S1_golden_results.jsonl", encoding="utf-8")}
 cand = {json.loads(l)["id"]: json.loads(l) for l in
         open("experiments/golden_standard/golden_candidates.jsonl", encoding="utf-8")}
 import sqlite3

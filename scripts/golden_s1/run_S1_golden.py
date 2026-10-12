@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
 GOLD = ROOT / "experiments/golden_standard"
-OUT_DIR = GOLD / "S1_result"
+OUT_DIR = GOLD          # 结果与输入同级，扁平存放
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
 
 from dotenv import load_dotenv  # noqa: E402
@@ -139,9 +139,9 @@ def main():
         recs = recs[: args.limit]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    tag = args.out_tag or ("pilot" if args.limit else "full")
-    jsonl_path = OUT_DIR / f"S1_golden_{tag}.jsonl"
-    json_path = OUT_DIR / f"S1_golden_{tag}_results.json"
+    tag = args.out_tag or ("pilot" if args.limit else "")
+    suffix = f"_{tag}" if tag else ""
+    jsonl_path = OUT_DIR / f"S1_golden_results{suffix}.jsonl"
 
     done = set()
     if jsonl_path.exists():                      # 断点续跑
@@ -196,11 +196,10 @@ def main():
         "avg_sec_per_case": round(
             sum(r.get("elapsed_sec", 0) for r in all_rows) / max(1, len(all_rows)), 1),
     }
-    json_path.write_text(json.dumps({"summary": summary, "results": all_rows},
-                                    ensure_ascii=False, indent=2), encoding="utf-8")
+    print("\n汇总: " + json.dumps(summary, ensure_ascii=False))
     print(f"\n✅ {ok}/{len(all_rows)} | {summary['avg_sec_per_case']}s/条 | "
           f"tok={summary['total_prompt_tokens']}+{summary['total_completion_tokens']}")
-    print(f"📁 {json_path}")
+    print(f"📁 {jsonl_path}")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>S1′ 编码 vs 库内既有编码 · 300 条逐条差异</title>
+<title>__ANAME__ vs __BNAME__ · 300 条逐条差异</title>
 <style>
   :root{
     --bg:#f7f8fa; --card:#fff; --ink:#1a1d23; --ink2:#5b6370; --ink3:#8b929e;
@@ -93,12 +93,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>S1′ 编码 <span style="color:var(--ink3);font-weight:400">vs</span> 库内既有编码</h1>
+  <h1>__ANAME__ <span style="color:var(--ink3);font-weight:400">vs</span> __BNAME__</h1>
   <div class="sub">同一批 300 条事故，两套标注逐条对照 · 共 19 类 CAICS 编码</div>
 
   <div class="note">
-    <b>库内编码来自本项目自己的 Step2 管道，不是真值。</b>下面所有"差异"只表示两套标注体系不一致，
-    不代表 S1′ 或库内谁更正确 —— 判定需要回原文核对。绿=两边都有，蓝=仅 S1′ 有，橙=仅库内有。
+    <b>两套编码都不是真值</b>，差异只表示标注体系不一致，不代表谁更正确 —— 判定需要回原文核对。
+    绿=两边都有，蓝=仅 __ANAME__ 有，橙=仅 __BNAME__ 有。
   </div>
 
   <div class="card">
@@ -115,8 +115,8 @@
     <h2>19 类编码逐类差异</h2>
     <div class="legend">
       <span><i class="dot" style="background:var(--both)"></i>两边都有</span>
-      <span><i class="dot" style="background:var(--s1)"></i>仅 S1′ 有</span>
-      <span><i class="dot" style="background:var(--db)"></i>仅库内有</span>
+      <span><i class="dot" style="background:var(--s1)"></i>仅 __ANAME__ 有</span>
+      <span><i class="dot" style="background:var(--db)"></i>仅 __BNAME__ 有</span>
     </div>
     <table class="code" id="codeTbl"></table>
   </div>
@@ -131,16 +131,15 @@
       <span class="chip" data-f="mid">中等差异</span>
       <span class="chip" data-f="lo">差异较大</span>
       <span class="chip" data-f="verylo">严重分歧</span>
-      <span class="chip" data-f="s1more">S1 编码更多</span>
-      <span class="chip" data-f="dbmore">库内编码更多</span>
+      <span class="chip" data-f="s1more">__ANAME__ 编码更多</span>
+      <span class="chip" data-f="dbmore">__BNAME__ 编码更多</span>
       <span class="chip" data-sort="j">按一致度排序</span>
     </div>
     <div id="list"></div>
   </div>
 
   <div class="foot">
-    数据：<code>golden_candidates.jsonl</code>（300 条输入）· <code>S1_golden_results.jsonl</code>（S1′ 结果）·
-    <code>S1_golden_review_vs_db.csv</code>（库内既有编码）<br>
+    数据：<code>golden_candidates.jsonl</code>（300 条输入）· 对照结果见同目录 <code>*_vs_db.csv</code><br>
     生成：<code>scripts/golden_s1/analyze_vs_db.py</code>
   </div>
 </div>
@@ -158,10 +157,10 @@ const kpis = [
   [STATS.n, '对比事故数'],
   [STATS.jmed.toFixed(3), '一致度中位 (Jaccard)'],
   [STATS.ident + ' / ' + STATS.n, '完全一致'],
-  [STATS.s1avg, 'S1′ 平均编码数'],
-  [STATS.dbavg, '库内平均编码数'],
-  [STATS.dboost, '仅库内有的编码数'],
-  [STATS.s1extra, '仅 S1′ 有的编码数'],
+  [STATS.s1avg, STATS.aName + ' 平均编码数'],
+  [STATS.dbavg, STATS.bName + ' 平均编码数'],
+  [STATS.dboost, '仅 ' + STATS.bName + ' 有的编码数'],
+  [STATS.s1extra, '仅 ' + STATS.aName + ' 有的编码数'],
 ];
 document.getElementById('kpis').innerHTML = kpis.map(([v,l]) =>
   `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
@@ -187,7 +186,8 @@ const maxTot = Math.max(...CODES.map(c => c.both + c.o1 + c.o2));
 document.getElementById('codeTbl').innerHTML =
   '<thead><tr><th style="width:52px">编码</th><th style="width:150px">名称</th>' +
   '<th>分布（按该类出现总数）</th><th style="width:64px">两边都有</th>' +
-  '<th style="width:70px">仅S1′</th><th style="width:70px">仅库内</th><th style="width:70px">一致率</th></tr></thead><tbody>' +
+  `<th style="width:70px">仅${STATS.aName}</th><th style="width:70px">仅${STATS.bName}</th>` +
+  '<th style="width:70px">一致率</th></tr></thead><tbody>' +
   CODES.map(c => {
     const tot = c.both + c.o1 + c.o2 || 1, w = tot / maxTot * 100;
     return `<tr><td class="c">${c.c}</td><td>${c.n}</td>
@@ -219,9 +219,9 @@ function render(items){
         </span>
       </div>
       <div class="diffs">
-        <span class="grp"><span class="lbl">仅 S1′ 有</span>${chips(r.bonly,'c-s1')}</span>
-        <span class="grp"><span class="lbl">仅库内有</span>${chips(r.donly,'c-db')}</span>
-        <span class="grp"><span class="lbl">共有 ${r.s1.filter(c=>r.db.includes(c)).length} 类 · S1′ ${r.s1.length} · 库 ${r.db.length}</span></span>
+        <span class="grp"><span class="lbl">仅 ${STATS.aName} 有</span>${chips(r.bonly,'c-s1')}</span>
+        <span class="grp"><span class="lbl">仅 ${STATS.bName} 有</span>${chips(r.donly,'c-db')}</span>
+        <span class="grp"><span class="lbl">共有 ${r.s1.filter(c=>r.db.includes(c)).length} 类 · ${STATS.aName} ${r.s1.length} · ${STATS.bName} ${r.db.length}</span></span>
       </div>
       <div class="detail">
         <div class="grid">${LAYERS.map(L => `

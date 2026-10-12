@@ -26,7 +26,15 @@ from run_S1_golden import USER_PREFIX, extract_json, validate  # noqa: E402
 
 
 def main():
-    path = GOLD / "S1_golden_results.jsonl"
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dir", default=str(GOLD), help="结果所在目录（可指向 pro/ 等子目录）")
+    ap.add_argument("--model", default="", help="覆盖模型名；留空读 .env")
+    args = ap.parse_args()
+    out_dir = Path(args.dir)
+
+    path = out_dir / "S1_golden_results.jsonl"
     rows = [json.loads(l) for l in path.open(encoding="utf-8")]
     raw_text = {json.loads(l)["id"]: json.loads(l)["raw_text"]
                 for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}
@@ -37,7 +45,7 @@ def main():
     system = build_system_prompt()
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"),
                        base_url=os.getenv("ANTHROPIC_BASE_URL"))
-    model = os.getenv("ANTHROPIC_MODEL")
+    model = args.model or os.getenv("ANTHROPIC_MODEL")
 
     fixed = {}
     for r in bad:

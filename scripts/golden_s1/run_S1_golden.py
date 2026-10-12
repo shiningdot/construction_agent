@@ -124,6 +124,10 @@ def main():
     ap.add_argument("--out-tag", default="")
     ap.add_argument("--only-ids", default="",
                     help="逗号分隔的事故 id，或指向每行一个 id 的文件；只跑这些")
+    ap.add_argument("--model", default="",
+                    help="覆盖模型名；留空则读 .env 的 ANTHROPIC_MODEL")
+    ap.add_argument("--out-dir", default="",
+                    help="结果输出目录；留空则写到 experiments/golden_standard/")
     ap.add_argument("--candidates", default="golden_candidates.jsonl",
                     help="候选集文件名（相对 experiments/golden_standard/）")
     args = ap.parse_args()
@@ -138,7 +142,9 @@ def main():
     if args.limit:
         recs = recs[: args.limit]
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out_dir) if args.out_dir else OUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    OUT_DIR = out_dir
     tag = args.out_tag or ("pilot" if args.limit else "")
     suffix = f"_{tag}" if tag else ""
     jsonl_path = OUT_DIR / f"S1_golden_results{suffix}.jsonl"
@@ -153,7 +159,7 @@ def main():
     todo = [r for r in recs if r["id"] not in done]
 
     system = build_system_prompt()
-    model = os.getenv("ANTHROPIC_MODEL")
+    model = args.model or os.getenv("ANTHROPIC_MODEL")
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"),
                        base_url=os.getenv("ANTHROPIC_BASE_URL"))
     print(f"模型 {model} | system {len(system)} 字符 | 待跑 {len(todo)} 条 "

@@ -26,7 +26,15 @@ CAICS_ORDER = ([f"M{i}" for i in range(1, 6)] + [f"F{i}" for i in range(1, 5)]
 
 
 def main():
-    rows = [json.loads(l) for l in (GOLD / "S1_golden_results.jsonl").open(encoding="utf-8")]
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dir", default=str(GOLD),
+                    help="结果所在目录（默认 experiments/golden_standard，可指向 pro/ 等子目录）")
+    args = ap.parse_args()
+    out_dir = Path(args.dir)
+
+    rows = [json.loads(l) for l in (out_dir / "S1_golden_results.jsonl").open(encoding="utf-8")]
     raw = {json.loads(l)["id"]: json.loads(l)["raw_text"]
            for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}
 
@@ -81,7 +89,7 @@ def main():
             print(f"  ⚠ {r['id'][:8]} {r['title'][:30]} | {'; '.join(r['schema_errors'])}")
 
     # 人工审核表
-    with (GOLD / "S1_golden_review.csv").open("w", newline="", encoding="utf-8") as f:
+    with (out_dir / "S1_golden_review.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["id", "title", "tier", "source", "text_len", "codes", "n_codes",
                     "accident_type", "severity", "deaths", "injuries", "date", "location",
@@ -103,7 +111,7 @@ def main():
     for aid, code in con.execute("select accident_id, code from caics_causes"):
         db_codes[aid].add(code)
     con.close()
-    with (GOLD / "S1_golden_review_vs_db.csv").open("w", newline="", encoding="utf-8") as f:
+    with (out_dir / "S1_golden_review_vs_db.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["id", "title", "S1_codes", "db_codes", "仅S1有", "仅库有", "Jaccard"])
         for r in rows:
@@ -114,7 +122,7 @@ def main():
                         "|".join(sorted(s1 - db)), "|".join(sorted(db - s1)),
                         round(len(s1 & db) / len(union), 3) if union else ""])
 
-    print(f"\n产物 → {GOLD}/S1_golden_review.csv, {GOLD}/S1_golden_review_vs_db.csv")
+    print(f"\n产物 → {out_dir}/S1_golden_review.csv, {out_dir}/S1_golden_review_vs_db.csv")
 
 
 if __name__ == "__main__":

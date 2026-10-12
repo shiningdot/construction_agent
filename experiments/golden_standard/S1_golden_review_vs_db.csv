@@ -1,4 +1,4 @@
-id,title,S1_codes,db_codes,仅S1有,仅库有,Jaccard
+id,title,S1′-flash_codes,库内Step2编码_codes,仅S1′-flash有,仅库内Step2编码有,Jaccard
 7dd2459ac7fa,"昆明新机场""1·3""支架坍塌事故",F2|H1|M1|M2|M3|M4|M5|T2,F2|H1|H3|M1|M2|M3|M4|M5|T2,,H3,0.889
 5ebe1aa97fb8,"贵阳市轨道交通2号线一期工程""8·8""坍塌事故",H1|H3|M1|M2|M3|M5,F2|H1|H2|H3|M1|M2|M3|M4|M5,,F2|H2|M4,0.667
 68118b313534,龙口市金域蓝湾B区施工升降机坠落事故,F2|F3|H1|H2|M1|M2|M3|M4|M5|T1,F2|F3|H1|H2|H3|M1|M2|M3|M4|M5|T1,,H3,0.909

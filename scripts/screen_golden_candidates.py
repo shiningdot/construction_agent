@@ -356,6 +356,10 @@ def main():
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    # 过程文件（打分全表、待重抓清单、报告、csv 视图）统一写进 _process/，
+    # 保持 out/ 顶层只有 golden_candidates.jsonl 这一份可直接使用的输入。
+    proc = out / "_process"
+    proc.mkdir(exist_ok=True)
 
     pool = [s for s in scored if s["tier"] in ("T1_core", "T2_short")]
     kept, dropped = dedup(pool)
@@ -374,13 +378,13 @@ def main():
             f.write(json.dumps({**c, "raw_text": raw_by_id[c["id"]]}, ensure_ascii=False) + "\n")
 
     keys = [k for k in selected[0] if k not in ("fails",)]
-    with (out / "golden_candidates.csv").open("w", newline="", encoding="utf-8") as f:
+    with (proc / "golden_candidates.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=keys)
         w.writeheader()
         for c in selected:
             w.writerow({k: v for k, v in c.items() if k in keys})
 
-    (out / "screening_all_scored.json").write_text(
+    (proc / "screening_all_scored.json").write_text(
         json.dumps(scored, ensure_ascii=False, indent=1), encoding="utf-8")
 
     # 网页来源中「最值得重抓」的一批：有原因段、文本较洁净、篇幅够
@@ -388,7 +392,7 @@ def main():
                    if s["source_class"] != "book" and s["head_variety"] >= 1
                    and s["frag_ratio"] <= MAX_FRAG_RATIO and s["len"] >= MIN_LEN_T1]
     recoverable.sort(key=lambda s: -s["score"])
-    with (out / "tier3_web_recoverable.csv").open("w", newline="", encoding="utf-8") as f:
+    with (proc / "tier3_web_recoverable.csv").open("w", newline="", encoding="utf-8") as f:
         cols = ["id", "title", "source_name", "source_url", "len", "trunc_ratio",
                 "frag_ratio", "cause_clauses", "score"]
         w = csv.DictWriter(f, fieldnames=cols)
@@ -412,8 +416,8 @@ def main():
     for k, v in sorted(Counter(c["layers_hit"] for c in selected).items()):
         L.append(f"| {k} 层 | {v} |")
     L += ["", f"- 网页来源待重抓清单：{len(recoverable)} 条 → `tier3_web_recoverable.csv`", ""]
-    (out / "SCREENING_REPORT.md").write_text("\n".join(L), encoding="utf-8")
-    print(f"产出 → {out}/")
+    (proc / "SCREENING_REPORT.md").write_text("\n".join(L), encoding="utf-8")
+    print(f"产出 → {out}/golden_candidates.jsonl（+ 过程文件在 {proc}/）")
 
 
 if __name__ == "__main__":

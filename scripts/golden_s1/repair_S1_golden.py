@@ -1,6 +1,6 @@
 """补跑 S1' 中的异常条目（API 错误 / JSON 解析失败 / schema 违规）。
 
-保留原始输出以便诊断，并把修复结果合并回 S1_golden_full.jsonl。
+保留原始输出以便诊断，并把修复结果合并回 S1_golden_results.jsonl。
 
 用法：
     python3 scripts/golden_s1/repair_S1_golden.py

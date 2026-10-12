@@ -13,7 +13,7 @@
 | `S1_golden_review_vs_db.csv` | 审核辅助：与库内既有 `caics_causes`（主管道产出）的逐条编码差异（**差异信号，非真值**） |
 
 筛选中间态、首轮含多事故合并块的版本等过程文件已全部删除；需要时用下方脚本重跑生成
-（注意 `screen_golden_candidates.py --select` 会另外写出打分/报告等过程文件）。
+（`screen_golden_candidates.py --select` 的过程文件会写进 `_process/` 子目录，不污染本层）。
 
 ## 数据来源与筛选
 

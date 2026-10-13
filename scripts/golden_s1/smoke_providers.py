@@ -81,18 +81,30 @@ def main():
     print("冒烟测试：GLM（智谱）与 腾讯混元")
     print("=" * 96)
 
-    # ── 1. 混元：Anthropic 兼容 ──
+    # ── 1. 混元：Anthropic 兼容，逐个候选端点试 ──
     hy_key = os.getenv("HUNYUAN_API_KEY", "")
-    hy_base = os.getenv("HUNYUAN_BASE_URL", "https://tokenhub-intl.tencentmaas.com")
-    print(f"\n[1] 混元 Anthropic 兼容  base={hy_base}")
+    HY_ENDPOINTS = [
+        os.getenv("HUNYUAN_BASE_URL", "https://tokenhub-intl.tencentmaas.com"),
+        "https://tokenhub.tencentmaas.com",              # 国内站（无 -intl）
+        "https://api.hunyuan.cloud.tencent.com",         # 混元原生域名
+        "https://api.hunyuan.cloud.tencent.com/anthropic",
+        "https://hunyuan.tencentcloudapi.com",
+    ]
+    print("\n[1] 混元 Anthropic 兼容（逐个候选端点）")
     if not hy_key:
         print("  ✗ 未读到 HUNYUAN_API_KEY")
     else:
-        out.append(probe("hunyuan hy3", f"{hy_base.rstrip('/')}/v1/messages",
-                         {"Content-Type": "application/json",
-                          "anthropic-version": "2023-06-01",
-                          "x-api-key": hy_key},
-                         anthropic_body("hy3"), "anthropic"))
+        seen = set()
+        for base in HY_ENDPOINTS:
+            b = base.rstrip("/")
+            if not b or b in seen:
+                continue
+            seen.add(b)
+            out.append(probe(f"hy3 @ {b[:46]}", f"{b}/v1/messages",
+                             {"Content-Type": "application/json",
+                              "anthropic-version": "2023-06-01",
+                              "x-api-key": hy_key},
+                             anthropic_body("hy3"), "anthropic"))
 
     # ── 2. GLM：Anthropic 兼容端点，两个 key × 候选模型名 ──
     glm_base = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/anthropic")

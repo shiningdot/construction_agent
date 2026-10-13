@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 OUT_DIR = GOLD          # 结果与输入同级，扁平存放
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))

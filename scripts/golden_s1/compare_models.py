@@ -19,7 +19,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/model-bakeoff")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
@@ -27,10 +27,10 @@ from analyze_causes_threeway import ALL_CODES, CODE_NAME  # noqa: E402
 
 # 模型 → 结果文件（相对 GOLD）
 MODELS = {
-    "flash": "S1_golden_results.jsonl",
+    "flash": "flash/S1_golden_results.jsonl",
     "pro": "pro/S1_golden_results.jsonl",
-    "glm-5.2": "glm/S1_golden_results.jsonl",
-    "hunyuan": "hunyuan/S1_golden_results.jsonl",
+    "glm-5.2": "glm5.2/S1_golden_results.jsonl",
+    "hunyuan": "hy3/S1_golden_results.jsonl",
 }
 
 

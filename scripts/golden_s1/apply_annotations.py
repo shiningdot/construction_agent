@@ -23,8 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from analyze_causes_threeway import ALL_CODES  # noqa: E402
 
-GT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen"
-          "/experiments/golden_standard/gt")
+GT = Path(__file__).resolve().parents[2] / "experiments/golden_standard/gt"   # 按脚本位置推导，勿写死
 BASIC_DRAFT = GT / "gt_draft.jsonl"
 CAUSE_DRAFT = GT / "gt_causes_draft.jsonl"
 BASIC_ANNO = GT / "gt_annotations.jsonl"

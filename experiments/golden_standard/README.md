@@ -3,19 +3,18 @@
 用于构建 CAICS 致因标注的**标准答案**：先筛出优质事故，再由强模型做特征提取与致因标注，
 最后人工审核核对，冻结为评测用的标准数据集。
 
-## 目录内容（4 个数据文件 + 本说明）
+## 目录内容
+
+顶层放**共享输入**与**跨模型对照**；四个模型的结果各自归档在 `flash/` `pro/` `glm5.2/` `hy3/`。
 
 | 文件 | 内容 |
 |---|---|
 | `golden_candidates.jsonl` | **300 条输入**。每条含 `raw_text` 全文 + 元数据 + 筛选指标（tier/score/来源/事故类型/死亡人数…） |
-| `S1_golden_results.jsonl` | **300 条结果**。每条含 `parsed`（**基础特征 31 字段** + **`codes` CAICS 5 层 19 类编码**）+ token/耗时 |
-| `S1_golden_review.csv` | **人工审核表**。逐条：编码 + 基础字段 + 原文节选（前 600 字） |
-| `S1_golden_review_vs_db.csv` | 审核辅助：与库内既有 `caics_causes`（主管道产出）的逐条编码差异（**差异信号，非真值**） |
-| `S1_vs_db_diff.html` | **可视化逐条差异**：一致度分档、19 类编码逐类差异、300 条逐条对照（可搜索/筛选/排序，展开看 5 层编码全景与原文）。生成：`scripts/golden_s1/analyze_vs_db.py` |
+| `flash/` `pro/` `glm5.2/` `hy3/` | **四个模型各自的归档**，每个含 `golden_candidates.jsonl`（原始输入）+ `S1_golden_results.jsonl`（最终结果，300 条，含基础特征 31 字段与 CAICS 19 类编码）+ 该模型的审核表与 vs 库内对照 |
 | `S1_pro_vs_flash.html` | **pro vs flash** 跨模型逐条对照（同一提示词、同一样本，只有模型不同） |
 | `basic_features_flash_vs_pro.html` | **基础特征一致性分析**：31 字段 × 300 条，flash/pro/库内三方并排，默认只显示分歧字段 |
 | `gt/` | **基础特征 GT**：`gt_draft.jsonl`（**最终 GT**：300 条 × **13 个核心客观特征**，3900 格全部定值 + 每格 provenance）、`annotation.html`（人工标注页，4 格已裁决完毕；如需再标注可用 `apply_annotations.py` 合回）、`GT_REPORT.md` · **致因 GT**：`gt_causes_draft.jsonl`（300 条 × 19 类逐编码 provenance，待裁 916 格）、`cause_annotation.html`（致因裁决页）、`CAUSE_GT_REPORT.md` |
-| `pro/` | **同 300 条的 pro 结果**，结构与本目录一致（结果 jsonl + 审核表 + vs 库内对照 CSV/HTML） |
+| `MODEL_COMPARISON.md` | **四模型能力对照报告**（含端点/额度踩坑记录）；明细见 `COMPARE_3models.txt` / `COMPARE_4models.txt` |
 
 筛选中间态、首轮含多事故合并块的版本等过程文件已全部删除；需要时用下方脚本重跑生成
 （`screen_golden_candidates.py --select` 的过程文件会写进 `_process/` 子目录，不污染本层）。

@@ -22,7 +22,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 GT = GOLD / "gt"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
@@ -88,7 +88,7 @@ def main():
     cand = {json.loads(l)["id"]: json.loads(l)
             for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}
     ids = list(cand)
-    F = codes_of(GOLD / "S1_golden_results.jsonl")
+    F = codes_of(GOLD / "flash/S1_golden_results.jsonl")
     P = codes_of(GOLD / "pro/S1_golden_results.jsonl")
     D, EV = db_codes_evidence(ids)
 

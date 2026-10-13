@@ -19,7 +19,7 @@ import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
 
@@ -115,7 +115,7 @@ def cmp_value(field: str, a, b, db=None):
 
 
 def main():
-    flash = load_results(GOLD / "S1_golden_results.jsonl")
+    flash = load_results(GOLD / "flash/S1_golden_results.jsonl")
     pro = load_results(GOLD / "pro/S1_golden_results.jsonl")
     cand = {json.loads(l)["id"]: json.loads(l)
             for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}

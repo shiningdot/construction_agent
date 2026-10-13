@@ -6,6 +6,10 @@
 生成脚本：`scripts/golden_s1/compare_models.py`
 明细输出：`COMPARE_3models.txt`（300 条全量）、`COMPARE_4models.txt`（四模型重叠的 86 条）
 
+## 结果位置
+
+每个模型的结果各自归档：`flash/`（deepseek-v4-flash）、`pro/`（deepseek-v4-pro）、`glm5.2/`、`hy3/`（腾讯混元）。每个文件夹内含**原始输入** `golden_candidates.jsonl` 与**最终结果** `S1_golden_results.jsonl`（各 300 条），以及该模型的审核表与 vs 库内对照。
+
 ## 一、各模型是否跑通
 
 | 模型 | 端点 | 状态 | 耗时/条 | 备注 |

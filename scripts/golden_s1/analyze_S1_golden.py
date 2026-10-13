@@ -14,7 +14,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))

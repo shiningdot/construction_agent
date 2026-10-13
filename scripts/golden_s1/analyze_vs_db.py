@@ -26,7 +26,7 @@ import statistics as st
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"
 
@@ -139,7 +139,7 @@ def build_html(rows, per_code, a_name, b_name, out_path: Path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--a", default=str(GOLD / "S1_golden_results.jsonl"))
+    ap.add_argument("--a", default=str(GOLD / "flash/S1_golden_results.jsonl"))
     ap.add_argument("--b", default="db", help="db 或另一份结果 jsonl 路径")
     ap.add_argument("--a-name", default="S1′")
     ap.add_argument("--b-name", default="库内")

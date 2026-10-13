@@ -20,7 +20,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path("/home/suntianhao/construction_agent/.claude/worktrees/golden-standard-screen")
+ROOT = Path(__file__).resolve().parents[2]   # 工作树根：按脚本位置推导，任何 worktree 都适用（勿写死绝对路径）
 GOLD = ROOT / "experiments/golden_standard"
 GT = GOLD / "gt"
 sys.path.insert(0, str(ROOT / "scripts/golden_s1"))
@@ -64,7 +64,7 @@ def enum_of(field):
 
 
 def main():
-    flash = load_results(GOLD / "S1_golden_results.jsonl")
+    flash = load_results(GOLD / "flash/S1_golden_results.jsonl")
     pro = load_results(GOLD / "pro/S1_golden_results.jsonl")
     cand = {json.loads(l)["id"]: json.loads(l)
             for l in (GOLD / "golden_candidates.jsonl").open(encoding="utf-8")}
@@ -160,7 +160,7 @@ def main():
          "具体部位 `accident_location_detail`、区县 `district`、标题 `title`、报告类型 `report_type`。",
          "**其他客观但零收益**：施工阶段/作业类型/伤亡工种/承包类型/涉及设备/涉及材料/建筑结构类型"
          "（保留会各增 11–70 条互异）。", "",
-         "被剔除字段的模型输出仍保留在 `S1_golden_results.jsonl` / `pro/S1_golden_results.jsonl`，"
+         "被剔除字段的模型输出仍保留在 `flash/S1_golden_results.jsonl` / `pro/S1_golden_results.jsonl`，"
          "需要时可随时取用。字段取舍依据见 `scripts/golden_s1/inventory_fields.py` 的全字段清点。", "",
          "## 各字段情况", "",
          "| 字段 | 三方一致 | 两方一致(自动) | 规则判定 | 三方互异(人工) | 自动率 |",

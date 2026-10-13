@@ -1,7 +1,7 @@
 import json, re, random
 
 recs = [json.loads(l) for l in
-        open("experiments/golden_standard/S1_golden_results.jsonl", encoding="utf-8")]
+        open("experiments/golden_standard/flash/S1_golden_results.jsonl", encoding="utf-8")]
 raw = {json.loads(l)["id"]: json.loads(l)["raw_text"] for l in
        open("experiments/golden_standard/golden_candidates.jsonl", encoding="utf-8")}
 random.seed(11)

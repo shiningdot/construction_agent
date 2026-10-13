@@ -19,7 +19,7 @@ print("  S1 漏掉但库内有的编码 top:", only_db.most_common(6))
 
 # 死亡人数一致性：S1 vs 库内
 recs = {json.loads(l)["id"]: json.loads(l) for l in
-        open("experiments/golden_standard/S1_golden_results.jsonl", encoding="utf-8")}
+        open("experiments/golden_standard/flash/S1_golden_results.jsonl", encoding="utf-8")}
 cand = {json.loads(l)["id"]: json.loads(l) for l in
         open("experiments/golden_standard/golden_candidates.jsonl", encoding="utf-8")}
 import sqlite3

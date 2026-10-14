@@ -199,10 +199,12 @@ def render_field_spec() -> str:
 FIELDS = None  # 运行时填充
 
 
-def build_system_prompt(strategy: str = "S1") -> str:
-    """把指定策略的正文拼上统一的 31 字段输出要求。默认 S1（与既有产物兼容）。"""
-    tax_and_examples, tail = load_strategy_parts(strategy)
+def build_output_block() -> str:
+    """「31 字段规格 + 输出要求」这一段——所有策略共用，保证输出口径一致。
 
+    单独抽出来，是为了让 S5′ 的汇总调用（只产出基础特征、codes 由管道给出）
+    复用同一段文本，避免两处口径漂移。
+    """
     global FIELDS
     FIELDS = render_field_spec()
     props = _load_step1_tool()["input_schema"]["properties"]
@@ -227,11 +229,7 @@ def build_system_prompt(strategy: str = "S1") -> str:
     import json as _json
     sample_txt = _json.dumps(sample, ensure_ascii=False)
 
-    return f"""你是施工安全事故分析专家。从事故文本中同时提取【基础特征】与【CAICS 致因编码】。
-
-{tax_and_examples}
-
-## 基础特征字段（31 个，与主管道 Step1 口径一致）
+    return f"""## 基础特征字段（31 个，与主管道 Step1 口径一致）
 
 {FIELDS}
 
@@ -247,7 +245,18 @@ def build_system_prompt(strategy: str = "S1") -> str:
 {sample_txt}
 
 字段清单：{example_keys}
-只输出 JSON，不要输出其它文字。{("\n\n" + tail) if tail else ""}"""
+只输出 JSON，不要输出其它文字。"""
+
+
+def build_system_prompt(strategy: str = "S1") -> str:
+    """把指定策略的正文拼上统一的 31 字段输出要求。默认 S1（与既有产物兼容）。"""
+    tax_and_examples, tail = load_strategy_parts(strategy)
+    block = build_output_block()
+    return f"""你是施工安全事故分析专家。从事故文本中同时提取【基础特征】与【CAICS 致因编码】。
+
+{tax_and_examples}
+
+{block}{("\n\n" + tail) if tail else ""}"""
 
 
 if __name__ == "__main__":

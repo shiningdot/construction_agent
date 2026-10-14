@@ -45,6 +45,10 @@ LABELS = {"deepseek-v4-flash": "flash", "deepseek-v4-pro": "pro",
 
 def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> dict:
     """一次调用。与 run_S1_golden 的同名函数一致，额外记录 hit_cap（是否撞顶）。"""
+    if strategy == "S5":                       # S5′ 是分层多调用，走专用适配器
+        from s5_layers import call_s5
+        return call_s5(client, model, system, rec, max_tokens, use_stream)
+
     user = USER_PREFIX + f"事故文本：\n{rec['raw_text']}"
     last_err = ""
     for attempt in range(3):
@@ -144,7 +148,8 @@ def main():
             done.add(r["id"])
     todo = [r for r in recs if r["id"] not in done]
 
-    system = prompt_build.build_system_prompt(args.strategy)
+    # S5′ 的提示词由 s5_layers 逐层自行构建，这里无需（也无法）预先拼一个 system
+    system = "" if args.strategy == "S5" else prompt_build.build_system_prompt(args.strategy)
     client = Anthropic(api_key=api_key, base_url=base_url)
     print(f"策略 {args.strategy} | provider={args.provider} | 模型 {model} | 标签 {label}\n"
           f"system {len(system)} 字符 | 待跑 {len(todo)} 条（已完成 {len(done)}）| "

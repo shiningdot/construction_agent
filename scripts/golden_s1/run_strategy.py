@@ -63,6 +63,10 @@ def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> di
             parsed = extract_json(raw)
             u = getattr(resp, "usage", None)
             ct = getattr(u, "output_tokens", 0) if u else 0
+            # 派生信号（不存原文，只存几个廉价计数）：用于事后判断
+            # 「模型是否真的先写了推理/计划」以及 S4′/S5′ 的 explicit vs inferred 比例
+            cut = raw.rfind("{")                     # extract_json 取的就是这个位置起
+            reason_text = raw[:cut] if cut > 0 else ""
             return {
                 "id": rec["id"], "title": rec["title"], "strategy": strategy,
                 "tier": rec["tier"], "source_name": rec["source_name"],
@@ -73,6 +77,9 @@ def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> di
                 "elapsed_sec": round(time.time() - t0, 1),
                 "prompt_tokens": getattr(u, "input_tokens", 0) if u else 0,
                 "completion_tokens": ct,
+                "reason_chars": len(reason_text),     # JSON 之前的行文长度（计划/推理）
+                "n_explicit": raw.count("[explicit]"),
+                "n_inferred": raw.count("[inferred]"),
                 "attempts": attempt + 1,
             }
         except Exception as e:  # noqa: BLE001

@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -23,6 +24,13 @@ SIX = f"{CLASSIFIER_MOD}/experiments/experiment_6strategies"
 # 策略正文在 system 文本中的截断标记：其后是「输出字段要求」，由本模块统一重写
 _OUTPUT_MARK = "输出最终JSON。字段要求:"
 _RUNNER_HEAD = "你是施工安全事故分析专家。从事故文本中提取致因编码。"
+
+# 本地重写覆盖目录：`prompts/{策略}.md` 存在时优先于上游源码。
+# 重设计的 S3′/S4′/S5′ 放这里——上游 run_S*.py 属于另一个 worktree，不可改动。
+# 文件内可用一行 `<!--TAIL-->` 把内容切成两段：前段进正文位置，后段拼在整个 system 的最末尾
+# （用于「必须输出 codes 数组」这类需要在字段清单之后才出现的指令）。
+OVERRIDE_DIR = Path(__file__).resolve().parent / "prompts"
+_TAIL_MARK = "<!--TAIL-->"
 
 # 各策略正文在 run_S*.py 里的常量名
 _RUN_CONST = {"S2": "S2_SYSTEM", "S3": "S3_SYSTEM", "S4": "S4_SYSTEM"}
@@ -110,8 +118,8 @@ def _strip_field_block(sys_text: str) -> str:
     return head + ("\n\n" + tail if tail else "")
 
 
-def load_strategy_body(strategy: str) -> str:
-    """返回策略的 system 正文（不含输出字段要求那一段，但保留尾部指令）。"""
+def _upstream_body(strategy: str) -> str:
+    """只从上游源码取正文（runner.py / run_S*.py），不看本地重写。"""
     if strategy in ("S0", "S1"):
         key = {"S0": "S0_ZeroShot", "S1": "S1_FewShot"}[strategy]
         sys_text = _load_runner().STRATEGIES[key]["system"]
@@ -132,6 +140,37 @@ def load_strategy_body(strategy: str) -> str:
     if body.startswith(_RUNNER_HEAD):          # 去掉自带抬头，避免与本模块抬头重复
         body = body[len(_RUNNER_HEAD):].lstrip()
     return body
+
+
+def load_strategy_parts(strategy: str) -> tuple[str, str]:
+    """返回 (正文, 末尾追加段)。
+
+    优先级：本地重写 `prompts/{策略}.md` > 上游源码（runner.py / run_S*.py）。
+    重写文件首行可用 `<!--BASE:Sx-->` 复用上游某策略的正文（避免抄写分类体系时漂移），
+    其后是要追加的内容；`<!--TAIL-->` 之后的内容则拼在整个 system 的最末尾。
+    """
+    ov = OVERRIDE_DIR / f"{strategy}.md"
+    if ov.exists():
+        text = ov.read_text(encoding="utf-8")
+        base = ""
+        m = re.match(r"^<!--BASE:(\w+)-->\s*", text)
+        if m:
+            base = _upstream_body(m.group(1))
+            text = text[m.end():]
+        if _TAIL_MARK in text:
+            body, tail = text.split(_TAIL_MARK, 1)
+            body, tail = body.strip(), tail.strip()
+        else:
+            body, tail = text.strip(), ""
+        if base:
+            body = base + ("\n\n" + body if body else "")
+        return body, tail
+    return _upstream_body(strategy), ""
+
+
+def load_strategy_body(strategy: str) -> str:
+    """返回策略的 system 正文（不含输出字段要求那一段，但保留尾部指令）。"""
+    return load_strategy_parts(strategy)[0]
 
 
 def _load_s1():            # 兼容旧调用点
@@ -162,7 +201,7 @@ FIELDS = None  # 运行时填充
 
 def build_system_prompt(strategy: str = "S1") -> str:
     """把指定策略的正文拼上统一的 31 字段输出要求。默认 S1（与既有产物兼容）。"""
-    tax_and_examples = load_strategy_body(strategy)
+    tax_and_examples, tail = load_strategy_parts(strategy)
 
     global FIELDS
     FIELDS = render_field_spec()
@@ -208,7 +247,7 @@ def build_system_prompt(strategy: str = "S1") -> str:
 {sample_txt}
 
 字段清单：{example_keys}
-只输出 JSON，不要输出其它文字。"""
+只输出 JSON，不要输出其它文字。{("\n\n" + tail) if tail else ""}"""
 
 
 if __name__ == "__main__":

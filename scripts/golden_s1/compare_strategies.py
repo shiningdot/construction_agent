@@ -29,9 +29,17 @@ ALL_CLASSES = [f"M{i}" for i in range(1, 6)] + [f"F{i}" for i in range(1, 5)] + 
 
 
 def results_path(strategy: str, label: str) -> Path:
+    """统一布局：strategies/{策略}/{模型}/results.jsonl。
+
+    S1 在该路径下是指向冻结归档 `{模型}/S1_golden_results.jsonl` 的符号链接
+    （S1 的数据已产出且不可变，不复制一份以免漂移）；链接缺失时回落到归档路径。
+    """
+    p = GOLD / "strategies" / strategy / label / "results.jsonl"
+    if p.exists():
+        return p
     if strategy == "S1":
         return GOLD / label / "S1_golden_results.jsonl"
-    return GOLD / "strategies" / strategy / label / "results.jsonl"
+    return p
 
 
 def load_codes(strategy: str, label: str) -> dict[str, set[str]]:

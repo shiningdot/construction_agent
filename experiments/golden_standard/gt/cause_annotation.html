@@ -161,6 +161,9 @@ function accDone(a){ return a.items.every(it => isDone(a.id, it.c)); }
 function accCount(a){ return a.items.filter(it => isDone(a.id, it.c)).length; }
 
 let kw = '', onlyPend = true, onlyHard = false;
+// 展开状态与卡内查找词存在 DOM 之外，避免局部更新/重渲染后丢失
+const openIds = new Set();
+const findVals = {};
 
 function render(){
   let list = DATA.slice();
@@ -171,17 +174,18 @@ function render(){
   if(!list.length){ el.innerHTML = '<div style="text-align:center;color:#8b929e;padding:40px">没有符合条件的条目 🎉</div>'; updateProgress(); return; }
   el.innerHTML = list.map(a => {
     const d = accCount(a), tot = a.items.length;
-    return `<div class="acc ${accDone(a)?'done':''}" data-id="${a.id}">
+    const fv = findVals[a.id] || '';
+    return `<div class="acc ${accDone(a)?'done':''} ${openIds.has(a.id)?'open':''}" data-id="${a.id}">
       <div class="ah">
-        <span class="pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
+        <span class="pill prog-pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
         <span class="t">${esc(a.t)}</span>
         ${a.hard ? '<span class="pill hard">'+a.hard+' 格重点核对</span>' : ''}
       </div>
       <div class="abody">
         <div class="pane left">
           <h4>原始语料 <input class="q" style="margin-left:6px;font-size:11.5px;padding:2px 7px"
-                placeholder="在语料中查找…" data-find="${a.id}"></h4>
-          <div class="raw" id="raw-${a.id}">${esc(a.txt)}</div>
+                placeholder="在语料中查找…" data-find="${a.id}" value="${esc(fv)}"></h4>
+          <div class="raw" id="raw-${a.id}">${renderText(a.txt, fv)}</div>
         </div>
         <div class="pane right">
           ${a.items.map(it => row(a.id, it)).join('')}
@@ -190,17 +194,51 @@ function render(){
             <select class="add" id="add-${a.id}"><option value="">选择编码…</option>${
               ALL.map(c => `<option value="${c}">${c} ${NAME[c]||''}</option>`).join('')}</select>
             <button data-add="${a.id}">添加</button>
-            <div id="xs-${a.id}">${extras(a.id).map(c =>
-              `<span class="xtag">${c} ${NAME[c]||''}<b data-xdel="${a.id}" data-xc="${c}">×</b></span>`).join('')}</div>
+            <div id="xs-${a.id}">${extraChips(a.id)}</div>
           </div>
         </div>
       </div>
     </div>`;
   }).join('');
   el.querySelectorAll('input[data-find]').forEach(inp => inp.addEventListener('input', e => {
-    const a = DATA.find(x => x.id === e.target.dataset.find);
-    document.getElementById('raw-' + a.id).innerHTML = renderText(a.txt, e.target.value.trim());
+    const id = e.target.dataset.find;
+    findVals[id] = e.target.value;
+    document.getElementById('raw-' + id).innerHTML = renderText(
+      DATA.find(x => x.id === id).txt, e.target.value.trim());
   }));
+  updateProgress();
+}
+
+// 补充编码的 chip（渲染与局部更新共用）
+function extraChips(id){
+  return extras(id).map(c =>
+    `<span class="xtag">${c} ${NAME[c]||''}<b data-xdel="${id}" data-xc="${c}">×</b></span>`).join('');
+}
+
+// ── 局部刷新：裁决后只改这一行/这张卡，不重建列表 ──
+function refreshItem(id, code){
+  const k = kOf(id, code), cur = state[k];
+  const rowEl = document.querySelector(`.it[data-row="${k}"]`);
+  if(!rowEl) return;
+  rowEl.classList.toggle('dec', cur === 'include');
+  rowEl.classList.toggle('dec-no', cur === 'exclude');
+  rowEl.querySelectorAll('[data-d]').forEach(b =>
+    b.classList.toggle('sel', b.dataset.d === cur));
+}
+function refreshCard(id){
+  const card = document.querySelector(`.acc[data-id="${id}"]`);
+  if(!card) return;
+  const a = DATA.find(x => x.id === id);
+  const d = accCount(a), tot = a.items.length, done = d === tot;
+  const pill = card.querySelector('.prog-pill');
+  pill.textContent = `${d}/${tot}`;
+  pill.classList.toggle('ok', done);
+  pill.classList.toggle('miss', !done);
+  card.classList.toggle('done', done);
+  if(done && openIds.has(id)){        // 全部裁完才折叠，给个"做完了"的反馈
+    openIds.delete(id);
+    card.classList.remove('open');
+  }
   updateProgress();
 }
 
@@ -212,7 +250,7 @@ function row(id, it){
     ? `<div class="ev"><span class="lb ${LB[it.lab]||'lb-n'}">${it.lab}</span>${esc(it.ev)}</div>`
     : `<div class="ev"><span class="lb lb-n">无证据</span>库内未给该编码，无证据可比对</div>`;
   const cls = cur === 'include' ? 'dec' : cur === 'exclude' ? 'dec-no' : '';
-  return `<div class="it ${cls}">
+  return `<div class="it ${cls}" data-row="${k}">
     <div class="h"><span class="code lv-${it.c[0]}">${it.c}</span><b>${NAME[it.c]||''}</b>
       ${votes}${it.hard?'<span class="pill hard">重点核对</span>':''}</div>
     ${ev}
@@ -231,13 +269,20 @@ function updateProgress(){
 
 document.getElementById('list').addEventListener('click', e => {
   const b = e.target.closest('[data-d]');
-  if(b){ state[b.dataset.k] = b.dataset.d; save(); render(); return; }
+  if(b){
+    const k = b.dataset.k, [id, code] = [k.slice(0, k.indexOf('::')), k.slice(k.indexOf('::') + 2)];
+    state[k] = b.dataset.d; save();
+    refreshItem(id, code); refreshCard(id);      // 局部更新，卡片保持展开
+    return;
+  }
   const add = e.target.closest('[data-add]');
   if(add){
     const id = add.dataset.add, sel = document.getElementById('add-' + id);
     if(sel.value){
       const arr = extras(id).slice(); if(!arr.includes(sel.value)) arr.push(sel.value);
-      state[id + '::__extra'] = arr; save(); render();
+      state[id + '::__extra'] = arr; save();
+      document.getElementById('xs-' + id).innerHTML = extraChips(id);
+      sel.value = '';
     }
     return;
   }
@@ -245,17 +290,26 @@ document.getElementById('list').addEventListener('click', e => {
   if(del){
     const id = del.dataset.xdel;
     state[id + '::__extra'] = extras(id).filter(x => x !== del.dataset.xc);
-    save(); render(); return;
+    save();
+    document.getElementById('xs-' + id).innerHTML = extraChips(id);
+    return;
   }
   const h = e.target.closest('.ah');
-  if(h) h.parentElement.classList.toggle('open');
+  if(h){
+    const card = h.parentElement, id = card.dataset.id;
+    const opened = card.classList.toggle('open');
+    if(opened) openIds.add(id); else openIds.delete(id);
+  }
 });
 document.getElementById('q').oninput = e => { kw = e.target.value.trim(); render(); };
 document.getElementById('fPend').onclick = e => { onlyPend = !onlyPend; e.target.classList.toggle('on', onlyPend); render(); };
 document.getElementById('fHard').onclick = e => { onlyHard = !onlyHard; e.target.classList.toggle('on', onlyHard); render(); };
 document.getElementById('btnExpand').onclick = e => {
   const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on);
-  document.querySelectorAll('.acc').forEach(a => a.classList.toggle('open', on));
+  document.querySelectorAll('.acc').forEach(a => {
+    a.classList.toggle('open', on);
+    if(on) openIds.add(a.dataset.id); else openIds.delete(a.dataset.id);
+  });
 };
 document.getElementById('btnNext').onclick = () => {
   const a = document.querySelector('.acc:not(.done)');

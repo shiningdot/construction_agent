@@ -229,6 +229,29 @@ def _call(client, model, system, user, max_tokens, use_stream, attempts=3) -> tu
     return "", last, 0, 0
 
 
+def _call_msgs(client, model, system, messages, max_tokens, use_stream, attempts=3):
+    """按 messages 发一次请求（补全重试需要多轮消息）。返回同 _call。"""
+    last = ""
+    for i in range(attempts):
+        try:
+            if use_stream:
+                with client.messages.stream(model=model, max_tokens=max_tokens,
+                                            temperature=0.0, system=system,
+                                            messages=messages) as st:
+                    resp = st.get_final_message()
+            else:
+                resp = client.messages.create(model=model, max_tokens=max_tokens,
+                                              temperature=0.0, system=system, messages=messages)
+            u = getattr(resp, "usage", None)
+            return ("".join(getattr(b, "text", "") for b in resp.content), "",
+                    getattr(u, "input_tokens", 0) if u else 0,
+                    getattr(u, "output_tokens", 0) if u else 0)
+        except Exception as e:  # noqa: BLE001
+            last = f"{type(e).__name__}: {e}"
+            time.sleep(2 ** i)
+    return "", last, 0, 0
+
+
 def _extract_obj(text: str) -> dict:
     from run_S1_golden import extract_json
     return extract_json(text)
@@ -292,9 +315,27 @@ def call_s5(client, model, system, rec, max_tokens, use_stream) -> dict:
             parsed = {"_error": parsed["_error"]}
 
     from run_S1_golden import validate
+    import completion_repair
+
+    # 汇总调用同样可能漏写字段（同 completion_repair 模块注释所述），走同一条补全逻辑
+    repaired = 0
+    if "_error" not in parsed:
+        extra = {"pt": 0, "ct": 0}
+
+        def _repair(msgs):
+            r2, e2, p2, c2 = _call_msgs(client, model, sum_sys, msgs, max_tokens, use_stream)
+            extra["pt"] += p2
+            extra["ct"] += c2
+            return (r2, None) if not e2 else ("", None)
+
+        parsed, repaired = completion_repair.try_repair(_repair, sum_user, raw6, parsed)
+        tok_in += extra["pt"]
+        tok_out += extra["ct"]
+
     if "_error" not in parsed:
         parsed["codes"] = final_codes          # 覆写：保证 codes 由程序化规则裁定
     schema_errors = validate(parsed) if "_error" not in parsed else []
+    missing = completion_repair.missing_fields(parsed) if "_error" not in parsed else []
 
     return {
         "id": rec["id"], "title": rec["title"], "strategy": "S5",
@@ -303,6 +344,8 @@ def call_s5(client, model, system, rec, max_tokens, use_stream) -> dict:
         "parsed": parsed,
         "parse_error": parsed.get("_error", ""),
         "schema_errors": schema_errors,
+        "missing_fields": missing,
+        "repaired_fields": repaired,
         "hit_cap": hit_cap,                    # 任一层或汇总调用撞顶
         "elapsed_sec": round(time.time() - t0, 1),
         "prompt_tokens": tok_in, "completion_tokens": tok_out,

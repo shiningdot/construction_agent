@@ -35,6 +35,7 @@ load_dotenv(Path("/home/suntianhao/construction_agent/.env"), override=True)
 
 from anthropic import Anthropic  # noqa: E402
 
+import completion_repair  # noqa: E402
 import prompt_build  # noqa: E402
 from run_S1_golden import PROVIDERS, USER_PREFIX, extract_json, validate  # noqa: E402
 
@@ -43,8 +44,22 @@ LABELS = {"deepseek-v4-flash": "flash", "deepseek-v4-pro": "pro",
           "glm-5.2": "glm5.2", "hy3": "hy3"}
 
 
+def _api_call(client, model, system, messages, max_tokens, use_stream):
+    """发一次请求，返回 (raw_text, prompt_tokens, completion_tokens)。"""
+    if use_stream:
+        with client.messages.stream(model=model, max_tokens=max_tokens, temperature=0.0,
+                                    system=system, messages=messages) as st:
+            resp = st.get_final_message()
+    else:
+        resp = client.messages.create(model=model, max_tokens=max_tokens, temperature=0.0,
+                                      system=system, messages=messages)
+    raw = "".join(getattr(b, "text", "") for b in resp.content)
+    u = getattr(resp, "usage", None)
+    return raw, (getattr(u, "input_tokens", 0) if u else 0), (getattr(u, "output_tokens", 0) if u else 0)
+
+
 def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> dict:
-    """一次调用。与 run_S1_golden 的同名函数一致，额外记录 hit_cap（是否撞顶）。"""
+    """一次调用。与 run_S1_golden 的同名函数一致，额外记录 hit_cap 与补全情况。"""
     if strategy == "S5":                       # S5′ 是分层多调用，走专用适配器
         from s5_layers import call_s5
         return call_s5(client, model, system, rec, max_tokens, use_stream)
@@ -54,19 +69,26 @@ def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> di
     for attempt in range(3):
         t0 = time.time()
         try:
-            if use_stream:
-                with client.messages.stream(
-                        model=model, max_tokens=max_tokens, temperature=0.0,
-                        system=system, messages=[{"role": "user", "content": user}]) as st:
-                    resp = st.get_final_message()
-            else:
-                resp = client.messages.create(
-                    model=model, max_tokens=max_tokens, temperature=0.0,
-                    system=system, messages=[{"role": "user", "content": user}])
-            raw = "".join(getattr(b, "text", "") for b in resp.content)
+            raw, pt, ct = _api_call(client, model, system,
+                                    [{"role": "user", "content": user}], max_tokens, use_stream)
             parsed = extract_json(raw)
-            u = getattr(resp, "usage", None)
-            ct = getattr(u, "output_tokens", 0) if u else 0
+
+            # 解析成功但字段不全 → 用模型自己的残缺输出回灌，要求补齐后重发一次
+            # （原因与实测比例见 completion_repair.py 的模块注释）
+            repaired = 0
+            if "_error" not in parsed:
+                extra = {"pt": 0, "ct": 0}
+
+                def _repair(msgs):
+                    r2, p2, c2 = _api_call(client, model, system, msgs, max_tokens, use_stream)
+                    extra["pt"] += p2
+                    extra["ct"] += c2
+                    return r2, None
+
+                parsed, repaired = completion_repair.try_repair(_repair, user, raw, parsed)
+                pt += extra["pt"]
+                ct += extra["ct"]
+
             # 派生信号（不存原文，只存几个廉价计数）：用于事后判断
             # 「模型是否真的先写了推理/计划」以及 S4′/S5′ 的 explicit vs inferred 比例
             cut = raw.rfind("{")                     # extract_json 取的就是这个位置起
@@ -77,9 +99,11 @@ def call_one(client, model, system, rec, max_tokens, use_stream, strategy) -> di
                 "text_len": len(rec["raw_text"]),
                 "parsed": parsed, "parse_error": parsed.get("_error", ""),
                 "schema_errors": validate(parsed),
+                "missing_fields": completion_repair.missing_fields(parsed),
+                "repaired_fields": repaired,          # 本次补全重试补回的字段数
                 "hit_cap": ct >= max_tokens,          # 撞顶：思考可能吃光预算
                 "elapsed_sec": round(time.time() - t0, 1),
-                "prompt_tokens": getattr(u, "input_tokens", 0) if u else 0,
+                "prompt_tokens": pt,
                 "completion_tokens": ct,
                 "reason_chars": len(reason_text),     # JSON 之前的行文长度（计划/推理）
                 "n_explicit": raw.count("[explicit]"),

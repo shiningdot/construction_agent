@@ -60,10 +60,28 @@ experiments/golden_standard/
 | `prompt_tokens` / `completion_tokens` / `elapsed_sec` / `attempts` | 开销 |
 | `reason_chars` | JSON 之前的行文长度——用于判断模型是否真的先写了计划/推理 |
 | `n_explicit` / `n_inferred` | S4′/S5′ 的显式 vs 推断标记计数 |
+| `missing_fields` / `repaired_fields` | 缺失的字段名；本次「补全重试」补回了几个（见下） |
 | `layer_codes` / `rules_fired` / `layers_failed` | **仅 S5′**：分层编码、代码级规则命中记录、失败层 |
 
 > ⚠️ `reason_chars` / `n_explicit` / `n_inferred` 三个派生字段是 2026-10-15 加进运行器的。
 > S0′/S1′ 的行没有这些字段（其数据早于该改动），分析时按缺失处理即可。
+
+### 关于「模型漏写字段」与 `repaired_fields`
+
+要求先写长文推理再输出 JSON 的策略（S2′/S3′/S4′/S5′）里，模型偶尔会在最终 JSON 中
+**整块跳过字段**（实测缺失的是 `accident_type`、`severity`、`deaths`、`injuries` 这一组连续字段）。
+发生率：S0′×glm 0/300、S2′×glm 2/300、S2′×flash 18/300（6.0%）、S3′×glm 9/119（7.6%）——
+**长文推理是其触发条件**，零样本的 S0′ 完全不出现。这是模型输出行为，不是截断、不是解析错误、
+也不是输入决定的（同一事故重复 8 次仅 1 次复现）。
+
+2026-10-15 起运行器加了**补全重试**（`scripts/golden_s1/completion_repair.py`）：解析成功但字段不全时，
+把模型自己的残缺输出回灌给它、点名缺失字段、要求重发一份完整 JSON，只补一次。
+**不改动任何提示词**，六个策略的 system 逐字节不变。因此：
+
+- `repaired_fields > 0` 的行 = 该行触发过补全重试并补回了这么多字段（属于正常流程，不是异常）。
+- 仍拿到完整 32 键的最终结果，与「下一轮重跑补漏」等效但省一轮。
+- 该机制上线**之前**跑的行（S0′/S1′ 全部、S2′ 全部、S3′ 前 ~130 行）没有这两个字段，
+  其偶发漏写由下一轮续跑补上——最终数据集同样每 id 一份完整 JSON。
 
 **取数的正确姿势**：按 `id` 去重，**同 id 取最后一条成功行**。
 `scripts/golden_s1/verify_matrix.py` 与 `compare_strategies.py` 都已按此实现。

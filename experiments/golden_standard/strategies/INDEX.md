@@ -5,6 +5,21 @@
 > 所有策略统一输出 `codes`（CAICS 5 层 19 类）+ 31 个基础特征；`temperature=0`、
 > `max_tokens=16384`、原文整段送入；四模型串行、每个模型 `--workers 3`。
 
+## 当前状态与暂缓项（2026-10-15）
+
+- **已完成**：S0′、S1′ 各 4 模型全部 300/300；S2′ 的 glm5.2 与 flash 已 300/300。
+- **DeepSeek 暂缓**（`deepseek-v4-flash` / `deepseek-v4-pro`）：2026-10-15 DeepSeek 官网服务器
+  故障。S3′/S4′/S5′ 的 flash 与 pro 两格**暂不跑**，等官方恢复后补。
+  S2′ 的 flash 已在故障前跑满，pro 未跑。
+- **正在跑**：仅用 glm-5.2 与 hy3 推进 S2′（hy3 剩余）→ S3′ → S4′ → S5′。
+- **补跑方式**（DeepSeek 恢复后，无需任何额外准备）：
+  ```bash
+  MODELS="flash pro" bash scripts/golden_s1/run_matrix_remaining.sh S2 S3 S4 S5
+  ```
+  断点续跑只跳过「完全成功」的条目，已跑满的格会被秒过。
+- `run_s0_all_models.sh` 支持 `MODELS` 环境变量筛选模型（`glm` / `flash` / `hy3` / `pro`），
+  默认全跑。服务商故障期间就用它挑可用模型。
+
 ## 目录布局
 
 ```

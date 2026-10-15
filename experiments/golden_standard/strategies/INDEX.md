@@ -26,12 +26,22 @@
 experiments/golden_standard/
 ├── golden_candidates.jsonl          # 300 条输入（唯一权威副本）
 ├── gt/                              # 基础特征 GT（3900 格已定）+ 致因标注
+├── gt_manual/                       # 用户 2026-10-15 手工标注的 GT（源目录只读复制而来）
+│   ├── cause_gt.jsonl               # ★ 致因 GT，300 条（评测用这个）
+│   ├── gt_draft.jsonl               # ★ 基础特征 GT，300 条 × 13 字段
+│   ├── gt_causes_full.jsonl         #   用户导出原件（294 条）
+│   ├── gt_causes_draft.jsonl        #   标注前的草稿（300 条，补齐 6 条时用）
+│   ├── cause_annotations.jsonl      #   人工裁决流水（932 条）
+│   └── *.html / causes_threeway.json#   标注页与三方投票原始数据
 ├── {glm5.2,flash,hy3,pro}/          # S1 的原始归档（冻结，含 review CSV / diff HTML）
 │   ├── golden_candidates.jsonl
 │   └── S1_golden_results.jsonl
 └── strategies/                      # 策略 × 模型矩阵（统一布局）
     ├── INDEX.md                     # 本文件
     ├── STRATEGY_MATRIX.md           # 矩阵总表：模型 × 策略，随各策略完成逐行补写
+    ├── EVAL_CAUSES.md / .csv        # ★ 致因 F1 评测结果（由 eval_matrix.py 生成）
+    ├── MATRIX_REPORT.md             # 自动数值报表（编码数/一致度/19 类包含率）
+    ├── MATRIX_STATUS.md             # 完成度巡检快照
     ├── S0_vs_S1.md                  # 逐类完整对照（由 compare_strategies.py 生成）
     ├── _pilots/{策略}/{模型}/       # 冒烟/试点结果，不参与矩阵统计
     ├── {S0..S5}/
@@ -113,10 +123,25 @@ python3 scripts/golden_s1/verify_matrix.py
 # 跑某个策略 × 四个模型（串行，每模型 3 并发）
 bash scripts/golden_s1/run_s0_all_models.sh S3
 
+# 只用部分模型（服务商故障期间）
+MODELS="glm hy3" bash scripts/golden_s1/run_matrix_remaining.sh S3 S4 S5
+
+# 致因 F1 评测（需 gt_manual/cause_gt.jsonl）
+python3 scripts/golden_s1/eval_matrix.py
+
 # 策略间逐条一致度（不需要人工真值）
 python3 scripts/golden_s1/compare_strategies.py --pairs S0,S1 \
     --md experiments/golden_standard/strategies/S0_vs_S1.md
 ```
 
-**F1 / 精确率 / 召回率待补**：等手工标注的 300 条真值导入后，用
-`runner.compute_metrics(predictions, ground_truth)` 统一补算（位置对齐的 micro/macro F1、Ave/Ave+）。
+## GT 与评测口径
+
+- **致因 GT**：`gt_manual/cause_gt.jsonl`（300 条）。用户的导出原件 `gt_causes_full.jsonl`
+  只有 294 条——导出页只遍历「有待裁格」的事故，漏掉了 6 条三方完全一致的；
+  `merge_manual_cause_gt.py` 已从草稿补齐，并用 `gt_source` 标明来源。
+- **基础特征 GT**：`gt_manual/gt_draft.jsonl`，300 条 × **13 个核心客观特征**。
+  ⚠️ 模型输出 31 个字段，但 GT 只敲定了其中 13 个，故基础特征准确率只在这 13 个上算。
+- **对齐**：GT 与预测都按 `accident_id` 键控，但**行序不同**，评测前必须按 id 排序做位置对齐
+  （`runner.compute_metrics` 是按位置对齐的，顺序错了会静默算错）。
+- **主口径**：`runner.compute_metrics`（与论文已报告数字同源）；`eval_matrix.py` 同时用
+  自实现的一份交叉校验，实测最大偏差 0.007。

@@ -38,12 +38,14 @@ experiments/golden_standard/
 │   └── S1_golden_results.jsonl
 └── strategies/                      # 策略 × 模型矩阵（统一布局）
     ├── INDEX.md                     # 本文件
-    ├── STRATEGY_MATRIX.md           # 矩阵总表：模型 × 策略，随各策略完成逐行补写
+    ├── STRATEGY_MATRIX.md           # 矩阵总表与结论（人工维护）
     ├── EVAL_CAUSES.md / .csv        # ★ 致因 F1 评测结果（由 eval_matrix.py 生成）
+    ├── EVAL_CAUSES_BYCLASS.md       # ★ 逐类分析：过输出定位、S3′ vs S2′（analyze_byclass.py）
     ├── MATRIX_REPORT.md             # 自动数值报表（编码数/一致度/19 类包含率）
     ├── MATRIX_STATUS.md             # 完成度巡检快照
     ├── S0_vs_S1.md                  # 逐类完整对照（由 compare_strategies.py 生成）
-    ├── _pilots/{策略}/{模型}/       # 冒烟/试点结果，不参与矩阵统计
+    ├── docs/                        # ★ 策略重设计说明与复现索引（S3′/S4′/S5′）
+    ├── _pilots/{策略}/{模型}/       # 冒烟/试点/旧版提示词结果，不参与矩阵统计
     ├── {S0..S5}/
     │   └── {glm5.2,flash,hy3,pro}/
     │       └── results.jsonl        # 该格的全部结果

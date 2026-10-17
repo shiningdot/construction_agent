@@ -301,7 +301,11 @@ async function loadData() {
 }
 
 /* ---------------- 存储 ---------------- */
-function lsKey() { return LS + '::' + (state.expert || '未署名'); }
+// 不同策略组合用独立命名空间：同一位专家在 6 策略版与 S0–S3 版之间的记录互不覆盖
+function lsKey() {
+  const variant = (D && D.meta && D.meta.variant) || 'all';
+  return LS + '::' + variant + '::' + (state.expert || '未署名');
+}
 function persist() {
   try { localStorage.setItem(lsKey(), JSON.stringify(state.reviews)); }
   catch (e) { toast('保存失败：浏览器存储空间不足'); }
@@ -685,7 +689,8 @@ function exportJSON() {
   const expert = payload.expert;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const fn = `CAICS致因审核_${expert}_${new Date().toISOString().slice(0, 10)}.json`;
+  const variant = (D.meta.variant && D.meta.variant !== 'all') ? `_${D.meta.variant}` : '';
+  const fn = `CAICS致因审核_${expert}${variant}_${new Date().toISOString().slice(0, 10)}.json`;
   const a = document.createElement('a');
   a.href = url; a.download = fn; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);

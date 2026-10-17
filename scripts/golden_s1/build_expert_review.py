@@ -163,6 +163,7 @@ def main():
             "strategies": strategies,
             "models": LABELS,
             "nCells": n_cells,
+            "variant": "all" if strategies == STRATEGIES else "-".join(strategies),
             "strategyLabels": STRATEGY_LABELS,
             "strategyShort": STRATEGY_SHORT,
             "modelLabels": MODEL_LABELS,

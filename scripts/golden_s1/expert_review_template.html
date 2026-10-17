@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAICS 致因标注 · 专家审核</title>
+<style>
+:root{
+  --bg:#f2f4f8; --card:#fff; --ink:#152238; --muted:#6b7a90;
+  --line:#e3e8ef; --line2:#eef2f7; --accent:#2456d6; --accent-soft:#eaf0ff;
+  --good:#12703f; --goodbg:#e7f6ec; --bad:#b42318; --badbg:#fdeceb;
+  --warn:#b54708; --warnbg:#fff4e5; --shadow:0 1px 2px rgba(16,24,40,.05),0 10px 30px -20px rgba(16,24,40,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg);color:var(--ink);display:flex;flex-direction:column;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+button{font:inherit;cursor:pointer}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ---------- 顶栏 ---------- */
+header{background:#152238;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;flex:0 0 auto}
+header h1{font-size:15px;white-space:nowrap}
+header .sub{color:#9fb0ca;font-size:11.5px}
+header .spacer{flex:1}
+header .item{display:flex;align-items:center;gap:6px;font-size:12px;color:#c8d4e6}
+header input{border:1px solid #3b4c68;background:#1e2f4a;color:#fff;border-radius:6px;padding:5px 9px;font:inherit;font-size:12.5px;width:120px;outline:none}
+header input:focus{border-color:#6f8fca}
+header .btn{border:0;border-radius:7px;padding:6px 12px;font-size:12.5px;background:#2a4a7c;color:#fff}
+header .btn:hover{background:#365c95}
+header .btn.primary{background:#2456d6}
+#btn-ref{display:none}
+header .btn.primary:hover{background:#3568ea}
+.progress{display:flex;align-items:center;gap:8px}
+.progress .track{width:130px;height:7px;background:#2b3d59;border-radius:4px;overflow:hidden}
+.progress .fill{height:100%;background:#4d8bf0;border-radius:4px;transition:width .2s}
+.progress b{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- 三栏 ---------- */
+.layout{flex:1;display:grid;grid-template-columns:275px minmax(0,1fr) 380px;min-height:0}
+@media(max-width:1200px){.layout{grid-template-columns:240px minmax(0,1fr)}.ref{display:none}.ref.show{display:block;position:fixed;right:0;top:52px;bottom:0;width:380px;z-index:30;box-shadow:-8px 0 30px rgba(0,0,0,.18)}#btn-ref{display:inline-block}}
+.col{min-height:0;overflow:auto;background:var(--card)}
+.list{border-right:1px solid var(--line);display:flex;flex-direction:column}
+.detail{border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--bg)}
+.ref{border-left:1px solid var(--line)}
+
+/* ---------- 左栏 ---------- */
+.list-tools{padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:3}
+.list-tools input{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12px;margin-bottom:7px}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip-filter{border:1px solid var(--line);background:#fff;border-radius:20px;padding:2px 9px;font-size:11px;color:var(--muted)}
+.chip-filter.on{background:var(--accent-soft);border-color:#bcd0f8;color:var(--accent);font-weight:600}
+.list-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:7px}
+.acc-list{flex:1;overflow:auto}
+.acc-item{padding:8px 12px;border-bottom:1px solid var(--line2);cursor:pointer;display:flex;gap:8px;align-items:flex-start}
+.acc-item:hover{background:#f7f9ff}
+.acc-item.on{background:var(--accent-soft);border-left:3px solid var(--accent);padding-left:9px}
+.acc-item .no{color:#9aa7b8;font-size:10.5px;font-variant-numeric:tabular-nums;padding-top:2px;min-width:24px}
+.acc-item .tt{font-size:12px;line-height:1.4;word-break:break-all}
+.acc-item .st{font-size:10px;margin-top:3px;display:flex;gap:6px;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:#c9d2e0;margin-right:3px;vertical-align:1px}
+.dot.reviewed{background:#18935c}.dot.edited{background:#d98a2b}.dot.pending{background:#c9d2e0}
+
+/* ---------- 中栏 ---------- */
+.detail-head{padding:14px 20px 12px;background:#fff;border-bottom:1px solid var(--line)}
+.detail-head h2{font-size:16px;line-height:1.35}
+.meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;margin-top:6px;align-items:center}
+.badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10.5px;background:#eef2f8;color:#44546c;white-space:nowrap}
+.badge.sev-较大事故{background:#fff4e5;color:#b54708}
+.badge.sev-重大事故{background:#fdeceb;color:#b42318}
+.badge.sev-特别重大事故{background:#7f1d1d;color:#fff}
+.detail-body{flex:1;overflow:auto;padding:14px 20px 90px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.panel-h{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2);background:#fbfcfe}
+.panel-h h3{font-size:13px}
+.panel-h .hint{color:var(--muted);font-size:11px;margin-left:auto}
+.panel-b{padding:12px 14px}
+.src-text{max-height:34vh;overflow:auto;font-size:12.5px;line-height:1.75;color:#2b3a52}
+.src-text.expanded{max-height:none}
+.src-text h4{font-size:13px;margin:12px 0 4px;color:#1a2b45}
+.src-text h4:first-child{margin-top:0}
+.src-text p{margin:0 0 8px;text-align:justify}
+.src-text .fig{color:#98a5b8;font-size:11.5px}
+
+/* 逐类审核 */
+.layer-h{display:flex;align-items:center;gap:8px;padding:7px 4px 5px;font-size:11.5px;color:#4a5b73;font-weight:600;border-bottom:1px solid var(--line2);margin-top:6px}
+.layer-h span{font-weight:400;color:var(--muted)}
+.cat{display:grid;grid-template-columns:26px 1fr auto auto auto;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #f3f6fa}
+.cat:last-child{border-bottom:0}
+.cat:hover{background:#fbfcff}
+.cat input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0}
+.cat .cname{display:flex;gap:7px;align-items:baseline;cursor:pointer;min-width:0}
+.cat .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:11.5px;color:#33415c;min-width:24px}
+.cat .cn{font-size:12.5px}
+.cat .gt-tag{font-size:10px;padding:0 5px;border-radius:4px;background:#eef2f8;color:#6b7a90}
+.cat .gt-tag.yes{background:#e8eefb;color:#2456d6}
+.cat.changed{background:#fffaeb}
+.cat.changed .cname{font-weight:600}
+.sup{display:flex;align-items:center;gap:3px}
+.sup .dots{display:flex;gap:1.5px}
+.sup i{width:4px;height:11px;border-radius:1px;background:#e2e8f0;display:block}
+.sup i.on{background:#7ba3e8}
+.sup .n{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:26px;text-align:right}
+.unc{border:1px solid var(--line);background:#fff;color:#98a5b8;width:22px;height:22px;border-radius:6px;font-size:11px;line-height:1;padding:0}
+.unc.on{background:var(--warnbg);border-color:#efc38a;color:var(--warn);font-weight:700}
+.cat.uncertain{background:#fffcf5}
+
+.review-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 12px;font-size:12.5px;color:#33415c}
+.btn:hover{background:#f4f7fc}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:#3568ea}
+.btn.warn{color:var(--warn);border-color:#efc38a}
+.note{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;min-height:54px;margin-top:10px}
+.stbar{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(242,244,248,0),#f2f4f8 34%);padding:10px 20px}
+.stbar .inner{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
+.stbar .msg{font-size:11.5px;color:var(--muted);flex:1}
+
+/* ---------- 右栏 ---------- */
+.ref-head{padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:3}
+.ref-head h3{font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ref-head h3 small{font-weight:400;color:var(--muted);font-size:10.5px}
+.seg{display:inline-flex;background:#f2f5fa;border:1px solid var(--line);border-radius:7px;padding:2px;gap:2px}
+.seg button{border:0;background:none;font-size:11.5px;padding:4px 9px;border-radius:5px;color:var(--muted)}
+.seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.12)}
+.ref-body{padding:10px 12px 30px}
+.ref-note{font-size:11px;color:var(--muted);background:#f8fafc;border:1px solid var(--line2);border-radius:7px;padding:7px 9px;margin-bottom:10px;line-height:1.55}
+.sup-row{display:grid;grid-template-columns:34px 1fr 30px;gap:7px;align-items:center;padding:3px 0;border-bottom:1px solid #f4f7fb}
+.sup-row .cd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;font-weight:700;color:#33415c}
+.sup-row .dots{display:flex;gap:2px}
+.sup-row .dots i{width:6px;height:12px;border-radius:1.5px;background:#e6ecf5;display:block}
+.sup-row .dots i.on{background:#5b8ee0}
+.sup-row .n{font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.sup-row.agree-row{background:#f2faf5}
+.sup-row.disagree-row{background:#fff6e9;border-radius:4px}
+.sup-row.disagree-row .n{color:var(--warn);font-weight:600}
+.grid24{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cellbox{border:1px solid var(--line);border-radius:8px;padding:7px 8px}
+.cellbox .h{font-size:10.5px;color:#44546c;margin-bottom:4px;display:flex;justify-content:space-between;gap:4px}
+.cellbox .h b{font-weight:650;font-size:11px}
+.chips-codes{display:flex;flex-wrap:wrap;gap:2px}
+.cc{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;padding:0 4px;border-radius:3px;background:#eef2f8;color:#5b6b82;font-weight:600}
+.cc.tp{background:var(--goodbg);color:var(--good)}
+.cc.fp{background:var(--badbg);color:var(--bad)}
+.cc.fn{background:var(--warnbg);color:var(--warn);border:1px dashed #e5b47e}
+.ref-empty{color:var(--muted);font-size:12px;padding:20px 4px;text-align:center}
+
+/* ---------- 导入/导出 ---------- */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#152238;color:#fff;padding:9px 16px;border-radius:9px;font-size:12.5px;opacity:0;pointer-events:none;transition:.2s;z-index:100}
+#toast.on{opacity:1}
+.modal-mask{position:fixed;inset:0;background:rgba(13,22,38,.5);display:none;z-index:90;padding:30px}
+.modal-mask.on{display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;max-width:720px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+.modal h3{padding:14px 18px;border-bottom:1px solid var(--line);font-size:14px}
+.modal .mb{padding:14px 18px;overflow:auto;font-size:12.5px}
+.modal .mf{padding:10px 18px 16px;display:flex;gap:8px;justify-content:flex-end}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:#f8fafc;border:1px solid var(--line2);border-radius:8px;padding:9px 11px}
+.stat b{display:block;font-size:19px;line-height:1.2}
+.stat span{color:var(--muted);font-size:11px}
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:200;color:var(--muted)}
+.spinner{width:30px;height:30px;border:3px solid #dbe3ef;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div>正在加载 300 条事故与参考结果…</div></div>
+
+<header>
+  <div>
+    <h1>CAICS 致因标注 · 专家审核</h1>
+    <div class="sub">逐条核对 19 类致因；修改自动保存在本机，完成后导出 JSON</div>
+  </div>
+  <div class="spacer"></div>
+  <label class="item">专家 <input id="expert" placeholder="输入姓名" autocomplete="off"></label>
+  <div class="progress item">
+    <span>进度</span>
+    <span class="track"><span class="fill" id="pfill" style="width:0%"></span></span>
+    <b id="ptext">0 / 300</b>
+  </div>
+  <button class="btn" id="btn-import">导入</button>
+  <button class="btn" id="btn-stats">统计</button>
+  <button class="btn primary" id="btn-export">导出审核结果</button>
+  <button class="btn" id="btn-ref" style="display:none">模型参考</button>
+</header>
+
+<div class="layout">
+  <!-- 左：事故列表 -->
+  <aside class="list">
+    <div class="list-tools">
+      <input id="q" type="search" placeholder="搜索标题 / 编号 / id">
+      <div class="chips" id="filters">
+        <button class="chip-filter on" data-f="all">全部</button>
+        <button class="chip-filter" data-f="todo">待审</button>
+        <button class="chip-filter" data-f="done">已审</button>
+        <button class="chip-filter" data-f="changed">有修改</button>
+        <button class="chip-filter" data-f="unc">有存疑</button>
+      </div>
+      <div class="list-meta">
+        <span id="list-count">300 条</span>
+        <button class="chip-filter" id="btn-sort">排序：编号</button>
+      </div>
+    </div>
+    <div class="acc-list" id="acc-list"></div>
+  </aside>
+
+  <!-- 中：详情与审核 -->
+  <main class="detail">
+    <div class="detail-head" id="d-head"></div>
+    <div class="detail-body" id="d-body"></div>
+    <div class="stbar"><div class="inner">
+      <span class="msg" id="save-msg">修改会实时保存在本机浏览器</span>
+      <button class="btn" id="btn-accept-gt">接受原 GT</button>
+      <button class="btn" id="btn-clear">全部清空</button>
+      <button class="btn primary" id="btn-confirm">确认并下一条 →</button>
+    </div></div>
+  </main>
+
+  <!-- 右：模型参考 -->
+  <aside class="ref" id="ref">
+    <div class="ref-head">
+      <h3>模型参考 <small>6 策略 × 4 模型</small></h3>
+      <div class="seg" id="ref-modes">
+        <button class="on" data-m="support">汇总支持度</button>
+        <button data-m="strategy">按策略</button>
+        <button data-m="model">按模型</button>
+      </div>
+    </div>
+    <div class="ref-body" id="ref-body"></div>
+  </aside>
+</div>
+
+<div id="toast"></div>
+
+<!-- 统计弹窗 -->
+<div class="modal-mask" id="stats-mask">
+  <div class="modal">
+    <h3>审核统计</h3>
+    <div class="mb" id="stats-body"></div>
+    <div class="mf"><button class="btn" id="stats-close">关闭</button></div>
+  </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div class="modal-mask" id="import-mask">
+  <div class="modal">
+    <h3>导入审核结果</h3>
+    <div class="mb">
+      <p style="margin:0 0 8px">选择之前导出的 JSON 文件。导入会与该专家在当前浏览器里的记录**合并**（同一条以文件中的为准）。</p>
+      <input type="file" id="import-file" accept="application/json,.json">
+    </div>
+    <div class="mf"><button class="btn" id="import-close">取消</button></div>
+  </div>
+</div>
+
+<script id="DATA_B64" type="text/plain">__DATA_B64__</script>
+<script>
+"use strict";
+/* ============================================================
+ * CAICS 致因标注专家审核页
+ *
+ * 数据：300 条事故原文 / 现有 GT / 24 格模型编码，gzip+base64 内嵌。
+ * 审核记录存 localStorage（按专家姓名隔离），可导出 JSON 交回汇总。
+ *
+ * 参考面板的默认视图是「汇总支持度」（每类被多少格选中），
+ * 而不是直接铺开 24 格明细——避免专家先看到具体模型/策略的具体答案。
+ * ============================================================ */
+let D = null;
+const LS = 'caics_expert_review_v1';
+const state = {
+  expert: '',
+  selectedId: null,
+  filter: 'all',
+  sort: 'idx',          // idx | disagreement
+  q: '',
+  refMode: 'support',   // support | strategy | model
+  refStrategy: 'S0',
+  refModel: 'glm5.2',
+  reviews: {},          // id -> {codes, uncertain, note, status, reviewed_at}
+};
+
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+/* ---------------- 数据加载 ---------------- */
+async function loadData() {
+  const b64 = document.getElementById('DATA_B64').textContent.replace(/\s+/g, '');
+  if (typeof DecompressionStream === 'undefined') throw new Error('浏览器不支持 DecompressionStream，请使用 Chrome 80+ / Edge 80+ / Firefox 113+ / Safari 16.4+');
+  const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const text = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  return JSON.parse(text);
+}
+
+/* ---------------- 存储 ---------------- */
+function lsKey() { return LS + '::' + (state.expert || '未署名'); }
+function persist() {
+  try { localStorage.setItem(lsKey(), JSON.stringify(state.reviews)); }
+  catch (e) { toast('保存失败：浏览器存储空间不足'); }
+}
+function restore() {
+  state.reviews = {};
+  try {
+    const raw = localStorage.getItem(lsKey());
+    if (raw) state.reviews = JSON.parse(raw) || {};
+  } catch (e) { state.reviews = {}; }
+}
+function reviewOf(a) { return state.reviews[a.id] || null; }
+function codesOf(a) {
+  const r = reviewOf(a);
+  return r ? r.codes.slice() : a.gtCodes.slice();
+}
+function ensure(a) {
+  if (!state.reviews[a.id]) {
+    state.reviews[a.id] = {
+      codes: a.gtCodes.slice(), uncertain: [], note: '',
+      status: 'pending', reviewed_at: null, base: a.gtCodes.slice(),
+    };
+  }
+  return state.reviews[a.id];
+}
+function statusOf(a) {
+  const r = reviewOf(a);
+  if (!r) return 'pending';
+  if (r.status === 'reviewed') return 'reviewed';
+  if (sameSet(r.codes, a.gtCodes) && !r.uncertain.length && !r.note) return 'pending';
+  return 'edited';
+}
+function sameSet(x, y) {
+  if (x.length !== y.length) return false;
+  const s = new Set(x);
+  return y.every(c => s.has(c));
+}
+
+/* ---------------- 初始化 ---------------- */
+async function boot() {
+  try { D = await loadData(); }
+  catch (e) {
+    $('#loading').innerHTML = '<div style="max-width:560px;text-align:center;color:#b42318">加载失败：' + esc(e.message) + '</div>';
+    return;
+  }
+  D.byId = {};
+  D.accidents.forEach(a => { D.byId[a.id] = a; });
+
+  state.expert = localStorage.getItem(LS + '::expert') || '';
+  $('#expert').value = state.expert;
+  restore();
+  try {
+    renderList();
+    renderDetail();
+    renderRef();
+    updateProgress();
+    bindUI();
+  } catch (e) {
+    console.error(e);
+    $('#loading').innerHTML = '<div style="max-width:620px;text-align:center;color:#b42318">初始化失败：'
+      + esc(e.message) + '<br><span style="font-size:11px;color:#8a97a8">' + esc(String(e.stack || '').split('\n')[1] || '') + '</span></div>';
+    return;
+  }
+  $('#loading').style.display = 'none';
+}
+
+/* ---------------- 左栏 ---------------- */
+function visibleList() {
+  let list = D.accidents.slice();
+  const q = state.q.trim().toLowerCase();
+  if (q) list = list.filter(a => a.title.toLowerCase().includes(q) || a.id.includes(q) || String(a.idx).includes(q));
+  if (state.filter === 'todo') list = list.filter(a => statusOf(a) !== 'reviewed');
+  else if (state.filter === 'done') list = list.filter(a => statusOf(a) === 'reviewed');
+  else if (state.filter === 'changed') list = list.filter(a => {
+    const r = reviewOf(a); return r && !sameSet(r.codes, a.gtCodes);
+  });
+  else if (state.filter === 'unc') list = list.filter(a => {
+    const r = reviewOf(a); return r && r.uncertain.length;
+  });
+  if (state.sort === 'disagreement') list.sort((a, b) => b.disagreement - a.disagreement || a.idx - b.idx);
+  return list;
+}
+
+function renderList() {
+  const list = visibleList();
+  $('#list-count').textContent = list.length + ' 条';
+  $('#btn-sort').textContent = state.sort === 'idx' ? '排序：编号' : '排序：分歧度';
+  $('#acc-list').innerHTML = list.map(a => {
+    const st = statusOf(a);
+    const r = reviewOf(a);
+    const changed = r ? !sameSet(r.codes, a.gtCodes) : false;
+    const unc = r ? r.uncertain.length : 0;
+    const cls = st === 'reviewed' ? 'reviewed' : (changed || unc || (r && r.note) ? 'edited' : 'pending');
+    const bits = [];
+    if (changed) bits.push('已修改');
+    if (unc) bits.push(unc + ' 存疑');
+    if (a.disagreement) bits.push('分歧 ' + a.disagreement);
+    return `<div class="acc-item ${a.id === state.selectedId ? 'on' : ''}" data-id="${a.id}">
+      <span class="no">${a.idx}</span>
+      <div style="min-width:0">
+        <div class="tt">${esc(a.title)}</div>
+        <div class="st"><span><i class="dot ${cls}"></i>${st === 'reviewed' ? '已审' : st === 'edited' ? '编辑中' : '待审'}</span>${bits.length ? '<span>· ' + esc(bits.join(' · ')) + '</span>' : ''}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div style="padding:30px;text-align:center;color:#8a97a8">没有匹配的事故</div>';
+
+  $$('#acc-list .acc-item').forEach(el => {
+    el.onclick = () => {
+      state.selectedId = el.dataset.id;
+      renderList();
+      renderDetail();
+      renderRef();
+      document.querySelector('.detail').scrollTop = 0;
+    };
+  });
+}
+
+/* ---------------- 中栏 ---------------- */
+function currentAccident() {
+  if (!state.selectedId && D.accidents.length) state.selectedId = D.accidents[0].id;
+  return D.byId[state.selectedId] || null;
+}
+
+function renderDetail() {
+  const a = currentAccident();
+  if (!a) { $('#d-head').innerHTML = ''; $('#d-body').innerHTML = ''; return; }
+
+  $('#d-head').innerHTML = `<h2>${esc(a.title)}</h2>
+    <div class="meta">
+      <span>#${a.idx}</span>
+      <span class="mono" style="font-size:11px">${esc(a.id)}</span>
+      <span>${esc(a.source)}</span>
+      <span class="badge">${esc(a.type)}</span>
+      <span class="badge sev-${esc(a.severity)}">${esc(a.severity)}</span>
+      <span>死亡 ${a.deaths == null ? '—' : a.deaths}</span>
+      <span>原 GT <b>${a.gtCodes.length}</b> 类</span>
+    </div>`;
+
+  const r = reviewOf(a);
+  const cur = new Set(codesOf(a));
+  const unc = new Set(r ? r.uncertain : []);
+
+  let h = `<div class="panel">
+    <div class="panel-h"><h3>事故原文</h3>
+      <span class="hint">${a.text.length} 字</span>
+      <button class="btn" id="btn-expand" style="padding:3px 9px;font-size:11.5px">展开</button>
+    </div>
+    <div class="panel-b"><div class="src-text" id="src-text">${renderSource(a.text)}</div></div>
+  </div>`;
+
+  h += `<div class="panel"><div class="panel-h"><h3>致因审核</h3>
+    <span class="hint">勾选 = 该致因成立；右侧 ? = 存疑</span></div>
+    <div class="panel-b">`;
+
+  D.meta.layers.forEach(([key, name, codes]) => {
+    h += `<div class="layer-h">${key} 层 · ${name} <span>（${codes.length} 类）</span></div>`;
+    codes.forEach(code => {
+      const on = cur.has(code);
+      const gt = a.gtCodes.includes(code);
+      const changed = on !== gt;
+      const sup = a.support[code] || 0;
+      const dots = Array.from({ length: 24 }, (_, i) =>
+        `<i class="${i < sup ? 'on' : ''}"></i>`).join('');
+      h += `<div class="cat ${changed ? 'changed' : ''} ${unc.has(code) ? 'uncertain' : ''}" data-code="${code}">
+        <input type="checkbox" data-ck="${code}" ${on ? 'checked' : ''}>
+        <label class="cname" data-lb="${code}">
+          <span class="code">${code}</span><span class="cn">${esc(D.meta.codeNames[code])}</span>
+          <span class="gt-tag ${gt ? 'yes' : ''}">${gt ? 'GT 有' : 'GT 无'}</span>
+        </label>
+        <span class="sup" title="24 格中有 ${sup} 格标了 ${code}"><span class="dots">${dots}</span><span class="n">${sup}/24</span></span>
+        <button class="unc ${unc.has(code) ? 'on' : ''}" data-unc="${code}" title="标记存疑">?</button>
+      </div>`;
+    });
+  });
+
+  h += `<textarea class="note" id="note" placeholder="整体备注（可选）：例如某类在原文中依据不足、或建议补充说明…">${esc(r ? r.note : '')}</textarea>
+    <div class="review-actions">
+      <button class="btn" id="btn-mark-all">标为存疑（未勾选）</button>
+      <span class="hint" style="color:#6b7a90;font-size:11.5px">当前 ${cur.size} 类 · 原 GT ${a.gtCodes.length} 类${r ? ' · 已编辑' : ''}</span>
+    </div>
+  </div></div>`;
+
+  $('#d-body').innerHTML = h;
+  bindDetail(a);
+}
+
+function renderSource(t) {
+  return t.split('\n').map(line => {
+    const s = line.trim();
+    if (!s) return '';
+    const clean = s.replace(/\$([^$]{1,80})\$/g, (m, inner) =>
+      inner.replace(/\\mathrm\{([^}]*)\}/g, '$1').replace(/\\[a-zA-Z]+/g, '')
+        .replace(/\^3/g, '³').replace(/\^2/g, '²').replace(/\s+/g, ' ').trim()
+    );
+    if (/^#{2,}\s*/.test(clean)) {
+      const txt = clean.replace(/^#{2,}\s*/, '');
+      return `<h4>${esc(txt)}</h4>`;
+    }
+    if (/^图\s*\d/.test(clean)) return `<p class="fig">${esc(clean)}</p>`;
+    return `<p>${esc(clean)}</p>`;
+  }).join('');
+}
+
+function bindDetail(a) {
+  const r = () => ensure(a);
+  $$('#d-body [data-ck]').forEach(ck => {
+    ck.onchange = () => {
+      const code = ck.dataset.ck;
+      const rr = r();
+      if (ck.checked) { if (!rr.codes.includes(code)) rr.codes.push(code); }
+      else { rr.codes = rr.codes.filter(c => c !== code); }
+      rr.status = 'edited';
+      persist(); updateProgress(); renderDetail(); renderRef(); renderList();
+    };
+  });
+  $$('#d-body [data-lb]').forEach(lb => {
+    lb.onclick = () => { const ck = document.querySelector(`[data-ck="${lb.dataset.lb}"]`); if (ck) ck.click(); };
+  });
+  $$('#d-body [data-unc]').forEach(b => {
+    b.onclick = () => {
+      const code = b.dataset.unc;
+      const rr = r();
+      if (rr.uncertain.includes(code)) rr.uncertain = rr.uncertain.filter(c => c !== code);
+      else rr.uncertain.push(code);
+      rr.status = 'edited';
+      persist(); renderDetail(); renderList();
+    };
+  });
+  const note = $('#note');
+  if (note) note.oninput = () => { r().note = note.value; r().status = 'edited'; persist(); renderList(); };
+  const exp = $('#btn-expand');
+  if (exp) exp.onclick = () => {
+    const t = $('#src-text');
+    t.classList.toggle('expanded');
+    exp.textContent = t.classList.contains('expanded') ? '收起' : '展开';
+  };
+  const markAll = $('#btn-mark-all');
+  if (markAll) markAll.onclick = () => {
+    const rr = r();
+    const unchecked = D.meta.codes.filter(c => !rr.codes.includes(c));
+    const set = new Set(rr.uncertain);
+    unchecked.forEach(c => set.add(c));
+    rr.uncertain = Array.from(set);
+    rr.status = 'edited';
+    persist(); renderDetail(); renderList();
+  };
+}
+
+/* ---------------- 右栏参考 ---------------- */
+function renderRef() {
+  const a = currentAccident();
+  $('#ref-modes').innerHTML = [
+    ['support', '汇总支持度'], ['strategy', '按策略'], ['model', '按模型'],
+  ].map(([k, n]) => `<button data-m="${k}" class="${state.refMode === k ? 'on' : ''}">${n}</button>`).join('');
+  $$('#ref-modes button').forEach(b => {
+    b.onclick = () => { state.refMode = b.dataset.m; renderRef(); };
+  });
+
+  if (!a) { $('#ref-body').innerHTML = '<div class="ref-empty">选择左侧事故后显示参考</div>'; return; }
+
+  if (state.refMode === 'support') {
+    let h = `<div class="ref-note">每行 24 根短条对应 24 个「策略 × 模型」组合，<b>蓝色条数</b> = 有多少个组合标了该类。24/24 表示全部一致；0 与中间值要分开看——中间值说明模型间有分歧（橙色行）。</div>`;
+    D.meta.layers.forEach(([key, name, codes]) => {
+      h += `<div style="font-size:10.5px;color:#8a97a8;margin:9px 0 3px;font-weight:600">${key} 层 · ${name}</div>`;
+      codes.forEach(code => {
+        const n = a.support[code] || 0;
+        const dots = Array.from({ length: 24 }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+        const cls = n === 24 ? 'agree-row' : (n === 0 ? '' : 'disagree-row');
+        h += `<div class="sup-row ${cls}" title="${code} ${D.meta.codeNames[code]}：${n}/24 格标了">
+          <span class="cd">${code}</span><span class="dots">${dots}</span><span class="n">${n}</span></div>`;
+      });
+    });
+    $('#ref-body').innerHTML = h;
+    return;
+  }
+
+  if (state.refMode === 'strategy') {
+    let h = `<div class="seg" style="margin-bottom:9px">` + D.meta.strategies.map(s =>
+      `<button data-s="${s}" class="${state.refStrategy === s ? 'on' : ''}">${D.meta.strategyShort[s]}</button>`).join('') + `</div>`;
+    h += `<div class="ref-note">${esc(D.meta.strategyLabels[state.refStrategy])} 下四个模型的编码；绿=与你当前勾选一致，红=它多标，橙虚线=它漏标。</div>`;
+    h += '<div class="grid24" style="grid-template-columns:1fr">';
+    D.meta.models.forEach(m => { h += cellBox(a, state.refStrategy, m); });
+    h += '</div>';
+    $('#ref-body').innerHTML = h;
+    $$('#ref-body [data-s]').forEach(b => b.onclick = () => { state.refStrategy = b.dataset.s; renderRef(); });
+    return;
+  }
+
+  let h = `<div class="seg" style="margin-bottom:9px">` + D.meta.models.map(m =>
+    `<button data-m2="${m}" class="${state.refModel === m ? 'on' : ''}">${esc(D.meta.modelShort[m])}</button>`).join('') + `</div>`;
+  h += `<div class="ref-note">${esc(D.meta.modelLabels[state.refModel])} 在六种策略下的编码；颜色含义同上。</div>`;
+  h += '<div class="grid24" style="grid-template-columns:1fr">';
+  D.meta.strategies.forEach(s => { h += cellBox(a, s, state.refModel); });
+  h += '</div>';
+  $('#ref-body').innerHTML = h;
+  $$('#ref-body [data-m2]').forEach(b => b.onclick = () => { state.refModel = b.dataset.m2; renderRef(); });
+}
+
+function cellBox(a, s, m) {
+  const key = s + '|' + m;
+  const pred = a.pred[key] || [];
+  const cur = new Set(codesOf(a));
+  const ps = new Set(pred);
+  const tp = pred.filter(c => cur.has(c));
+  const fp = pred.filter(c => !cur.has(c));
+  const fn = Array.from(cur).filter(c => !ps.has(c));
+  const chips = pred.map(c => `<span class="cc ${cur.has(c) ? 'tp' : 'fp'}" title="${esc(D.meta.codeNames[c])}">${c}</span>`).join('')
+    + fn.map(c => `<span class="cc fn" title="你有、它没标：${esc(D.meta.codeNames[c])}">${c}</span>`).join('');
+  return `<div class="cellbox">
+    <div class="h"><b>${esc(D.meta.strategyShort[s])} · ${esc(D.meta.modelShort[m])}</b>
+      <span>${pred.length} 类 · TP${tp.length}/FP${fp.length}/FN${fn.length}</span></div>
+    <div class="chips-codes">${chips || '<span style="color:#9aa7b8;font-size:10.5px">未输出</span>'}</div>
+  </div>`;
+}
+
+/* ---------------- 进度与操作 ---------------- */
+function updateProgress() {
+  const total = D.accidents.length;
+  const done = D.accidents.filter(a => statusOf(a) === 'reviewed').length;
+  $('#ptext').textContent = done + ' / ' + total;
+  $('#pfill').style.width = (done / total * 100).toFixed(1) + '%';
+}
+
+function gotoNext() {
+  const list = visibleList();
+  const i = list.findIndex(a => a.id === state.selectedId);
+  const next = list[i + 1] || list[0];
+  if (!next) return;
+  state.selectedId = next.id;
+  renderList(); renderDetail(); renderRef();
+  document.querySelector('.detail').scrollTop = 0;
+}
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('on'), 1800);
+}
+
+/* ---------------- 导入导出 ---------------- */
+function buildExportPayload() {
+  const expert = state.expert.trim() || '未署名';
+  const items = D.accidents
+    .filter(a => reviewOf(a))
+    .map(a => {
+      const r = reviewOf(a);
+      const added = r.codes.filter(c => !a.gtCodes.includes(c));
+      const removed = a.gtCodes.filter(c => !r.codes.includes(c));
+      return {
+        accident_id: a.id,
+        idx: a.idx,
+        title: a.title,
+        base_gt_codes: a.gtCodes,
+        reviewed_codes: D.meta.codes.filter(c => r.codes.includes(c)),
+        added_codes: added,
+        removed_codes: removed,
+        changed_codes: removed.concat(added),
+        uncertain: D.meta.codes.filter(c => r.uncertain.includes(c)),
+        note: r.note || '',
+        status: r.status,
+        reviewed_at: r.reviewed_at,
+      };
+    });
+  return {
+    expert,
+    schema: 'caics-expert-review-v1',
+    exported_at: new Date().toISOString(),
+    n_total: D.accidents.length,
+    n_reviewed: items.filter(x => x.status === 'reviewed').length,
+    n_touched: items.length,
+    items,
+  };
+}
+
+function exportJSON() {
+  const payload = buildExportPayload();
+  const expert = payload.expert;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const fn = `CAICS致因审核_${expert}_${new Date().toISOString().slice(0, 10)}.json`;
+  const a = document.createElement('a');
+  a.href = url; a.download = fn; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`已导出 ${payload.items.length} 条（${payload.n_reviewed} 条已确认）`);
+}
+
+function importJSON(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      if (obj.schema !== 'caics-expert-review-v1') throw new Error('文件格式不匹配');
+      if (obj.expert && !state.expert.trim()) {
+        state.expert = obj.expert;
+        $('#expert').value = obj.expert;
+        localStorage.setItem(LS + '::expert', obj.expert);
+      }
+      let n = 0;
+      (obj.items || []).forEach(it => {
+        if (!D.byId[it.accident_id]) return;
+        state.reviews[it.accident_id] = {
+          codes: it.reviewed_codes || [],
+          uncertain: it.uncertain || [],
+          note: it.note || '',
+          status: it.status || 'reviewed',
+          reviewed_at: it.reviewed_at || null,
+          base: it.base_gt_codes || [],
+        };
+        n++;
+      });
+      persist();
+      renderList(); renderDetail(); renderRef(); updateProgress();
+      $('#import-mask').classList.remove('on');
+      toast(`已导入 ${n} 条`);
+    } catch (e) {
+      toast('导入失败：' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showStats() {
+  const total = D.accidents.length;
+  const reviewed = D.accidents.filter(a => statusOf(a) === 'reviewed').length;
+  const edited = D.accidents.filter(a => { const r = reviewOf(a); return r && !sameSet(r.codes, a.gtCodes); }).length;
+  const withUnc = D.accidents.filter(a => { const r = reviewOf(a); return r && r.uncertain.length; }).length;
+  const codeDelta = {};
+  D.accidents.forEach(a => {
+    const r = reviewOf(a);
+    if (!r) return;
+    a.gtCodes.forEach(c => { if (!r.codes.includes(c)) codeDelta[c] = (codeDelta[c] || 0) - 1; });
+    r.codes.forEach(c => { if (!a.gtCodes.includes(c)) codeDelta[c] = (codeDelta[c] || 0) + 1; });
+  });
+  const rows = Object.entries(codeDelta).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 12);
+  let h = `<div class="stat-grid">
+    <div class="stat"><b>${reviewed}<span style="font-size:12px;color:#8a97a8"> / ${total}</span></b><span>已确认</span></div>
+    <div class="stat"><b>${edited}</b><span>与 GT 不同</span></div>
+    <div class="stat"><b>${withUnc}</b><span>含存疑类</span></div>
+  </div>`;
+  h += `<div style="font-weight:600;font-size:12px;margin-bottom:6px">改动最多的类别（专家 − GT，仅统计已编辑条目）</div>`;
+  h += rows.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px">' + rows.map(([c, d]) =>
+      `<tr><td style="padding:4px 6px;border-bottom:1px solid #eef2f7"><b class="mono">${c}</b> ${esc(D.meta.codeNames[c])}</td>
+       <td style="padding:4px 6px;border-bottom:1px solid #eef2f7;text-align:right;color:${d > 0 ? '#12703f' : '#b42318'}">${d > 0 ? '+' : ''}${d}</td></tr>`).join('') + '</table>'
+    : '<div style="color:#8a97a8">还没有修改</div>';
+  $('#stats-body').innerHTML = h;
+  $('#stats-mask').classList.add('on');
+}
+
+/* ---------------- 绑定 ---------------- */
+function bindUI() {
+  $('#expert').oninput = e => {
+    state.expert = e.target.value;
+    localStorage.setItem(LS + '::expert', state.expert);
+    restore();
+    renderList(); renderDetail(); renderRef(); updateProgress();
+  };
+  $('#q').oninput = e => { state.q = e.target.value; renderList(); };
+  $$('#filters .chip-filter').forEach(b => b.onclick = () => {
+    state.filter = b.dataset.f;
+    $$('#filters .chip-filter').forEach(x => x.classList.toggle('on', x === b));
+    renderList();
+  });
+  $('#btn-sort').onclick = () => {
+    state.sort = state.sort === 'idx' ? 'disagreement' : 'idx';
+    renderList();
+  };
+  $('#btn-accept-gt').onclick = () => {
+    const a = currentAccident(); if (!a) return;
+    const r = ensure(a);
+    r.codes = a.gtCodes.slice(); r.uncertain = []; r.status = 'edited';
+    persist(); renderDetail(); renderRef(); renderList(); updateProgress();
+    toast('已恢复为原 GT');
+  };
+  $('#btn-clear').onclick = () => {
+    const a = currentAccident(); if (!a) return;
+    const r = ensure(a);
+    r.codes = []; r.status = 'edited';
+    persist(); renderDetail(); renderRef(); renderList(); updateProgress();
+    toast('已清空全部勾选');
+  };
+  $('#btn-confirm').onclick = () => {
+    const a = currentAccident(); if (!a) return;
+    const r = ensure(a);
+    r.status = 'reviewed';
+    r.reviewed_at = new Date().toISOString();
+    persist(); updateProgress(); renderList();
+    $('#save-msg').textContent = `已确认 #${a.idx}（${r.codes.length} 类）`;
+    gotoNext();
+  };
+  $('#btn-export').onclick = exportJSON;
+  $('#btn-stats').onclick = showStats;
+  $('#stats-close').onclick = () => $('#stats-mask').classList.remove('on');
+  $('#btn-import').onclick = () => $('#import-mask').classList.add('on');
+  $('#import-close').onclick = () => $('#import-mask').classList.remove('on');
+  $('#import-file').onchange = e => { if (e.target.files[0]) importJSON(e.target.files[0]); };
+  $$('.modal-mask').forEach(m => m.onclick = e => { if (e.target === m) m.classList.remove('on'); });
+  $('#btn-ref').onclick = () => $('#ref').classList.toggle('show');
+
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input,textarea')) return;
+    if (e.key === 'ArrowRight' && e.altKey) { e.preventDefault(); gotoNext(); }
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

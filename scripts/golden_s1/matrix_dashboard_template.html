@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>策略 × 模型 交叉矩阵看板 · CAICS 致因编码</title>
+<style>
+:root{
+  --bg:#f3f5f9; --card:#fff; --ink:#152238; --muted:#6b7a90;
+  --line:#e3e8ef; --line2:#eef2f7; --accent:#2456d6; --accent2:#eaf0ff;
+  --good:#12703f; --goodbg:#e7f6ec; --bad:#b42318; --badbg:#fdeceb;
+  --warn:#b54708; --warnbg:#fff4e5; --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px -16px rgba(16,24,40,.28);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13.5px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1500px;margin:0 auto;padding:0 22px}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
+a{color:var(--accent)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ---------- 顶部 ---------- */
+header.top{background:linear-gradient(135deg,#152238 0%,#1f3a63 60%,#2456d6 160%);color:#fff;padding:26px 0 22px}
+header.top h1{font-size:21px}
+header.top .sub{margin:6px 0 0;color:#b9c6dc;font-size:12.5px}
+header.top .kpis{display:flex;gap:26px;margin-top:16px;flex-wrap:wrap}
+header.top .kpi b{display:block;font-size:20px;font-weight:650;line-height:1.2}
+header.top .kpi span{font-size:11.5px;color:#a9b8d0}
+
+/* ---------- 导航 ---------- */
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+nav.tabs .wrap{display:flex;gap:2px;overflow-x:auto}
+.tab{border:0;background:none;padding:13px 17px;font-size:13.5px;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+main{padding:22px 0 80px}
+section[data-tab]{display:none}
+section[data-tab].on{display:block}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+.card-h{display:flex;align-items:baseline;gap:12px;padding:15px 18px 0;flex-wrap:wrap}
+.card-h h2{font-size:15px}
+.card-h .note{color:var(--muted);font-size:12px}
+.card-b{padding:14px 18px 18px}
+.hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+.hint code{background:#f4f6fa;padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+/* ---------- 控件 ---------- */
+.seg{display:inline-flex;background:#f2f5fa;border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;font:inherit;font-size:12.5px;padding:5px 11px;border-radius:6px;cursor:pointer;color:var(--muted)}
+.seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.12)}
+.ctl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ctl label{font-size:12px;color:var(--muted)}
+select,input[type=search]{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+input[type=search]{min-width:250px}
+select:focus,input:focus{outline:2px solid #c7d7ff;outline-offset:-1px}
+
+/* ---------- 热力表 ---------- */
+.tbl-scroll{overflow:auto;border:1px solid var(--line);border-radius:9px}
+table.heat{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+table.heat th,table.heat td{border-bottom:1px solid var(--line2);border-right:1px solid var(--line2);padding:0}
+table.heat thead th{background:#f8fafc;color:var(--muted);font-weight:600;font-size:11.5px;padding:7px 6px;text-align:center;
+  position:sticky;top:0;z-index:3;white-space:nowrap}
+table.heat thead tr.grp th{background:#eef2f8;border-bottom:1px solid var(--line)}
+table.heat .rowh{text-align:left;padding:8px 12px;background:#fbfcfe;font-weight:600;font-size:12px;white-space:nowrap;
+  position:sticky;left:0;z-index:2;border-right:1px solid var(--line)}
+table.heat thead .rowh{z-index:4}
+table.heat .rowh small{display:block;font-weight:400;color:var(--muted);font-size:10.5px}
+.heatcell{text-align:center;padding:7px 4px;font-variant-numeric:tabular-nums;cursor:pointer;min-width:78px}
+table.heat.compact .heatcell{padding:6px 3px;min-width:50px;font-size:11.5px}
+table.heat.compact .rowh{min-width:118px;padding:7px 10px}
+.heatcell:hover{outline:2px solid var(--accent);outline-offset:-2px;position:relative;z-index:1}
+td.mean,th.mean{background:#f7f9fc;font-weight:650;text-align:center;padding:7px 8px;color:#33415c;white-space:nowrap}
+tr.footer td,tr.footer th{border-top:1px solid var(--line);background:#f7f9fc}
+.legend{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11.5px;color:var(--muted)}
+.legend .bar{height:10px;width:150px;border-radius:5px;
+  background:linear-gradient(90deg,hsl(212,45%,96%),hsl(212,60%,72%),hsl(212,70%,54%),hsl(212,75%,34%))}
+
+/* ---------- 条形图 ---------- */
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:8px 30px}
+@media(max-width:1000px){.bars{grid-template-columns:1fr}}
+.bar-row{display:grid;grid-template-columns:104px 1fr 56px;align-items:center;gap:8px;font-size:11.5px}
+.bar-row .lb{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{position:relative;height:14px;background:#f1f4f9;border-radius:4px;overflow:hidden}
+.bar-fill{display:block;height:100%;border-radius:4px}
+.bar-row .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.gtline{position:absolute;top:0;bottom:0;width:2px;background:#111;opacity:.6}
+
+/* ---------- 事故表 ---------- */
+#acc-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+#acc-table thead th{position:sticky;top:0;background:#f8fafc;z-index:2;text-align:left;font-weight:600;
+  color:var(--muted);font-size:11.5px;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+#acc-table thead th:hover{color:var(--ink)}
+#acc-table tbody td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+#acc-table tbody tr{cursor:pointer}
+#acc-table tbody tr:hover{background:#f5f8ff}
+#acc-table .idx{color:#9aa7b8;font-variant-numeric:tabular-nums;text-align:right}
+#acc-table .ttl{font-weight:550;max-width:430px}
+#acc-table .ttl .src{display:block;color:#93a0b2;font-size:10.5px;font-weight:400;margin-top:1px}
+.badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10.5px;background:#eef2f8;color:#44546c;white-space:nowrap}
+.badge.sev-一般事故{background:#eef2f8}
+.badge.sev-较大事故{background:#fff4e5;color:#b54708}
+.badge.sev-重大事故{background:#fdeceb;color:#b42318}
+.badge.sev-特别重大事故{background:#7f1d1d;color:#fff}
+.num{font-variant-numeric:tabular-nums;text-align:center}
+.pill-cell{text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.legend-inline{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.legend-inline i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+
+/* ---------- 弹窗 ---------- */
+#modal{position:fixed;inset:0;background:rgba(13,22,38,.55);display:none;z-index:100;padding:24px}
+#modal.on{display:block}
+.modal-box{background:#fff;border-radius:14px;max-width:calc(100vw - 48px);margin:0 auto;height:100%;display:flex;flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.4);overflow:hidden}
+.modal-h{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;gap:18px;align-items:flex-start}
+.modal-h .grow{flex:1;min-width:0}
+.modal-h h2{font-size:17px;line-height:1.35}
+.modal-h .meta{color:var(--muted);font-size:12px;margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.x{border:0;background:#f2f5fa;width:32px;height:32px;border-radius:8px;font-size:17px;cursor:pointer;color:#5b6b82;line-height:1}
+.x:hover{background:#e6ebf3}
+.modal-tabs{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--line);background:#fbfcfe}
+.modal-tabs button{border:0;background:none;font:inherit;font-size:12.5px;padding:11px 14px;cursor:pointer;color:var(--muted);
+  border-bottom:2px solid transparent}
+.modal-tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.modal-b{padding:16px 16px 26px;overflow:auto;flex:1}
+
+/* 24 格网格 */
+.cells{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:1150px){.cells{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cell-card{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff;cursor:pointer;transition:.12s}
+.cell-card:hover{border-color:#b9c9ea;box-shadow:0 3px 10px -4px rgba(36,86,214,.3)}
+.cell-card.on{border-color:var(--accent);box-shadow:0 0 0 2px #d7e3ff}
+.cell-card .ch{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:6px}
+.cell-card .ch b{font-size:12px}
+.cell-card .ch .n{color:var(--muted);font-size:10.5px;white-space:nowrap}
+.cell-card .stats{display:flex;gap:9px;font-size:11px;margin-bottom:7px;font-variant-numeric:tabular-nums}
+.cell-card .stats .tp{color:var(--good)} .cell-card .stats .fp{color:var(--bad)}
+.cell-card .stats .fn{color:var(--warn)} .cell-card .stats .f1{color:#44546c;margin-left:auto;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+.chip{font-size:10px;padding:1px 5px;border-radius:4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600}
+.chip.tp{background:var(--goodbg);color:var(--good)}
+.chip.fp{background:var(--badbg);color:var(--bad)}
+.chip.fn{background:var(--warnbg);color:var(--warn);border:1px dashed #e0a672}
+
+/* 字段表 */
+table.fields{width:100%;border-collapse:collapse;font-size:12px}
+table.fields th,table.fields td{padding:6px 10px;border-bottom:1px solid var(--line2);text-align:left;vertical-align:top}
+table.fields th{background:#f8fafc;color:var(--muted);font-weight:600;font-size:11.5px;white-space:nowrap}
+table.fields td.k{color:#44546c;white-space:nowrap;font-weight:550}
+table.fields td.v{word-break:break-word}
+table.fields tr:hover td{background:#fbfcfe}
+.longtext{background:#fbfcfe;border:1px solid var(--line2);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px;white-space:pre-wrap;line-height:1.65}
+
+/* 基础特征对比表 */
+table.bf{border-collapse:separate;border-spacing:0;font-size:11.5px;width:auto}
+table.bf th,table.bf td{border-bottom:1px solid var(--line2);border-right:1px solid var(--line2);padding:4px 2px;text-align:center;white-space:nowrap;font-size:10px}
+table.bf thead th{background:#f8fafc;color:var(--muted);font-weight:600;position:sticky;top:0;z-index:2}
+table.bf thead tr.grp th{background:#eef2f8;z-index:3}
+table.bf td.k{text-align:left;font-weight:600;background:#fbfcfe;position:sticky;left:0;z-index:1;border-right:1px solid var(--line);min-width:110px;padding:5px 7px;font-size:10.5px}
+table.bf thead th.k{z-index:4}
+table.bf td.hit{background:var(--goodbg);color:var(--good);font-weight:600}
+table.bf td.hit-null{background:#f4f6f5;color:#95a39a}
+table.bf td.miss{background:var(--badbg);color:var(--bad)}
+table.bf td.gt{background:#f1f4f9;font-weight:600;color:#33415c}
+table.bf .tiny{font-size:10px}
+
+/* 结论卡 */
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px}
+.finding{border-left:3px solid var(--accent);background:#fbfcff;padding:10px 13px;border-radius:0 8px 8px 0}
+.finding b{display:block;font-size:12.5px;margin-bottom:3px}
+.finding span{color:var(--muted);font-size:11.5px}
+
+/* 加载 */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;z-index:200;color:var(--muted);font-size:13px}
+.spinner{width:34px;height:34px;border:3px solid #dbe3ef;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:var(--bad);max-width:620px;text-align:center;line-height:1.7}
+.count-note{color:var(--muted);font-size:12px;margin-left:auto}
+details.raw summary{cursor:pointer;color:var(--accent);font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div>正在解压 300 条 × 24 格标注结果…</div></div>
+
+<header class="top">
+  <div class="wrap">
+    <h1>策略 × 模型 交叉矩阵看板</h1>
+    <p class="sub">300 条建筑施工事故人工 GT · 6 种提示策略 × 4 个模型 · 致因编码 19 类 + 基础特征 13 字段</p>
+    <div class="kpis" id="kpis"></div>
+  </div>
+</header>
+
+<nav class="tabs"><div class="wrap">
+  <button class="tab on" data-tab="overview">总览矩阵</button>
+  <button class="tab" data-tab="causes">致因编码 · 逐类</button>
+  <button class="tab" data-tab="basic">基础特征 · 逐字段</button>
+  <button class="tab" data-tab="accidents">300 条事故明细</button>
+</div></nav>
+
+<main class="wrap">
+  <section data-tab="overview" class="on">
+    <div class="card">
+      <div class="card-h">
+        <h2>策略 × 模型 总体表现</h2>
+        <span class="note">点击任一格 → 查看该格逐类表现</span>
+      </div>
+      <div class="card-b">
+        <div class="ctl" id="ov-metric-seg"></div>
+        <div class="tbl-scroll"><div id="ov-heat"></div></div>
+        <div class="legend"><span>低</span><span class="bar"></span><span>高</span><span id="ov-range"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <h2>平均编码数：每模型 × 每策略</h2>
+        <span class="note">虚线为人工 GT 的平均 <b id="gt-avg"></b> 编码/条；明显高于虚线即过输出</span>
+      </div>
+      <div class="card-b"><div class="bars" id="code-bars"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>主要发现</h2></div>
+      <div class="card-b"><div class="findings" id="findings"></div></div>
+    </div>
+  </section>
+
+  <section data-tab="causes">
+    <div class="card">
+      <div class="card-h">
+        <h2>逐类表现</h2>
+        <span class="note">19 类 × 6 策略；默认对四个模型求平均</span>
+      </div>
+      <div class="card-b">
+        <div class="ctl" id="cause-ctls"></div>
+        <div class="tbl-scroll"><div id="cause-heat"></div></div>
+        <div class="legend"><span>低</span><span class="bar"></span><span>高</span><span id="cause-range"></span></div>
+        <p class="hint">宏平均只对 GT 中出现过的类别求平均。预测数/GT 数 &gt; 1 表示该类被系统性多标（过输出），&lt; 1 表示漏标。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>逐格总体指标</h2><span class="note">与《最终说明》同口径（runner.compute_metrics）</span></div>
+      <div class="card-b" style="overflow:auto"><div id="cause-summary"></div></div>
+    </div>
+  </section>
+
+  <section data-tab="basic">
+    <div class="card">
+      <div class="card-h">
+        <h2>基础特征准确率：13 个字段 × 24 格</h2>
+        <span class="note">数值字段允许 ±0.5 容差；其余严格相等</span>
+      </div>
+      <div class="card-b">
+        <div class="tbl-scroll"><div id="basic-heat"></div></div>
+        <div class="legend"><span>低</span><span class="bar"></span><span>高</span><span id="basic-range"></span></div>
+        <p class="hint">GT 只覆盖模型输出 31 字段中的这 13 个核心客观特征；其余字段（名称类、书写类）未纳入评测。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>逐字段的 24 格分布</h2></div>
+      <div class="card-b"><div class="bars" id="basic-bars"></div></div>
+    </div>
+  </section>
+
+  <section data-tab="accidents">
+    <div class="card">
+      <div class="card-h">
+        <h2>300 条事故</h2>
+        <span class="note">点击任一行 → 查看该事故在 24 格下的完整标注结果</span>
+        <span class="count-note" id="acc-count"></span>
+      </div>
+      <div class="card-b">
+        <div class="ctl">
+          <input type="search" id="f-q" placeholder="搜索事故标题或 id…">
+          <label>事故类型 <select id="f-type"></select></label>
+          <label>等级 <select id="f-sev"></select></label>
+          <button class="tab" style="border:1px solid var(--line);border-radius:7px;padding:6px 12px" id="f-reset">重置</button>
+        </div>
+        <div class="legend-inline" style="margin-bottom:8px">
+          <span><i style="background:var(--badbg);border:1px solid #f3b4ae"></i>该策略多标（均值 &gt; GT）</span>
+          <span><i style="background:var(--warnbg);border:1px solid #f0c48a"></i>接近 GT（±1）</span>
+          <span><i style="background:#e8f0fe;border:1px solid #a9c2f5"></i>欠标（均值 &lt; GT）</span>
+        </div>
+        <div class="tbl-scroll" style="max-height:calc(100vh - 290px)">
+          <table id="acc-table">
+            <thead><tr>
+              <th class="idx">#</th>
+              <th data-sort="title">事故标题</th>
+              <th data-sort="type">类型</th>
+              <th data-sort="severity">等级</th>
+              <th data-sort="deaths">死亡</th>
+              <th data-sort="gtN">GT 编码</th>
+              <th data-sort="S0" title="该策略四模型平均编码数">S0′</th>
+              <th data-sort="S1" title="该策略四模型平均编码数">S1′</th>
+              <th data-sort="S2" title="该策略四模型平均编码数">S2′</th>
+              <th data-sort="S3" title="该策略四模型平均编码数">S3′</th>
+              <th data-sort="S4" title="该策略四模型平均编码数">S4′</th>
+              <th data-sort="S5" title="该策略四模型平均编码数">S5′</th>
+            </tr></thead>
+            <tbody id="acc-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="modal">
+  <div class="modal-box">
+    <div class="modal-h">
+      <div class="grow">
+        <h2 id="m-title"></h2>
+        <div class="meta" id="m-meta"></div>
+      </div>
+      <button class="x" id="m-close" title="关闭">×</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="on" data-mtab="codes">致因编码对比</button>
+      <button data-mtab="basic">基础特征对比</button>
+      <button data-mtab="raw">完整标注字段</button>
+    </div>
+    <div class="modal-b" id="m-body"></div>
+  </div>
+</div>
+
+<script id="DATA_B64" type="text/plain">__DATA_B64__</script>
+<script>
+"use strict";
+/* ============================================================
+ * 策略 × 模型 矩阵看板
+ * 数据在页面内以 gzip+base64 内嵌，浏览器端用 DecompressionStream 解压。
+ * 所有指标由 Python 端按《最终说明》同口径预计算，前端只做展示与逐条 diff。
+ * ============================================================ */
+let D = null;
+const state = {
+  tab: 'overview',
+  ovMetric: 'ave_plus_F1',
+  causeMode: 'avg',          // 'avg' | 具体策略
+  causeMetric: 'F1',
+  sort: { key: 'idx', dir: 1 },
+  filter: { q: '', type: '', severity: '' },
+  acc: null,                 // 当前事故
+  mtab: 'codes',
+  cellKey: null,             // 当前展开的格
+  rawS: 'S0', rawM: 'glm5.2',
+};
+
+const S = () => D.meta.strategies;
+const M = () => D.meta.models;
+const K = (s, m) => s + '|' + m;
+const cell = (s, m) => D.metrics[K(s, m)];
+
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt3 = v => (v == null || isNaN(v)) ? '—' : v.toFixed(3);
+const pct1 = v => (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(1) + '%';
+const fmt2 = v => (v == null || isNaN(v)) ? '—' : v.toFixed(2);
+
+function heat(v, lo, hi) {
+  const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo || 1)));
+  const l = 95 - 66 * t;
+  const s = 40 + 40 * t;
+  return { bg: `hsl(212,${s.toFixed(0)}%,${l.toFixed(1)}%)`, fg: l < 60 ? '#fff' : '#16233a' };
+}
+function divColor(v, mid, span) {
+  const t = Math.max(-1, Math.min(1, (v - mid) / span));
+  const a = Math.abs(t);
+  if (t < 0) return { bg: `hsl(214,70%,${(96 - 42 * a).toFixed(1)}%)`, fg: a > .55 ? '#fff' : '#16233a' };
+  return { bg: `hsl(3,72%,${(96 - 42 * a).toFixed(1)}%)`, fg: a > .55 ? '#fff' : '#16233a' };
+}
+
+/* ---------------- 数据加载 ---------------- */
+async function loadData() {
+  const b64 = document.getElementById('DATA_B64').textContent.replace(/\s+/g, '');
+  if (!b64 || b64.indexOf('__DATA') === 0) throw new Error('数据占位符未被替换');
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前浏览器不支持 DecompressionStream（需要 Chrome 80+ / Edge 80+ / Firefox 113+ / Safari 16.4+）');
+  }
+  const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const text = await new Response(stream).text();
+  return JSON.parse(text);
+}
+
+/* ---------------- 初始化 ---------------- */
+async function boot() {
+  try {
+    D = await loadData();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      '<div class="err"><b>数据加载失败</b><br>' + esc(e.message) + '</div>';
+    return;
+  }
+  // 预建索引
+  D.byId = {};
+  D.accidents.forEach(a => { D.byId[a.id] = a; });
+  buildAccIndex();
+  renderKpis();
+  renderOverview();
+  renderCodeBars();
+  renderFindings();
+  renderCauses();
+  renderCauseSummary();
+  renderBasic();
+  renderBasicBars();
+  renderAccidents();
+  bindUI();
+  document.getElementById('loading').style.display = 'none';
+  // 支持 #causes / #basic / #accidents 直达
+  const h = location.hash.replace('#', '');
+  if (['overview', 'causes', 'basic', 'accidents'].includes(h)) switchTab(h);
+}
+
+function buildAccIndex() {
+  // 每条事故 × 每策略：四模型平均编码数
+  D.accAvg = {};
+  D.accidents.forEach(a => {
+    const o = {};
+    S().forEach(s => {
+      let sum = 0, n = 0;
+      M().forEach(m => {
+        const p = D.preds[K(s, m)][a.id];
+        if (p) { sum += (p.codes || []).length; n++; }
+      });
+      o[s] = n ? sum / n : null;
+    });
+    D.accAvg[a.id] = o;
+  });
+}
+
+/* ---------------- 顶部 KPI ---------------- */
+function renderKpis() {
+  const gtAvg = D.meta.gtAvgCodes;
+  const best = D.meta.best;
+  document.getElementById('kpis').innerHTML = [
+    ['300', '事故 × 人工 GT'],
+    ['24', '策略 × 模型组合'],
+    ['19', 'CAICS 致因类别'],
+    ['13', '基础特征字段'],
+    [gtAvg.toFixed(2), 'GT 平均编码/条'],
+    [best.value.toFixed(3), '最佳 ' + best.label + ' · Ave+-F1'],
+  ].map(([b, s]) => `<div class="kpi"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join('');
+}
+
+/* ---------------- Tab 1：总览 ---------------- */
+const OV_METRICS = [
+  { k: 'ave_plus_F1', name: 'Ave+-F1', fmt: fmt3 },
+  { k: 'ave_F1', name: 'Ave-F1', fmt: fmt3 },
+  { k: 'ave_R', name: '宏召回', fmt: fmt3 },
+  { k: 'ave_P', name: '宏精确', fmt: fmt3 },
+  { k: 'micro_F1', name: '微-F1', fmt: fmt3 },
+  { k: 'exact', name: '完全一致率', fmt: pct1 },
+  { k: 'avg_codes', name: '平均编码数', fmt: fmt2, div: true },
+  { k: 'basic_acc', name: '基础特征准确率', fmt: pct1 },
+];
+
+function renderOverview() {
+  const seg = document.getElementById('ov-metric-seg');
+  seg.innerHTML = '<div class="seg">' + OV_METRICS.map(m =>
+    `<button data-ov="${m.k}" class="${m.k === state.ovMetric ? 'on' : ''}">${m.name}</button>`).join('') + '</div>';
+  seg.querySelectorAll('button').forEach(b => b.onclick = () => {
+    state.ovMetric = b.dataset.ov; renderOverview();
+  });
+
+  const met = OV_METRICS.find(x => x.k === state.ovMetric);
+  const rng = D.meta.ranges[met.k] || { lo: 0, hi: 1 };
+  let h = '<table class="heat"><thead><tr><th class="rowh">策略 \\ 模型</th>';
+  M().forEach(m => h += `<th>${esc(D.meta.modelLabels[m])}</th>`);
+  h += '<th class="mean">策略均值</th></tr></thead><tbody>';
+
+  S().forEach(s => {
+    h += `<tr><th class="rowh">${esc(D.meta.strategyLabels[s])}</th>`;
+    const vals = [];
+    M().forEach(m => {
+      const v = cell(s, m)[met.k];
+      vals.push(v);
+      const c = met.div ? divColor(v, D.meta.gtAvgCodes, 3) : heat(v, rng.lo, rng.hi);
+      h += `<td class="heatcell" data-s="${s}" data-m="${m}" style="background:${c.bg};color:${c.fg}">${met.fmt(v)}</td>`;
+    });
+    h += `<td class="mean">${met.fmt(vals.reduce((a, b) => a + b, 0) / vals.length)}</td></tr>`;
+  });
+  h += '<tr class="footer"><th class="rowh">模型均值</th>';
+  M().forEach(m => {
+    const vals = S().map(s => cell(s, m)[met.k]);
+    h += `<td class="mean">${met.fmt(vals.reduce((a, b) => a + b, 0) / vals.length)}</td>`;
+  });
+  h += '<td class="mean"></td></tr></tbody></table>';
+  const box = document.getElementById('ov-heat');
+  box.innerHTML = h;
+  box.querySelectorAll('.heatcell').forEach(td => {
+    td.onclick = () => {
+      state.causeMode = td.dataset.s;
+      state.causeMetric = (met.k === 'ave_R') ? 'R' : (met.k === 'ave_P') ? 'P' : 'F1';
+      switchTab('causes');
+    };
+  });
+  document.getElementById('ov-range').textContent = met.div
+    ? `偏离 GT ${D.meta.gtAvgCodes.toFixed(2)} 编码：蓝=欠标，红=过标`
+    : `色阶 ${met.fmt(rng.lo)} → ${met.fmt(rng.hi)}`;
+}
+
+function renderCodeBars() {
+  const max = Math.max(...S().flatMap(s => M().map(m => cell(s, m).avg_codes)));
+  const hi = max * 1.08;
+  const rows = [];
+  S().forEach(s => M().forEach(m => rows.push({ s, m, v: cell(s, m).avg_codes })));
+  const gtx = D.meta.gtAvgCodes / hi * 100;
+  document.getElementById('gt-avg').textContent = D.meta.gtAvgCodes.toFixed(2);
+  const box = document.getElementById('code-bars');
+  box.style.gridAutoFlow = 'column';
+  box.style.gridTemplateRows = `repeat(${Math.ceil(rows.length / 2)},auto)`;
+  box.innerHTML = rows.map(r => {
+    const p = r.v / hi * 100;
+    const over = r.v > D.meta.gtAvgCodes + 0.6;
+    const col = over ? 'linear-gradient(90deg,#e88b7d,#c2452f)' : 'linear-gradient(90deg,#8fb2ef,#3f6fd8)';
+    return `<div class="bar-row" title="${esc(D.meta.strategyLabels[r.s])} × ${esc(D.meta.modelLabels[r.m])}：${r.v.toFixed(2)} 编码/条">
+      <span class="lb">${esc(D.meta.strategyShort[r.s])} · ${esc(D.meta.modelShort[r.m])}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${p.toFixed(1)}%;background:${col}"></span>
+        <span class="gtline" style="left:${gtx.toFixed(1)}%"></span></span>
+      <span class="val" style="color:${over ? 'var(--bad)' : 'inherit'}">${r.v.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderFindings() {
+  const f = D.meta.findings || [];
+  document.getElementById('findings').innerHTML = f.map(x =>
+    `<div class="finding"><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div>`).join('');
+}
+
+/* ---------------- Tab 2：致因逐类 ---------------- */
+function renderCauses() {
+  const ctls = document.getElementById('cause-ctls');
+  const modes = [{ k: 'avg', name: '四模型平均' }].concat(S().map(s => ({ k: s, name: D.meta.strategyShort[s] })));
+  const mets = [
+    { k: 'F1', name: 'F1' }, { k: 'R', name: '召回' }, { k: 'P', name: '精确' },
+    { k: 'ratio', name: '预测数/GT数' },
+  ];
+  ctls.innerHTML =
+    '<div class="seg">' + modes.map(x => `<button data-cm="${x.k}" class="${x.k === state.causeMode ? 'on' : ''}">${esc(x.name)}</button>`).join('') + '</div>' +
+    '<div class="seg">' + mets.map(x => `<button data-cmet="${x.k}" class="${x.k === state.causeMetric ? 'on' : ''}">${esc(x.name)}</button>`).join('') + '</div>';
+  ctls.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { state.causeMode = b.dataset.cm; renderCauses(); });
+  ctls.querySelectorAll('[data-cmet]').forEach(b => b.onclick = () => { state.causeMetric = b.dataset.cmet; renderCauses(); });
+
+  const single = state.causeMode !== 'avg';
+  const cols = single ? M() : S();
+  const colLabel = c => single ? D.meta.modelLabels[c] : D.meta.strategyLabels[c];
+  const met = state.causeMetric;
+  const isRatio = met === 'ratio';
+
+  let h = '<table class="heat"><thead><tr><th class="rowh">类别</th>';
+  cols.forEach(c => h += `<th>${esc(colLabel(c))}</th>`);
+  h += '<th class="mean">' + (single ? '模型均值' : '策略均值') + '</th></tr></thead><tbody>';
+
+  D.meta.layers.forEach(([lay, layName, codes]) => {
+    h += `<tr><th class="rowh" colspan="${cols.length + 2}" style="background:#eef2f8;font-size:11.5px;color:#4a5b73;padding:5px 12px">${esc(lay)} 层 · ${esc(layName)}</th></tr>`;
+    codes.forEach(code => {
+      h += `<tr><th class="rowh">${code} <small>${esc(D.meta.codeNames[code])} · GT ${D.meta.nGt[code]}</small></th>`;
+      const vals = [];
+      cols.forEach(c => {
+        let v;
+        if (isRatio) {
+          let np = 0, ng = 0;
+          if (single) { const pc = cell(state.causeMode, c).perClass[code]; np = pc.n_pred; ng = pc.n_gt; }
+          else { M().forEach(m => { const pc = cell(c, m).perClass[code]; np += pc.n_pred; ng += pc.n_gt; }); }
+          v = ng ? np / ng : null;
+        } else {
+          if (single) v = cell(state.causeMode, c).perClass[code][met];
+          else {
+            const arr = M().map(m => cell(c, m).perClass[code][met]);
+            v = arr.reduce((a, b) => a + b, 0) / arr.length;
+          }
+        }
+        vals.push(v);
+        if (v == null) { h += '<td class="heatcell" style="color:#aab4c4">—</td>'; return; }
+        const cl = isRatio ? divColor(v, 1, 2) : heat(v, 0.45, 1.0);
+        h += `<td class="heatcell" style="background:${cl.bg};color:${cl.fg}">${isRatio ? v.toFixed(2) : v.toFixed(3)}</td>`;
+      });
+      const ok = vals.filter(v => v != null);
+      const mean = ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+      h += `<td class="mean">${mean == null ? '—' : isRatio ? mean.toFixed(2) : mean.toFixed(3)}</td></tr>`;
+    });
+  });
+  // GT 正例行
+  h += `<tr class="footer"><th class="rowh">GT 正例（条）</th>`;
+  cols.forEach(() => { h += '<td class="mean" style="font-weight:400;font-size:11px">—</td>'; });
+  h += '</tr></tbody></table>';
+
+  document.getElementById('cause-heat').innerHTML = h;
+  document.getElementById('cause-range').textContent = isRatio
+    ? '1.00 = 与 GT 数量一致；蓝=欠标，红=过标'
+    : '色阶 0.45 → 1.00（F1 / 召回 / 精确）';
+}
+
+function renderCauseSummary() {
+  let h = '<table class="fields"><thead><tr><th>策略</th><th>模型</th><th>n</th><th>Ave-F1</th>' +
+    '<th>Ave+-F1</th><th>宏召回</th><th>宏精确</th><th>微-F1</th><th>完全一致</th><th>编码/条</th><th>基础特征</th></tr></thead><tbody>';
+  S().forEach(s => M().forEach(m => {
+    const c = cell(s, m);
+    h += `<tr><td>${esc(D.meta.strategyShort[s])}</td><td>${esc(D.meta.modelLabels[m])}</td><td>${c.n}</td>` +
+      `<td class="mono">${fmt3(c.ave_F1)}</td><td class="mono"><b>${fmt3(c.ave_plus_F1)}</b></td>` +
+      `<td class="mono">${fmt3(c.ave_R)}</td><td class="mono">${fmt3(c.ave_P)}</td>` +
+      `<td class="mono">${fmt3(c.micro_F1)}</td><td class="mono">${pct1(c.exact)}</td>` +
+      `<td class="mono">${fmt2(c.avg_codes)}</td><td class="mono">${pct1(c.basic_acc)}</td></tr>`;
+  }));
+  h += '</tbody></table>';
+  document.getElementById('cause-summary').innerHTML = h;
+}
+
+/* ---------------- Tab 3：基础特征 ---------------- */
+function renderBasic() {
+  const fields = D.meta.basicFields;
+  let h = '<table class="heat compact"><thead>';
+  h += '<tr class="grp"><th class="rowh" rowspan="2">字段</th>';
+  S().forEach(s => h += `<th colspan="${M().length}">${esc(D.meta.strategyShort[s])}</th>`);
+  h += '<th class="mean" rowspan="2">均值</th></tr><tr>';
+  S().forEach(s => M().forEach(m => h += `<th>${esc(D.meta.modelShort[m])}</th>`));
+  h += '</tr></thead><tbody>';
+
+  fields.forEach(f => {
+    h += `<tr><th class="rowh">${esc(D.meta.basicNames[f])}<small>${esc(f)}</small></th>`;
+    const vals = [];
+    S().forEach(s => M().forEach(m => {
+      const pb = cell(s, m).perBasic[f];
+      const v = pb && pb.tot ? pb.hit / pb.tot : null;
+      vals.push(v);
+      if (v == null) { h += '<td class="heatcell" style="color:#aab4c4">—</td>'; return; }
+      const c = heat(v, D.meta.basicRange.lo, D.meta.basicRange.hi);
+      h += `<td class="heatcell" style="background:${c.bg};color:${c.fg}" title="${esc(D.meta.basicNames[f])} · ${esc(D.meta.strategyShort[s])} × ${esc(D.meta.modelLabels[m])}：${pb.hit}/${pb.tot}">${pct1(v)}</td>`;
+    }));
+    const ok = vals.filter(v => v != null);
+    h += `<td class="mean">${ok.length ? pct1(ok.reduce((a, b) => a + b, 0) / ok.length) : '—'}</td></tr>`;
+  });
+  // 每格总体
+  h += '<tr class="footer"><th class="rowh">总体</th>';
+  S().forEach(s => M().forEach(m => {
+    h += `<td class="mean">${pct1(cell(s, m).basic_acc)}</td>`;
+  }));
+  const all = S().flatMap(s => M().map(m => cell(s, m).basic_acc));
+  h += `<td class="mean">${pct1(all.reduce((a, b) => a + b, 0) / all.length)}</td></tr>`;
+  h += '</tbody></table>';
+  document.getElementById('basic-heat').innerHTML = h;
+  document.getElementById('basic-range').textContent =
+    `色阶 ${pct1(D.meta.basicRange.lo)} → ${pct1(D.meta.basicRange.hi)}`;
+}
+
+function renderBasicBars() {
+  const out = [];
+  D.meta.basicFields.forEach(f => {
+    const vals = S().flatMap(s => M().map(m => cell(s, m).perBasic[f]))
+      .filter(x => x && x.tot).map(x => x.hit / x.tot);
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    out.push(`<div class="bar-row" title="${esc(D.meta.basicNames[f])}：24 格平均 ${pct1(avg)}">
+      <span class="lb">${esc(D.meta.basicNames[f])}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${(avg * 100).toFixed(1)}%;background:linear-gradient(90deg,#8fb2ef,#3f6fd8)"></span></span>
+      <span class="val">${pct1(avg)}</span></div>`);
+  });
+  const bb = document.getElementById('basic-bars');
+  bb.style.gridAutoFlow = 'column';
+  bb.style.gridTemplateRows = `repeat(${Math.ceil(out.length / 2)},auto)`;
+  bb.innerHTML = out.join('');
+}
+
+/* ---------------- Tab 4：事故明细 ---------------- */
+function renderAccidents() {
+  // 筛选项：只在首次构建，之后恢复已选值（否则每次重渲染都会把下拉重置）
+  const tSel = document.getElementById('f-type'), sSel = document.getElementById('f-sev');
+  if (tSel.options.length === 0) {
+    const types = [...new Set(D.accidents.map(a => a.type))].sort();
+    const sevs = ['一般事故', '较大事故', '重大事故', '特别重大事故']
+      .filter(s => D.accidents.some(a => a.severity === s));
+    tSel.innerHTML = '<option value="">全部</option>' + types.map(t => `<option>${esc(t)}</option>`).join('');
+    sSel.innerHTML = '<option value="">全部</option>' + sevs.map(t => `<option>${esc(t)}</option>`).join('');
+  }
+  tSel.value = state.filter.type;
+  sSel.value = state.filter.severity;
+
+  const list = filteredAccidents();
+  document.getElementById('acc-count').textContent = `${list.length} / ${D.accidents.length} 条`;
+
+  if (!list.length) {
+    document.getElementById('acc-body').innerHTML =
+      '<tr><td colspan="12" style="text-align:center;padding:44px;color:var(--muted)">没有匹配的事故</td></tr>';
+    return;
+  }
+  document.getElementById('acc-body').innerHTML = list.map(a => {
+    const gt = a.gtCodes.length;
+    const cells = S().map(s => {
+      const v = D.accAvg[a.id][s];
+      if (v == null) return '<td class="num">—</td>';
+      const d = v - gt;
+      const bg = d > 1.5 ? 'var(--badbg)' : d > 0.5 ? 'var(--warnbg)' : d < -0.5 ? '#e8f0fe' : 'transparent';
+      return `<td class="pill-cell" style="background:${bg}">${v.toFixed(1)}</td>`;
+    }).join('');
+    return `<tr data-id="${a.id}">
+      <td class="idx">${a.idx}</td>
+      <td class="ttl">${esc(a.title)}<span class="src">${esc(a.source)}</span></td>
+      <td><span class="badge">${esc(a.type)}</span></td>
+      <td><span class="badge sev-${esc(a.severity)}">${esc(a.severity || '—')}</span></td>
+      <td class="num">${a.deaths == null ? '—' : a.deaths}</td>
+      <td class="num">${gt}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('#acc-body tr').forEach(tr => {
+    tr.onclick = () => openDetail(tr.dataset.id);
+  });
+}
+
+function filteredAccidents() {
+  const q = state.filter.q.trim().toLowerCase();
+  let list = D.accidents.filter(a => {
+    if (state.filter.type && a.type !== state.filter.type) return false;
+    if (state.filter.severity && a.severity !== state.filter.severity) return false;
+    if (q && !(a.title.toLowerCase().includes(q) || a.id.includes(q))) return false;
+    return true;
+  });
+  const { key, dir } = state.sort;
+  list = list.slice().sort((a, b) => {
+    let x, y;
+    if (key === 'idx') { x = a.idx; y = b.idx; }
+    else if (key === 'gtN') { x = a.gtCodes.length; y = b.gtCodes.length; }
+    else if (S().includes(key)) { x = D.accAvg[a.id][key]; y = D.accAvg[b.id][key]; }
+    else { x = a[key] == null ? '' : a[key]; y = b[key] == null ? '' : b[key]; }
+    if (x === y) return a.idx - b.idx;
+    return (x < y ? -1 : 1) * dir;
+  });
+  return list;
+}
+
+/* ---------------- 事故详情弹窗 ---------------- */
+function openDetail(aid) {
+  const a = D.byId[aid];
+  if (!a) return;
+  state.acc = a;
+  state.cellKey = null;
+  state.mtab = 'codes';
+  document.getElementById('m-title').textContent = a.title;
+  document.getElementById('m-meta').innerHTML = [
+    `<span>id <span class="mono">${esc(a.id)}</span></span>`,
+    `<span>${esc(a.source)}</span>`,
+    `<span class="badge">${esc(a.type)}</span>`,
+    `<span class="badge sev-${esc(a.severity)}">${esc(a.severity)}</span>`,
+    `<span>死亡 ${a.deaths == null ? '—' : a.deaths} 人</span>`,
+    `<span>GT 编码 <b>${a.gtCodes.length}</b> 条</span>`,
+  ].join('');
+  document.querySelectorAll('.modal-tabs button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mtab === 'codes'));
+  renderModal();
+  document.getElementById('modal').classList.add('on');
+}
+
+function renderModal() {
+  const a = state.acc;
+  const body = document.getElementById('m-body');
+  if (state.mtab === 'codes') body.innerHTML = modalCodes(a);
+  else if (state.mtab === 'basic') body.innerHTML = modalBasic(a);
+  else body.innerHTML = modalRaw(a);
+
+  if (state.mtab === 'codes') {
+    body.querySelectorAll('.cell-card').forEach(el => {
+      el.onclick = () => {
+        const k = el.dataset.k;
+        state.cellKey = (state.cellKey === k) ? null : k;
+        renderModal();
+      };
+    });
+  }
+  if (state.mtab === 'raw') {
+    document.getElementById('raw-s').onchange = e => { state.rawS = e.target.value; renderModal(); };
+    document.getElementById('raw-m').onchange = e => { state.rawM = e.target.value; renderModal(); };
+  }
+}
+
+function modalCodes(a) {
+  const gtSet = new Set(a.gtCodes);
+  let h = `<div class="ctl"><span class="hint" style="margin:0">GT 编码：</span>` +
+    a.gtCodes.map(c => `<span class="chip tp" title="${esc(D.meta.codeNames[c])}">${c}</span>`).join('') +
+    `<span class="hint" style="margin:0 0 0 14px">共 ${a.gtCodes.length} 条 · 点击任一卡片查看该格完整标注字段</span></div>`;
+
+  h += '<div class="cells">';
+  S().forEach(s => M().forEach(m => {
+    const k = K(s, m);
+    const p = D.preds[k][a.id];
+    const codes = (p && p.codes) ? p.codes.filter(c => D.meta.codes.includes(c)) : [];
+    const ps = new Set(codes);
+    const tp = codes.filter(c => gtSet.has(c));
+    const fp = codes.filter(c => !gtSet.has(c));
+    const fn = a.gtCodes.filter(c => !ps.has(c));
+    const P = tp.length + fp.length ? tp.length / (tp.length + fp.length) : 0;
+    const R = tp.length + fn.length ? tp.length / (tp.length + fn.length) : 0;
+    const F1 = P + R ? 2 * P * R / (P + R) : 0;
+    const chips = codes.map(c => `<span class="chip ${gtSet.has(c) ? 'tp' : 'fp'}" title="${esc(D.meta.codeNames[c])}">${c}</span>`).join('') +
+      fn.map(c => `<span class="chip fn" title="GT 有、本格漏标：${esc(D.meta.codeNames[c])}">${c}</span>`).join('');
+    const empty = !p ? '<span class="hint">该格无结果</span>' : (codes.length ? chips : '<span class="hint">未输出任何编码</span>');
+    h += `<div class="cell-card ${state.cellKey === k ? 'on' : ''}" data-k="${k}">
+      <div class="ch"><b>${esc(D.meta.strategyShort[s])} · ${esc(D.meta.modelLabels[m])}</b><span class="n">${codes.length} 编码</span></div>
+      <div class="stats"><span class="tp">TP ${tp.length}</span><span class="fp">FP ${fp.length}</span><span class="fn">FN ${fn.length}</span><span class="f1">F1 ${F1.toFixed(2)}</span></div>
+      <div class="chips">${empty}</div>
+    </div>`;
+  }));
+  h += '</div>';
+
+  if (state.cellKey) h += modalCellFields(a, state.cellKey);
+  return h;
+}
+
+function modalCellFields(a, key) {
+  const [s, m] = key.split('|');
+  const p = D.preds[key][a.id];
+  if (!p) return '<p class="hint">该格没有结果。</p>';
+  let h = `<h3 style="margin:18px 0 8px;font-size:14px">${esc(D.meta.strategyShort[s])} · ${esc(D.meta.modelLabels[m])} 的完整标注</h3>`;
+  h += '<table class="fields"><tbody>';
+  D.meta.fieldOrder.forEach(f => {
+    if (f === 'codes') return;
+    let v = p[f];
+    if (v === undefined || v === null || v === '') return;
+    if (typeof v === 'object') v = JSON.stringify(v, null, 0);
+    const cls = (f === 'summary' || f === 'direct_cause') ? 'v' : 'v';
+    h += `<tr><td class="k">${esc(D.meta.fieldNames[f] || f)}<br><span class="mono" style="font-size:10px;color:#9aa7b8">${f}</span></td><td class="${cls}">${esc(v)}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+function modalBasic(a) {
+  const fields = D.meta.basicFields;
+  let h = '<div class="tbl-scroll"><table class="bf"><thead>';
+  h += '<tr class="grp"><th class="k" rowspan="2">字段</th><th class="gt" rowspan="2">GT</th>';
+  S().forEach(s => h += `<th colspan="${M().length}">${esc(D.meta.strategyShort[s])}</th>`);
+  h += '</tr><tr>';
+  S().forEach(s => M().forEach(m => h += `<th>${esc(D.meta.modelShort[m])}</th>`));
+  h += '</tr></thead><tbody>';
+  fields.forEach(f => {
+    h += `<tr><td class="k">${esc(D.meta.basicNames[f])}<br><span class="tiny mono" style="color:#9aa7b8">${f}</span></td>`;
+    const g = a.gtBasic[f];
+    h += `<td class="gt">${g == null ? '—' : esc(g)}</td>`;
+    S().forEach(s => M().forEach(m => {
+      const p = D.preds[K(s, m)][a.id];
+      const pv = p ? p[f] : undefined;
+      const hit = fieldHit(g, pv);
+      const bothNull = (g == null) && (pv == null);
+      const txt = (pv === undefined || pv === null || pv === '') ? '—' : pv;
+      const cls = hit ? (bothNull ? 'hit-null' : 'hit') : 'miss';
+      const note = bothNull ? '双方均未提及（记为一致）' : (hit ? '命中' : '未命中');
+      h += `<td class="${cls}" title="GT：${g == null ? '—' : esc(g)}｜预测：${esc(txt)}｜${note}">${esc(txt)}</td>`;
+    }));
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="hint">绿=与 GT 一致（数值字段 ±0.5 内算一致），红=不一致。悬停可看 GT 与预测对照。</p>';
+  return h;
+}
+
+function fieldHit(g, p) {
+  const pv = (p === undefined) ? null : p;
+  if (typeof g === 'number' && typeof pv === 'number') return Math.abs(g - pv) <= 0.5;
+  return g === pv;
+}
+
+function modalRaw(a) {
+  const sOpts = S().map(s => `<option value="${s}" ${s === state.rawS ? 'selected' : ''}>${esc(D.meta.strategyLabels[s])}</option>`).join('');
+  const mOpts = M().map(m => `<option value="${m}" ${m === state.rawM ? 'selected' : ''}>${esc(D.meta.modelLabels[m])}</option>`).join('');
+  const p = D.preds[K(state.rawS, state.rawM)][a.id];
+  let h = `<div class="ctl"><label>策略 <select id="raw-s">${sOpts}</select></label>` +
+    `<label>模型 <select id="raw-m">${mOpts}</select></label></div>`;
+  if (!p) return h + '<p class="hint">该格没有结果。</p>';
+
+  const gtSet = new Set(a.gtCodes);
+  h += `<div class="ctl"><span class="hint" style="margin:0">GT：</span>` +
+    a.gtCodes.map(c => `<span class="chip tp">${c}</span>`).join('') + `</div>`;
+  h += `<div class="ctl"><span class="hint" style="margin:0">本格输出：</span>` +
+    (p.codes || []).map(c => `<span class="chip ${gtSet.has(c) ? 'tp' : 'fp'}">${c}</span>`).join('') + `</div>`;
+
+  if (p.summary) h += `<div class="longtext"><b>summary</b><br>${esc(p.summary)}</div>`;
+  if (p.direct_cause) h += `<div class="longtext"><b>direct_cause</b><br>${esc(p.direct_cause)}</div>`;
+
+  h += '<table class="fields"><tbody>';
+  D.meta.fieldOrder.forEach(f => {
+    if (f === 'codes' || f === 'summary' || f === 'direct_cause') return;
+    const v = p[f];
+    if (v === undefined || v === null || v === '') return;
+    h += `<tr><td class="k">${esc(D.meta.fieldNames[f] || f)}<br><span class="mono" style="font-size:10px;color:#9aa7b8">${f}</span></td><td class="v">${esc(v)}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+/* ---------------- 交互绑定 ---------------- */
+function switchTab(t) {
+  state.tab = t;
+  document.querySelectorAll('.tab[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('section[data-tab]').forEach(s => s.classList.toggle('on', s.dataset.tab === t));
+  if (t === 'causes') renderCauses();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function bindUI() {
+  document.querySelectorAll('.tab[data-tab]').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+
+  // 事故筛选
+  const q = document.getElementById('f-q');
+  q.oninput = () => { state.filter.q = q.value; renderAccidents(); };
+  document.getElementById('f-type').onchange = e => { state.filter.type = e.target.value; renderAccidents(); };
+  document.getElementById('f-sev').onchange = e => { state.filter.severity = e.target.value; renderAccidents(); };
+  document.getElementById('f-reset').onclick = () => {
+    state.filter = { q: '', type: '', severity: '' };
+    q.value = ''; document.getElementById('f-type').value = ''; document.getElementById('f-sev').value = '';
+    renderAccidents();
+  };
+
+  // 表头排序
+  document.querySelectorAll('#acc-table thead th[data-sort]').forEach(th => {
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (state.sort.key === k) state.sort.dir *= -1;
+      else state.sort = { key: k, dir: 1 };
+      renderAccidents();
+    };
+  });
+
+  // 弹窗
+  document.getElementById('m-close').onclick = () => document.getElementById('modal').classList.remove('on');
+  document.getElementById('modal').onclick = e => {
+    if (e.target.id === 'modal') document.getElementById('modal').classList.remove('on');
+  };
+  document.querySelectorAll('.modal-tabs button').forEach(b => {
+    b.onclick = () => {
+      state.mtab = b.dataset.mtab;
+      state.cellKey = null;
+      document.querySelectorAll('.modal-tabs button').forEach(x => x.classList.toggle('on', x === b));
+      renderModal();
+    };
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('modal').classList.remove('on');
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

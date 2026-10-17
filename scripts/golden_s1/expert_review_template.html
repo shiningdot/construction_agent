@@ -43,10 +43,12 @@ header .btn.primary:hover{background:#3568ea}
 /* ---------- 三栏 ---------- */
 .layout{flex:1;display:grid;grid-template-columns:275px minmax(0,1fr) 380px;min-height:0}
 @media(max-width:1200px){.layout{grid-template-columns:240px minmax(0,1fr)}.ref{display:none}.ref.show{display:block;position:fixed;right:0;top:52px;bottom:0;width:380px;z-index:30;box-shadow:-8px 0 30px rgba(0,0,0,.18)}#btn-ref{display:inline-block}}
-.col{min-height:0;overflow:auto;background:var(--card)}
-.list{border-right:1px solid var(--line);display:flex;flex-direction:column}
-.detail{border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--bg)}
-.ref{border-left:1px solid var(--line)}
+/* 三栏都要能独立滚动：grid/flex 子项必须显式 min-height:0，
+   否则内容会把栏撑高、超出视口后被 body{overflow:hidden} 裁掉。 */
+.list,.detail,.ref{min-height:0}
+.list{border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.detail{border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+.ref{border-left:1px solid var(--line);overflow-y:auto;overflow-x:hidden}
 
 /* ---------- 左栏 ---------- */
 .list-tools{padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:3}
@@ -55,7 +57,7 @@ header .btn.primary:hover{background:#3568ea}
 .chip-filter{border:1px solid var(--line);background:#fff;border-radius:20px;padding:2px 9px;font-size:11px;color:var(--muted)}
 .chip-filter.on{background:var(--accent-soft);border-color:#bcd0f8;color:var(--accent);font-weight:600}
 .list-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:7px}
-.acc-list{flex:1;overflow:auto}
+.acc-list{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 .acc-item{padding:8px 12px;border-bottom:1px solid var(--line2);cursor:pointer;display:flex;gap:8px;align-items:flex-start}
 .acc-item:hover{background:#f7f9ff}
 .acc-item.on{background:var(--accent-soft);border-left:3px solid var(--accent);padding-left:9px}
@@ -66,14 +68,14 @@ header .btn.primary:hover{background:#3568ea}
 .dot.reviewed{background:#18935c}.dot.edited{background:#d98a2b}.dot.pending{background:#c9d2e0}
 
 /* ---------- 中栏 ---------- */
-.detail-head{padding:14px 20px 12px;background:#fff;border-bottom:1px solid var(--line)}
+.detail-head{padding:14px 20px 12px;background:#fff;border-bottom:1px solid var(--line);flex:0 0 auto}
 .detail-head h2{font-size:16px;line-height:1.35}
 .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;margin-top:6px;align-items:center}
 .badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10.5px;background:#eef2f8;color:#44546c;white-space:nowrap}
 .badge.sev-较大事故{background:#fff4e5;color:#b54708}
 .badge.sev-重大事故{background:#fdeceb;color:#b42318}
 .badge.sev-特别重大事故{background:#7f1d1d;color:#fff}
-.detail-body{flex:1;overflow:auto;padding:14px 20px 90px}
+.detail-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 20px 24px;overscroll-behavior:contain}
 .panel{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
 .panel-h{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2);background:#fbfcfe}
 .panel-h h3{font-size:13px}
@@ -116,7 +118,7 @@ header .btn.primary:hover{background:#3568ea}
 .btn.primary:hover{background:#3568ea}
 .btn.warn{color:var(--warn);border-color:#efc38a}
 .note{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;min-height:54px;margin-top:10px}
-.stbar{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(242,244,248,0),#f2f4f8 34%);padding:10px 20px}
+.stbar{flex:0 0 auto;background:linear-gradient(180deg,rgba(242,244,248,0),#f2f4f8 34%);padding:10px 20px}
 .stbar .inner{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .stbar .msg{font-size:11.5px;color:var(--muted);flex:1}
 

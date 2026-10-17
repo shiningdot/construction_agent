@@ -92,15 +92,28 @@ def load_basic() -> dict[str, dict]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=str(DEFAULT_OUT))
+    ap.add_argument("--out", default="", help="输出路径；默认按策略组合命名")
+    ap.add_argument("--strategies", default=",".join(STRATEGIES),
+                    help="逗号分隔，只包含这些策略的参考结果（如 S0,S1,S2,S3）")
     args = ap.parse_args()
+
+    strategies = [s.strip().upper() for s in args.strategies.split(",") if s.strip()]
+    unknown = [s for s in strategies if s not in STRATEGIES]
+    if unknown:
+        sys.exit(f"未知策略：{unknown}；可选 {STRATEGIES}")
+    if not strategies:
+        sys.exit("--strategies 不能为空")
+    if not args.out:
+        suffix = "" if strategies == STRATEGIES else "_" + "-".join(strategies)
+        args.out = str(GOLD / "expert_review" / f"专家标注审核{suffix}.html")
 
     cause_gt = load_cause_gt()
     texts = load_texts()
     basic = load_basic()
 
+    n_cells = len(strategies) * len(LABELS)
     preds: dict[tuple[str, str], dict[str, dict]] = {}
-    for s in STRATEGIES:
+    for s in strategies:
         for lb in LABELS:
             preds[(s, lb)] = load_preds(s, lb)
 
@@ -117,7 +130,7 @@ def main():
 
         pred = {}
         support = {c: 0 for c in ALL_CODES}
-        for s in STRATEGIES:
+        for s in strategies:
             for lb in LABELS:
                 p = preds[(s, lb)].get(aid)
                 codes = [c for c in ((p or {}).get("codes") or []) if c in ALL_CODES]
@@ -125,7 +138,7 @@ def main():
                 for c in codes:
                     support[c] += 1
         # 分歧度：至少有模型选、至少有不选的类别数（0–19）
-        disagreement = sum(1 for c in ALL_CODES if 0 < support[c] < 24)
+        disagreement = sum(1 for c in ALL_CODES if 0 < support[c] < n_cells)
 
         accidents.append({
             "id": aid,
@@ -147,8 +160,9 @@ def main():
             "codes": ALL_CODES,
             "codeNames": CODE_NAMES,
             "layers": LAYERS,
-            "strategies": STRATEGIES,
+            "strategies": strategies,
             "models": LABELS,
+            "nCells": n_cells,
             "strategyLabels": STRATEGY_LABELS,
             "strategyShort": STRATEGY_SHORT,
             "modelLabels": MODEL_LABELS,
@@ -176,8 +190,9 @@ def main():
     # 自检
     back = json.loads(gzip.decompress(base64.b64decode(b64)))
     assert len(back["accidents"]) == len(accidents)
-    assert all(len(a["pred"]) == 24 for a in back["accidents"])
-    print(f"自检通过：{len(back['accidents'])} 条 × 24 格参考")
+    assert all(len(a["pred"]) == n_cells for a in back["accidents"])
+    print(f"自检通过：{len(back['accidents'])} 条 × {n_cells} 格参考"
+          f"（{','.join(strategies)}）")
 
 
 if __name__ == "__main__":

@@ -226,7 +226,7 @@ header .btn.primary:hover{background:#3568ea}
   <!-- 右：模型参考 -->
   <aside class="ref" id="ref">
     <div class="ref-head">
-      <h3>模型参考 <small>6 策略 × 4 模型</small></h3>
+      <h3>模型参考 <small id="ref-sub"></small></h3>
       <div class="seg" id="ref-modes">
         <button class="on" data-m="support">汇总支持度</button>
         <button data-m="strategy">按策略</button>
@@ -266,11 +266,11 @@ header .btn.primary:hover{background:#3568ea}
 /* ============================================================
  * CAICS 致因标注专家审核页
  *
- * 数据：300 条事故原文 / 现有 GT / 24 格模型编码，gzip+base64 内嵌。
+ * 数据：300 条事故原文 / 现有 GT / 策略×模型各格的编码，gzip+base64 内嵌。
  * 审核记录存 localStorage（按专家姓名隔离），可导出 JSON 交回汇总。
  *
  * 参考面板的默认视图是「汇总支持度」（每类被多少格选中），
- * 而不是直接铺开 24 格明细——避免专家先看到具体模型/策略的具体答案。
+ * 而不是直接铺开所有格明细——避免专家先看到具体模型/策略的具体答案。
  * ============================================================ */
 let D = null;
 const LS = 'caics_expert_review_v1';
@@ -349,6 +349,7 @@ async function boot() {
   }
   D.byId = {};
   D.accidents.forEach(a => { D.byId[a.id] = a; });
+  $('#ref-sub').textContent = `${D.meta.strategies.length} 策略 × ${D.meta.models.length} 模型`;
 
   state.expert = localStorage.getItem(LS + '::expert') || '';
   $('#expert').value = state.expert;
@@ -463,7 +464,7 @@ function renderDetail() {
       const gt = a.gtCodes.includes(code);
       const changed = on !== gt;
       const sup = a.support[code] || 0;
-      const dots = Array.from({ length: 24 }, (_, i) =>
+      const dots = Array.from({ length: D.meta.nCells }, (_, i) =>
         `<i class="${i < sup ? 'on' : ''}"></i>`).join('');
       h += `<div class="cat ${changed ? 'changed' : ''} ${unc.has(code) ? 'uncertain' : ''}" data-code="${code}">
         <input type="checkbox" data-ck="${code}" ${on ? 'checked' : ''}>
@@ -471,7 +472,7 @@ function renderDetail() {
           <span class="code">${code}</span><span class="cn">${esc(D.meta.codeNames[code])}</span>
           <span class="gt-tag ${gt ? 'yes' : ''}">${gt ? 'GT 有' : 'GT 无'}</span>
         </label>
-        <span class="sup" title="24 格中有 ${sup} 格标了 ${code}"><span class="dots">${dots}</span><span class="n">${sup}/24</span></span>
+        <span class="sup" title="${D.meta.nCells} 格中有 ${sup} 格标了 ${code}"><span class="dots">${dots}</span><span class="n">${sup}/${D.meta.nCells}</span></span>
         <button class="unc ${unc.has(code) ? 'on' : ''}" data-unc="${code}" title="标记存疑">?</button>
       </div>`;
     });
@@ -563,14 +564,15 @@ function renderRef() {
   if (!a) { $('#ref-body').innerHTML = '<div class="ref-empty">选择左侧事故后显示参考</div>'; return; }
 
   if (state.refMode === 'support') {
-    let h = `<div class="ref-note">每行 24 根短条对应 24 个「策略 × 模型」组合，<b>蓝色条数</b> = 有多少个组合标了该类。24/24 表示全部一致；0 与中间值要分开看——中间值说明模型间有分歧（橙色行）。</div>`;
+    const N = D.meta.nCells;
+    let h = `<div class="ref-note">每行 ${N} 根短条对应 ${N} 个「策略 × 模型」组合，<b>蓝色条数</b> = 有多少个组合标了该类。${N}/${N} 表示全部一致；0 与中间值要分开看——中间值说明模型间有分歧（橙色行）。</div>`;
     D.meta.layers.forEach(([key, name, codes]) => {
       h += `<div style="font-size:10.5px;color:#8a97a8;margin:9px 0 3px;font-weight:600">${key} 层 · ${name}</div>`;
       codes.forEach(code => {
         const n = a.support[code] || 0;
-        const dots = Array.from({ length: 24 }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
-        const cls = n === 24 ? 'agree-row' : (n === 0 ? '' : 'disagree-row');
-        h += `<div class="sup-row ${cls}" title="${code} ${D.meta.codeNames[code]}：${n}/24 格标了">
+        const dots = Array.from({ length: N }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+        const cls = n === N ? 'agree-row' : (n === 0 ? '' : 'disagree-row');
+        h += `<div class="sup-row ${cls}" title="${code} ${D.meta.codeNames[code]}：${n}/${N} 格标了">
           <span class="cd">${code}</span><span class="dots">${dots}</span><span class="n">${n}</span></div>`;
       });
     });

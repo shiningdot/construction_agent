@@ -12,7 +12,7 @@
 | `fig1_strategy_model_aveplus_f1.{pdf,png}` | 6 策略 × 4 模型 Ave+ F1 热力图（含均值行列） |
 | `fig2_class_strategy_f1.{pdf,png}` | 19 类 × 6 策略 F1 热力图（4 模型均值，按 M/F/T/H/C 分层，右侧标 GT 正例数） |
 | `fig3_strategy_multimetric.{pdf,png}` | 策略级 2×3 多指标对比（Ave+ F1/R/P、Micro-F1、Exact、13 字段准确率） |
-| `fig4_cause_distribution.{pdf,png}` | 19 类致因在 300 条事故中的频率分布（水平堆叠条形图：蓝=1 被标注，橙=0 未标注） |
+| `fig4_cause_distribution.{pdf,png}` | 19 类致因频率分布（水平堆叠条形图：蓝=事故致因，橙=非致因；左侧只显示编码） |
 
 ## 复现
 
@@ -53,7 +53,7 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 - **Exact**：预测编码集合与 GT 完全相同的比例。
 - **基础特征准确率**：只覆盖 13 个字段（GT 未敲定其余 18 个字段），不能表述为 31 字段全量准确率。
 - **图 2** 是 4 模型均值，模型间差异见图 3 的散点；三角标记表示 S4′/S5′ 相对 S0′–S3′ 均值变化 ≥2 个百分点。
-- **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；蓝色段（1）表示该事故被标注为该致因，橙色段（0）表示未被标注，每行总长固定为 300。
+- **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部中文图注说明「蓝色代表是事故致因，橘色则不是」，每行总长固定为 300。
 - **图 3** 的 y 轴为非零基线（a–d 60–100，e 0–30，f 90–100），图注需说明；误差棒是 4 个模型间的 SEM，不是重复运行的方差（每格只运行一次）。
 - **类别英文名**为初译，集中在 `scripts/golden_s1/build_figure_data.py` 的 `CLASS_DISPLAY`，审校后可直接替换并重绘。
 - **S4′/S5′ 的 C1 解读**：S4′ 的 C1 接近崩塌（7.3%），S5′ 恢复至 51.1%，不要将两者等同。

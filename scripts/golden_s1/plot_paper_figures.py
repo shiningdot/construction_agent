@@ -565,13 +565,8 @@ def plot_fig4(doc: dict, out_dir: Path, formats: tuple[str, ...], dpi: int) -> l
     )
 
     ax.set_yticks(y)
-    ax.set_yticklabels(
-        [
-            f"{code}  {doc['labels']['class_display'][code]}"
-            for _, code in rows
-        ],
-        fontsize=6.0,
-    )
+    # 只显示编码（如 F4），不附英文描述
+    ax.set_yticklabels([code for _, code in rows], fontsize=6.8)
     ax.invert_yaxis()
     ax.set_xlim(0, 345)
     ax.set_xticks([0, 50, 100, 150, 200, 250, 300])
@@ -598,12 +593,16 @@ def plot_fig4(doc: dict, out_dir: Path, formats: tuple[str, ...], dpi: int) -> l
         start += len(layer["codes"])
         ax.axhline(start - 0.5, color="#999999", linewidth=0.6)
 
-    ax.legend(
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.12),
-        ncol=2,
-        frameon=False,
-        fontsize=6.3,
+    # 底部中文图注（替代 1/0 图例，直接说明颜色含义）
+    fig.subplots_adjust(bottom=0.14)
+    fig.text(
+        0.5,
+        0.02,
+        "蓝色代表是事故致因，橘色则不是",
+        ha="center",
+        va="bottom",
+        fontsize=7,
+        fontproperties=font_manager.FontProperties(family="WenQuanYi Zen Hei"),
     )
     return save_figure(fig, out_dir, "fig4_cause_distribution", formats, dpi)
 

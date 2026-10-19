@@ -16,6 +16,9 @@
 | `table_cause_distribution.tex` | LaTeX `booktabs` 三线表代码（需导言区 `\usepackage{booktabs}`） |
 | `table_cause_distribution.md` | Markdown 三线表（可复制到 Word / 网页） |
 | `table_cause_distribution.{pdf,png}` | 三线表图片（PDF 矢量 / PNG 300 DPI，可直接插入 Word） |
+| `table_caics_definitions_zh.docx` | 中文操作定义表（Word 表格，同层合并，可直接插入论文） |
+| `table_caics_definitions_zh.md` | 中文操作定义表（Markdown，四列：层 / 编码 / 定义 / 文本示例） |
+| `table_caics_definitions_zh.csv` | 中文操作定义表（UTF-8 BOM，Excel / Word 可直接打开） |
 
 ## 复现
 
@@ -41,6 +44,10 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
   --data-json experiments/golden_standard/figures/figure_data.json \
   --out-dir experiments/golden_standard/figures \
   --formats pdf,png --dpi 300
+
+# 4. 中文操作定义表（层 / 编码 / 定义 / 文本示例）
+/home/suntianhao/construction_agent/.venv/bin/python \
+  scripts/golden_s1/make_definition_table_zh.py
 ```
 
 只读快照也可作为数据源：
@@ -65,6 +72,7 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 - **图 2** 是 4 模型均值，模型间差异见图 3 的散点；三角标记表示 S4′/S5′ 相对 S0′–S3′ 均值变化 ≥2 个百分点。
 - **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部英文图注说明「1 = contributing factor，0 = opposite」，每行总长固定为 300。
 - **三线表**的 `Frequency (%)` 分母是 300 条事故，各编码占比不能相加；19 类合计 2,355 个编码，平均 7.85 条/事故。表题号 `Table 1.` 为占位，论文排版时按实际编号替换。
+- **中文操作定义表**取自 `docs/paper_v2/eswa_paper_v2_zh.md` 表 2，四列（层、编码、定义、文本示例），不含频次与样本量；Word 版同层单元格已合并，表题号为占位。
 - **图 3** 的 y 轴为非零基线（a–d 60–100，e 0–30，f 90–100），图注需说明；误差棒是 4 个模型间的 SEM，不是重复运行的方差（每格只运行一次）。
 - **类别英文名**为初译，集中在 `scripts/golden_s1/build_figure_data.py` 的 `CLASS_DISPLAY`，审校后可直接替换并重绘。
 - **S4′/S5′ 的 C1 解读**：S4′ 的 C1 接近崩塌（7.3%），S5′ 恢复至 51.1%，不要将两者等同。

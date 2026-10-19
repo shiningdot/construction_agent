@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """调试: 单次 v2 调用并打印原始响应"""
 import sys, json, sqlite3
+from pathlib import Path
 sys.path.insert(0, '/home/suntianhao/construction_agent')
 from dotenv import load_dotenv
 load_dotenv('/home/suntianhao/construction_agent/.env', override=True)
 from anthropic import Anthropic
 
-sys.path.insert(0, '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/scripts')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from ablation_gatekeeping import PROMPTS, JSON_SPEC, USER_PREFIX, TWOSTEP_BODY, COVERAGE, extract_json
 
 db = sqlite3.connect('/home/suntianhao/construction_agent/data/caiems_v2.db')

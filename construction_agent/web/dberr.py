@@ -156,6 +156,20 @@ def _hint(code: str, kind: str, path: Path, what: str) -> str:
     label = _LABEL[kind]
 
     if code == "database_not_found":
+        # 同一档在两种库上的**下一步动作不同**，所以按 kind 分岔。
+        #
+        # 工作库本来就是空的，「文件不在」跑建库脚本是对的（脚本是
+        # `CREATE TABLE IF NOT EXISTS`，幂等、只补缺的表）。这一格 2026-10-05
+        # 之前漏了——hint 只说「用环境变量指定库文件」，把第一次打开页面的
+        # 用户引去设一个他并不需要设的环境变量，**而真正的下一步是建库**。
+        # 实现漏了这条，本文件开头对它推理的注释却写着「『文件不在』与
+        # 『零张表』都能靠 `create_staging_db.py` 修」——注释说了、代码没做。
+        #
+        # 主库（final）**不能**这么说：它是数据资产，不存在说明环境指错了，
+        # 引用户去 `create_db_v2.py` 只会建出一个空的主库，比不提示更费事。
+        if kind == "staging":
+            return (f"工作库还没建：跑 {script} 建表（幂等，可反复跑）。"
+                    f"若库文件在别处，用环境变量 {env} 指定")
         return (f"用环境变量 {env} 指定库文件，例如 "
                 f"{env}=/home/suntianhao/construction_agent/data/{_FILENAME[kind]}")
 

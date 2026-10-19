@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """用恢复的专家GT重算六策略指标 + bootstrap CI"""
 import json, sys, random
-sys.path.insert(0, '/home/suntianhao/construction_agent')
+from pathlib import Path
+
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立。
+# 原先 `sys.path` 与 BASE 指向主仓库、GT 又指向 classifier-mod worktree，
+# 两处都可能落空：主仓库下没有 experiments/experiment_6strategies（见
+# CLAUDE.md），而写死的那个 worktree 一旦改名/清理就断。
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from construction_agent.evaluation.experiment3.runner import compute_metrics
 
-BASE = '/home/suntianhao/construction_agent/experiments/experiment_6strategies'
-GT = json.load(open('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_gatekeeping/gt_recovered.json'))
+BASE = str(ROOT / 'experiments' / 'experiment_6strategies')
+GT = json.load(open(str(ROOT / 'experiments' / 'ablation_gatekeeping'
+                         / 'gt_recovered.json')))
 gt_list = [GT[str(i)] for i in range(100)]
 
 # 加载各策略结果（按 index 1-100 排序，统一解析到顶层 codes/accident_type/severity）

@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -216,3 +218,75 @@ def test_判据自检_不记_fetch_failed这一条就红(tmp_path, caplog):
     assert got == []
     assert agg._fetch_failed == 0
     assert "全部" not in caplog.text
+
+
+# --------------------------------------------------------------------------
+# 本地文件的归属：谁的文件归谁（§2.5.51）
+# --------------------------------------------------------------------------
+
+def _ds(c, name: str) -> dict:
+    return next(x for x in c._active_sources if x["name"] == name)
+
+
+def test_本类缓存文件不会被当成本地数据文件(tmp_path):
+    """`{name}_cache.json` **匹配** `{name}*.json`——但它不是数据源。
+
+    不管的话 `_load_cache` 那道 30 天闸门会被绕过：缓存过期返回空、本该去
+    平台重新取数，结果 `_fetch_dataset` 又从缓存文件里把同一份旧数据读回来。
+    """
+    c = _make(tmp_path, ["shandong"])
+    (tmp_path / "open_gov_shandong_cache.json").write_text(
+        json.dumps([{"备注": "30 天前的旧数据"}], ensure_ascii=False),
+        encoding="utf-8")
+
+    assert c._fetch_dataset(_ds(c, "open_gov_shandong")) == []
+
+
+def test_别的数据集的文件不会被误用(tmp_path):
+    """无前缀回退会捞到另一家的文件，而转换时用的是**本家**的字段映射。"""
+    c = _make(tmp_path, ["shandong"])
+    (tmp_path / "open_gov_heze.csv").write_text(
+        "单位名称,隐患描述\n菏泽某工地,脚手架连墙件缺失\n", encoding="utf-8")
+
+    assert c._fetch_dataset(_ds(c, "open_gov_shandong")) == []
+
+
+def test_自己前缀的文件仍能读到(tmp_path):
+    """修法不能把正常路径一起关掉——这是 `_print_manual_guide` 推荐的命名。"""
+    c = _make(tmp_path, ["shandong"])
+    (tmp_path / "open_gov_shandong.csv").write_text(
+        "单位名称,隐患描述\n烟台某工程,安全备案信息缺项\n", encoding="utf-8")
+
+    got = c._fetch_dataset(_ds(c, "open_gov_shandong"))
+    assert len(got) == 1
+    assert got[0]["单位名称"] == "烟台某工程"
+
+
+def test_无前缀且非他家的文件仍能读到(tmp_path):
+    """无前缀回退是**有意**的：用户手工下载多半不会按我们的命名规则改名。"""
+    c = _make(tmp_path, ["shandong"])
+    (tmp_path / "栖霞市建设工程.csv").write_text(
+        "单位名称,隐患描述\n栖霞某工程,备案缺失\n", encoding="utf-8")
+
+    assert len(c._fetch_dataset(_ds(c, "open_gov_shandong"))) == 1
+
+
+def test_缓存过期后不会被自己的缓存续期(tmp_path):
+    """闸门的端到端形态：过期不是「读不到」，而是「读到了同一份旧的」。
+
+    修前的实际路径——`_load_cache` 返回空（过期）→ `_fetch_dataset` 从
+    **同一个缓存文件**里把数据读回来 → `collect()` 再 `_save_cache` 续期。
+    「30 天过期」等于没写。修后断言两件事：没有产出，且缓存文件没被续期。
+    """
+    c = _make(tmp_path, ["shandong"])
+    cache = tmp_path / "open_gov_shandong_cache.json"
+    cache.write_text(json.dumps([{"单位名称": "旧数据"}], ensure_ascii=False),
+                     encoding="utf-8")
+    old = time.time() - 60 * 86400          # mtime 推到 60 天前
+    os.utime(cache, (old, old))
+
+    out = c.collect()
+
+    assert out == [], "过期缓存不应被当成数据产出"
+    assert c._fetch_failed == 1
+    assert os.path.getmtime(cache) < time.time() - 50 * 86400, "缓存被续期了"

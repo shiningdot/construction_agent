@@ -18,7 +18,7 @@
 
 默认跑全部 24 个源，每个源最多收 3 条，单源 120 秒。
 
-## 四条口径，先看这里
+## 七条口径，先看这里
 
 1. **不写任何库。** 只读探测：`registry.build(key, data_dir=<tmp>)` 之后挂一个
    只记账的 sink，不碰 `raw_accidents`，也不碰 `data/<源名>/`。探测完临时目录
@@ -50,7 +50,9 @@
    日志里都只有一行 WARNING，采集任务都报「成功」。
 
    2026-10-01 实测 `jl_em`（DNS）、`jx_em`（SSL 老式重协商）、`hub_em`（412）
-   三个源在旧表上逐格相同；第三十七轮把 `_fetch_failed` 加进 TRS 基类（只数
+   三个源在旧表上逐格相同（**`jl_em` / `jx_em` 2026-10-05 已各自修好**，
+   现役样本只剩 `hub_em`——见 `docs/web/01_在线采集.md` §2.5.53 / §2.5.44）；
+   第三十七轮把 `_fetch_failed` 加进 TRS 基类（只数
    重试耗尽，404/410 不算），「结果」栏据此拆出 `没连上`。**但 `jx_em` 的 TLS
    修好之后变成 `net_failed = 0` + `listed = 0`，与「栏目本来就空」又逐格相同**
    ——它实际是列表页 200 / 271,906 字节（SPA 壳），修好一层只是把它从一种
@@ -60,6 +62,19 @@
    **已知的不可分**：真·空栏目（站点通了、那个栏目确实零条）也落在 `解析空`，
    两者都要人去看页面；这一格至少把「压根没取到页面」排除了。
    **只覆盖 12 个 TRS 源**，其余源仍只有 `空` 一种。
+
+7. **每个源的输出都带着自己的源名，归属不用猜。** 四个源并发跑，子进程的
+   warning 实时穿插——**旧输出里不带前缀的行只能按「挨着哪条 `[N/24]`」来
+   猜，而那是错的**（`[N/24]` 是完成顺序，不是排列顺序）。2026-10-05 就
+   栽在这上面：把 `百度搜索「…」返回的是拦截页` 归给了 `open_gov`，
+   而 `open_gov.py` 里 `baidu` 一处都没有。现在子进程的输出先落进
+   `<key>.stdout`，父进程在汇总行之后整块打印、逐行补 `[key]` 前缀，
+   并缩进 10 格——**从「挨着谁」变成「它自己写着是谁」**。详见
+   `docs/web/01_在线采集.md` §2.5.57。
+
+   ⚠️ **这条修的是「读日志的人会归错」，不是「日志里没有归属信息」**：
+   `[hub_em] HTTP 412…` 这类采集器自己打的 warning 一直带前缀，从不误判；
+   出事的是搜索层与 TRS 基类打的无前缀行。
 
 ## 退出码
 
@@ -79,6 +94,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import multiprocessing as mp
 import shutil
 import sys
@@ -114,11 +130,32 @@ _FULL_LIST_MAX = 60
 _HARD_STOP = 200
 
 
-def _median(xs: list[int]) -> int:
+def _median(xs: list[int]) -> int | None:
+    """样本中位数；**一个样本都没有时返回 `None`，不是 `0`**。
+
+    `0` 在这张表里是一个**可能的真值**——抓到了详情页、正文确实是 0 字。
+    「一个样本都没量到」不是。两者此前长得一样（`_median([])` 返回 `0`），
+    于是 `hub_em`（压根没连上）、`jx_em`（列表页解析出 0 条）、`sc_em`（列表
+    4 条全被初筛排除、没抓过详情页）在「正文中位」一栏**都显示 `0`**，读起来
+    像三家都量到了 0 字——而这三种情况需要修的东西完全不同。
+
+    表格里 `—` 表示不适用，与同表的「列表」「耗时」两列一致；控制台那条路径
+    本来就有 `if res["count"]` 挡着，只有表格这条漏了。
+    """
     if not xs:
-        return 0
+        return None
     ys = sorted(xs)
     return ys[len(ys) // 2]
+
+
+def _median_cell(chars: list[int]) -> str:
+    """「正文中位」一格的渲染：**没有样本是 `—`（不适用），不是 `0`**。
+
+    抽成函数是为了让这条判据可测——它此前埋在 `main()` 的 print 里，和同表
+    另外两列（「列表」「耗时」）的处理分居两处，于是只有它漏了守卫。
+    """
+    med = _median(chars)
+    return "—" if med is None else str(med)
 
 
 # --------------------------------------------------------------------------
@@ -149,6 +186,8 @@ class _Sink:
         self._fh = path.open("w", encoding="utf-8")
         self.limit = limit
         self.count = 0
+        # 已记过的 URL（见 `_accept`：两条通路会把同一批数据送两次）
+        self._seen: set[str] = set()
         # 挂上采集器，好在早停之前先看一眼「列表到底有多长」——见 `_short_list()`。
         # 允许为 None：build 失败时没有采集器可挂。
         self.watch = None
@@ -172,6 +211,19 @@ class _Sink:
         return False
 
     def _accept(self, title, url, text) -> None:
+        # **同一 URL 只记一次。** `run_source` 对同一个 sink 接了两条投递路径
+        # ——`store.attach(sink)`（`RawAccidentStore.add()` 里回调）与
+        # `for item in collector.collect()`——而 TRS 族的 `collect()`
+        # **两条都走**。不挡就把一批数据记两遍：实测 `jx_em`
+        # `collect()` 返回 3 条、表上印 **6** 条（2026-10-05 §2.5.48）。
+        #
+        # 去重口径与生产侧对齐：`raw_accidents` 表有 `UNIQUE(url_hash)`，
+        # 所以真写库那边本来就是幂等的，**只有这张纯内存的表会翻倍**。
+        # `url` 为空时不去重——没有键可用，退回原行为。
+        if url:
+            if url in self._seen:
+                return
+            self._seen.add(url)
         self.count += 1
         # 逐条落盘 + flush：父进程超时 kill 之后，已经收到的条目还能读出来。
         # 「120 秒收到 47 条」和「120 秒一条没有」是完全不同的两个结论。
@@ -240,7 +292,74 @@ def _closure_of(collector) -> dict | None:
             "filtered": filt, "sum": col + rev + filt}
 
 
+class _CaptureStreams:
+    """把子进程的输出改道到 `cap`：`sys.stdout` / `sys.stderr`，**以及 root 上
+    已有的 `StreamHandler`**。
+
+    只改 `sys.stdout/stderr` 会漏掉一类 handler——`logging.StreamHandler()`
+    在**构造时**就把当时的 `sys.stderr` 存进了 `self.stream`，之后改
+    `sys.stdout` 与它无关。实测（2026-10-05，零请求）：空 handler 的进程里
+    重定向抓得住，装了 `StreamHandler` 之后抓到的是**空串**——沉默地漏。
+
+    `logging.lastResort` 是例外，不用管它：它的 `stream` 是 property，每次
+    emit 现读 `sys.stderr`，所以改动天然生效。
+
+    **改不到谁**：挂在**非 root** logger 上的 handler（某个库自己
+    `addHandler`）。当前导入链里没有这样的库（`grep -rn "addHandler|
+    basicConfig" construction_agent/collector/` 只命中 `run_collect.py`
+    这个 CLI，不在链上）；真出现了就会照旧漏到终端，
+    `tests/test_probe_child_output.py` 里那条断言会先炸。
+    """
+
+    def __init__(self, cap) -> None:
+        self.cap = cap
+        self._saved: list = []
+
+    def __enter__(self) -> "_CaptureStreams":
+        for attr in ("stdout", "stderr"):
+            self._saved.append((sys, attr, getattr(sys, attr)))
+        sys.stdout = sys.stderr = self.cap       # type: ignore[assignment]
+        for h in logging.getLogger().handlers:
+            if isinstance(h, logging.StreamHandler):
+                self._saved.append((h, "stream", h.stream))
+                h.stream = self.cap              # type: ignore[assignment]
+        return self
+
+    def __exit__(self, *_exc) -> bool:
+        for obj, attr, val in reversed(self._saved):
+            setattr(obj, attr, val)
+        self._saved.clear()
+        return False                             # 不吞异常
+
+
 def _probe_child(key: str, work: Path, limit: int, tmp_root: Path) -> None:
+    """在子进程里探一个源。结果写 `<work>/<key>.jsonl`，异常写 `<key>.err`。
+
+    本函数只做一件事：**把子进程的输出关进自己的文件**，再调
+    `_probe_child_inner` 干正事。为什么必须关——见 `_attr_line`。
+
+    用**行缓冲的文件**而不是 `io.StringIO`：被父进程 `terminate()` 掉的源
+    （超时那一路）也能留住已经写出来的行，而 `StringIO` 在 SIGTERM 下
+    一行都带不走——**恰恰是最需要日志的那次探测最拿不到日志**。
+    """
+    work = Path(work)
+    try:
+        cap = open(work / f"{key}.stdout", "w",
+                   encoding="utf-8", buffering=1)
+    except OSError:
+        # 落不了盘就照旧直通终端。**不因为「记不上日志」而放弃探测**——
+        # 那会把一个日志设施问题升级成「这个源没数据」。
+        _probe_child_inner(key, work, limit, tmp_root)
+        return
+    try:
+        with _CaptureStreams(cap):
+            _probe_child_inner(key, work, limit, tmp_root)
+    finally:
+        cap.close()
+
+
+def _probe_child_inner(key: str, work: Path, limit: int,
+                       tmp_root: Path) -> None:
     """在子进程里探一个源。结果写 `<work>/<key>.jsonl`，异常写 `<key>.err`。
 
     **全程不写库**：只 `build` + 挂 sink，`executor` 那条写 `raw_accidents`
@@ -378,6 +497,68 @@ def _read_result(key: str, work: Path) -> dict:
     return out
 
 
+def _read_captured(key: str, work: Path) -> list:
+    """读子进程关进 `<key>.stdout` 的那些行（见 `_probe_child`）。"""
+    p = work / f"{key}.stdout"
+    if not p.exists():
+        return []
+    # `errors="replace"`：站点返回的乱码字节不该让整份日志读不出来。
+    return [ln for ln in p.read_text(encoding="utf-8", errors="replace")
+            .splitlines() if ln.strip()]
+
+
+# 子进程输出块相对 `[N/24]` 汇总行的缩进。纯排版：让「谁说的」一眼可见。
+_BLOCK_INDENT = " " * 10
+
+
+def _attr_line(key: str, line: str) -> str:
+    """给子进程的一行输出补上源名前缀，**归属不再靠位置**。
+
+    这修的是一个把我骗了两次的读数陷阱（§2.5.56）。四个源并发跑
+    （`CONCURRENCY = 4`）、子进程 stdout 直通终端，于是：
+
+      · `[N/24]` 是**完成顺序**，不是源的排列顺序
+      · 子进程的 warning 实时穿插，谁挨着谁纯属巧合
+
+    日志里一屏长这样（真实发生过）：
+
+        百度搜索「建筑施工 安全事故 死亡」返回的是拦截页…
+          [18/24] open_gov             没连上    0 条   47.2s
+
+    按行相邻归属，就把百度那行算给了 `open_gov`——而 `open_gov.py` 里
+    `baidu` 一处都没有（它压根不走搜索层）。**能归属的行是带前缀的**
+    （`[open_gov] …` 是采集器自己打的），**不带前缀的行**（搜索层的
+    `百度搜索「…」…`、TRS 基类 `trs_cms_base.py:1063` 的
+    `HTTP … (尝试 …): …`——**12 个源共用同一句**）在旧输出里无凭据可归属。
+    （日志模板里的 `…` 是 AST 归一化后的占位，源码是 f-string
+    `f"HTTP {resp.status_code} (尝试 {attempt+1}): {url}"`——直接 grep
+    `HTTP {} ` 在源码里找不到，要按行号认。）
+
+    举基类那句而不是举某个源自己的：归属难就难在**内容认不出是谁**。
+    `henan_em.py:370` 的 `未找到 div.zfxxgk_zdgkc` 虽然也不带前缀、也会
+    交错，但它是 henan_em 独有的一句，读的人能从措辞反推——**这不是本
+    修法要解决的那一类**。（本 docstring 初版就把这句写成了「基类的」，
+    在没有凭据的地方凭印象指认，正是本文档要防的那个动作。）
+
+    修法不是「把搜索层加上源名」——那要让搜索层知道自己被谁调用，
+    侵入十八个源。改在**父进程侧**：子进程把输出写进 `<key>.stdout`
+    （`_probe_child`），父进程在汇总行之后整块打印并逐行补前缀。
+    于是**每一行都自带归属凭据**，缩进还告诉你这行属于上面那条汇总。
+
+    已带 `[key]` 前缀的行不重复加，否则会写成 `[hub_em] [hub_em] HTTP 412…`。
+    """
+    s = line.rstrip()
+    return f"{_BLOCK_INDENT}{s.lstrip()}" if s.lstrip().startswith(f"[{key}]") \
+        else f"{_BLOCK_INDENT}[{key}] {s.lstrip()}"
+
+
+def _print_result_block(res: dict, work: Path, done: int, total: int) -> None:
+    """打印一个源的汇总行 + 它自己的输出块（父进程侧，唯一打印出口）。"""
+    print(f"  [{done:2d}/{total}] {_fmt_line(res)}", flush=True)
+    for line in _read_captured(res["key"], work):
+        print(_attr_line(res["key"], line), flush=True)
+
+
 def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> list:
     pending = list(specs)
     running: list[dict] = []
@@ -425,7 +606,7 @@ def _run_all(specs, work: Path, tmp_root: Path, limit: int, timeout: int) -> lis
                 results.append(res)
                 running.remove(item)
                 done += 1
-                print(f"  [{done:2d}/{total}] {_fmt_line(res)}", flush=True)
+                _print_result_block(res, work, done, total)
     except KeyboardInterrupt:
         for item in running:
             item["proc"].kill()
@@ -438,7 +619,9 @@ def _status_of(res: dict) -> str:
     """四种取值变成六种：`空` 被拆成「没连上」与「解析空」。
 
     2026-10-01 实测：`jl_em`（DNS 解析失败）、`jx_em`（SSL 老式重协商被禁）、
-    `hub_em`（HTTP 412 反爬）三个源，三种毫不相干的故障，在旧表上逐格相同。
+    `hub_em`（HTTP 412 反爬）三个源，三种毫不相干的故障，在旧表上逐格相同
+    （**前两家 2026-10-05 已修好**，现役样本只剩 `hub_em`——见
+    `docs/web/01_在线采集.md` §2.5.53 / §2.5.44）。
     它们和「站点通了、栏目确实没内容」在 `_total_listed` 上都是 0——不拆开，
     这一栏就答不了「这个源还活着吗」。
 
@@ -519,7 +702,8 @@ def _fmt_line(res: dict) -> str:
     chars = [r["chars"] for r in res["rows"]]
     med = _median(chars)
     listed = res.get("listed")
-    extra = f"正文中位 {med} 字" if res["count"] else (res.get("error") or "")[:60]
+    extra = (f"正文中位 {med} 字" if med is not None
+             else (res.get("error") or "")[:60])
     tail = "" if listed is None else f"列表 {listed}"
     clo = _closure_cell(res)
     clo = "" if clo == "—" else f"闭环 {clo}"
@@ -700,7 +884,7 @@ def main() -> int:
             print(f"| `{r['key']}` | {spec.group if spec else '?'} | {_status_of(r)} "
                   f"| {_count_cell(r)} | {'—' if listed is None else listed} "
                   f"| {_closure_cell(r)} "
-                  f"| {_median(chars)} | {el} | {r.get('note','')} |")
+                  f"| {_median_cell(chars)} | {el} | {r.get('note','')} |")
         print("\n> `条数` 带 `*` = 被早停截断，等于 `--limit`，**不是抓到了这么多**；"
               "不带 = 列表本就短，跑到底的真实候选数。两者不要横向比。")
 

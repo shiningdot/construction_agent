@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """过程记录 MD → LaTeX → PDF（中文，CJK 字体）"""
 import re, subprocess, os
+from pathlib import Path
 
-SRC = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/paper_creation_process.md'
-OUT = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/paper_creation_process.tex'
+# 本仓库根：脚本在 scripts/ 下，上溯一级即仓库根（worktree 与主仓库都成立）
+ROOT = Path(__file__).resolve().parents[1]
+
+SRC = str(ROOT / 'docs' / 'paper' / 'paper_creation_process.md')
+OUT = str(ROOT / 'docs' / 'paper' / 'paper_creation_process.tex')
 
 text = open(SRC, encoding='utf-8').read()
 
@@ -116,7 +120,7 @@ print(f'TeX 已生成: {OUT}')
 # tectonic 编译
 tectonic = '/home/suntianhao/TEM/tectonic'
 pdf_dir = os.path.dirname(OUT)
-r = subprocess.run([tectonic, OUT], capture_output=True, text=True, cwd='/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod')
+r = subprocess.run([tectonic, OUT], capture_output=True, text=True, cwd=str(ROOT))
 print('tectonic 退出码:', r.returncode)
 for ln in r.stderr.split('\n')[-6:]:
     if 'error' in ln.lower() or 'warning' in ln.lower() and 'Overfull' not in ln:

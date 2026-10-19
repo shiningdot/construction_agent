@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Phase 5a 引用合规校验 v2：逐条核对 27 条参考文献是否在正文被引用"""
 import re
+from pathlib import Path
 
-PATH = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'
+PATH = str(Path(__file__).resolve().parents[1] / 'docs' / 'paper' / 'eswa_paper.md')
 text = open(PATH, encoding='utf-8').read()
 body = text.split('## References')[0]
 

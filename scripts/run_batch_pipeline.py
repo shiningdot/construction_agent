@@ -1,6 +1,6 @@
 """批量管线: 原始数据 → 分类 → 提取 → 编码 → 入库。"""
 
-import json, sqlite3, sys, logging, hashlib
+import json, re, sqlite3, sys, logging, hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +30,149 @@ BATCH_SIZE = 50
 def generate_id(title: str, date: str, city: str) -> str:
     parts = f"{title}|{date}|{city}"
     return hashlib.md5(parts.encode()).hexdigest()[:12]
+
+
+class AdmissionGuard:
+    """入库前查重守门：按与主键 id 无关的客观特征查已有库，命中即跳过。
+
+    为什么需要它：主键 `id = md5(title|date|city)`，而 `title` 由 step1 的 LLM
+    **每次现场提取**、措辞会变。同一条原始记录跨批次重跑时 title 不同 → id 不同
+    → 两道闸门（`INSERT OR REPLACE` 靠主键、`UNIQUE(accident_id,url)` 靠 id）
+    **同时失效**，各落一行。2026-10-08 主库按 raw_text 全等查出 20 组 / 21 行
+    这样的重复并删除（见 `scripts/dedup_accidents.py`）。本守门在写入之前，
+    用「原文/URL/时间地点」这些不随 LLM 措辞漂移的特征拦住它们。
+
+    三档（口径复用 collector/base.py 与 collector/cleaners/deduplicator.py）：
+
+        L1 内容哈希    md5(raw_text)             硬，同一份原文
+        L2 URL 哈希    md5(归一化 source_url)     硬，**排除本地书源**
+        L3 结构化指纹  年月|城市|dN|iN|类型         软，仅告警不拦截
+
+    **本地书源分流**：`source_url` 是本地 PDF 路径（非 http）的条目不进 L2 索引。
+    一本书的几百条案例共用同一路径，进 URL 索引会把它们全判成同一事故。L1 内容
+    哈希对书源仍有效——同案例全文相同才命中，正是它抓出了库里的书源重复。
+
+    L3 只告警：指纹（年月+城市+伤亡+类型）会误伤「同城同月两起同类型同伤亡事故」，
+    不能做硬判据，所以只记日志、不拦入库。
+    """
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._content: dict[str, str] = {}  # md5(raw_text) → accident_id
+        self._url: dict[str, str] = {}      # md5(归一化 url) → accident_id（仅 http）
+        self._fp: dict[str, str] = {}       # 指纹 → accident_id
+        self._load(conn)
+
+    # ── 三个哈希的口径 ──
+
+    @staticmethod
+    def _content_hash(text: str) -> str:
+        if not text:
+            return ""
+        return hashlib.md5(text.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _url_hash(url: str) -> str:
+        """归一化 URL 后取哈希。归一化与 deduplicator._hash_url 一致：
+        去首尾空白、去尾斜杠、去 www 前缀、去 fragment。"""
+        normalized = url.strip().rstrip("/")
+        normalized = re.sub(r"^https?://(?:www\.)?", "", normalized)
+        normalized = normalized.split("#")[0]
+        if not normalized:
+            return ""
+        return hashlib.md5(normalized.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _fingerprint(d: dict) -> str:
+        """(年月|城市|d死亡|i受伤|类型) 的指纹，字段全空返回 ''。"""
+        parts = []
+        date = d.get("date") or ""
+        if len(date) >= 7:
+            parts.append(date[:7])
+        if d.get("city"):
+            parts.append(d["city"])
+        deaths = d.get("deaths") or 0
+        if deaths > 0:
+            parts.append(f"d{deaths}")
+        injuries = d.get("injuries") or 0
+        if injuries > 0:
+            parts.append(f"i{injuries}")
+        if d.get("accident_type"):
+            parts.append(d["accident_type"])
+        if not parts:
+            return ""
+        return hashlib.md5("|".join(parts).encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _is_local_source(url: str) -> bool:
+        """本地电子书源：source_url 是文件路径而非 http(s) URL。"""
+        return not url.lower().startswith(("http://", "https://"))
+
+    def _load(self, conn: sqlite3.Connection) -> None:
+        """从已有库建三档内存索引（像 Deduplicator.load_existing_dataset）。
+
+        空库 / `accidents` 表未建时静默返回空索引——测试用临时库没有该表，
+        此时守门退化为不拦截，与加守门之前的行为一致。
+        """
+        try:
+            rows = conn.execute(
+                "SELECT id, raw_text, source_url, date, city, deaths, injuries, accident_type "
+                "FROM accidents"
+            ).fetchall()
+        except sqlite3.OperationalError as e:
+            logger.warning(f"AdmissionGuard 读不到 accidents 表（{e}），本次不做查重守门")
+            return
+
+        for aid, raw_text, source_url, date, city, deaths, injuries, atype in rows:
+            ch = self._content_hash(raw_text or "")
+            if ch:
+                self._content.setdefault(ch, aid)
+
+            url = source_url or ""
+            if url and not self._is_local_source(url):
+                uh = self._url_hash(url)
+                if uh:
+                    self._url.setdefault(uh, aid)
+
+            fp = self._fingerprint(
+                {"date": date, "city": city, "deaths": deaths,
+                 "injuries": injuries, "accident_type": atype}
+            )
+            if fp:
+                self._fp.setdefault(fp, aid)
+
+    # ── 查询 ──
+
+    def check(self, s1: dict, raw: dict) -> tuple[str | None, str | None]:
+        """硬判据：命中返回 (层, 已有 accident_id)，未命中返回 (None, None)。"""
+        ch = self._content_hash(raw.get("content", "") or "")
+        if ch and ch in self._content:
+            return ("L1", self._content[ch])
+
+        url = raw.get("source_url", "") or ""
+        if url and not self._is_local_source(url):
+            uh = self._url_hash(url)
+            if uh and uh in self._url:
+                return ("L2", self._url[uh])
+        return (None, None)
+
+    def fingerprint_hit(self, s1: dict) -> str | None:
+        """软判据：指纹命中返回已有 accident_id（仅供告警，不拦入库）。"""
+        fp = self._fingerprint(s1)
+        return self._fp.get(fp) if fp else None
+
+    def add(self, s1: dict, raw: dict, accident_id: str) -> None:
+        """本条已成功入库后更新索引，使同批次内后续条目也能被拦住。"""
+        ch = self._content_hash(raw.get("content", "") or "")
+        if ch:
+            self._content.setdefault(ch, accident_id)
+        url = raw.get("source_url", "") or ""
+        if url and not self._is_local_source(url):
+            uh = self._url_hash(url)
+            if uh:
+                self._url.setdefault(uh, accident_id)
+        fp = self._fingerprint(s1)
+        if fp:
+            self._fp.setdefault(fp, accident_id)
 
 
 def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
@@ -92,11 +235,14 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
 
     # caics_causes —— 先清后写。
     #
-    # 主表用 INSERT OR REPLACE（重跑=覆盖），子表若裸 INSERT 就会在原有基础上
-    # 再加一遍：同一件事故补跑一次，编码翻倍。而事故详情页会把同一编码显示两遍，
-    # 每份证据单看都成立，不数行数发现不了。用真 schema 实测过：写入两次后
-    # caics_causes 从 2 行变 4 行。同类修法见 `review/promote.py:11` 记的历史
-    # 教训与蓝图 03 §5.3 规则 2。
+    # 主表用 INSERT OR REPLACE（重跑=覆盖）——**前提是 generate_id 稳定**。但 id
+    # 里含 LLM 现场提取的 title，措辞一变 id 就变，REPLACE 退化成一条普通 INSERT，
+    # 同一份原文会落成两行（2026-10-08 实测主库 20 组 / 21 行，见
+    # `scripts/dedup_accidents.py`）。所以入库前还有一道 AdmissionGuard 按
+    # raw_text/URL 拦。子表若裸 INSERT 就会在原有基础上再加一遍：同一件事故补跑
+    # 一次，编码翻倍。而事故详情页会把同一编码显示两遍，每份证据单看都成立，
+    # 不数行数发现不了。用真 schema 实测过：写入两次后 caics_causes 从 2 行变 4 行。
+    # 同类修法见 `review/promote.py:11` 记的历史教训与蓝图 03 §5.3 规则 2。
     #
     # 不能靠 UNIQUE(accident_id, code) 来挡：同一类致因在一件事故里有**多条不同
     # 证据**是正常标注（主库实测 278 组，例如「4 根挑杆未与楼层锚固环连接」与
@@ -138,7 +284,9 @@ def insert_accident(conn: sqlite3.Connection, s1: dict, s2_result, raw: dict,
     ))
 
     # search_logs —— 同上。source_urls 不在此列：它有 UNIQUE(accident_id, url)，
-    # INSERT OR IGNORE 已经挡住了重复，再加 DELETE 反而会删掉同一事故的其它来源 URL
+    # 同一 accident_id 下的重复 url 由 INSERT OR IGNORE 挡住；再加 DELETE 反而会
+    # 删掉同一事故的其它来源 URL。注意这条唯一约束**第一列就是 accident_id**，
+    # 所以它挡不住「同一份原文因 id 变化而落成两条」的重复——那种靠 AdmissionGuard。
     conn.execute("DELETE FROM search_logs WHERE accident_id = ?", (aid,))
     if search_result and search_result.get("search_performed"):
         conn.execute("""
@@ -187,8 +335,14 @@ def run_batch(n: int = BATCH_SIZE):
     # 接管，与下面的 DELETE 形成双保险。
     conn.execute("PRAGMA foreign_keys = ON")
 
+    # 入库前查重守门：从已有库建三档索引，写入前拦住「同一份原文因 id 变化而
+    # 重复」的条目（见 AdmissionGuard docstring）。放在编排层、insert 之外，
+    # 不改 insert_accident 本身的语义。
+    guard = AdmissionGuard(conn)
+
     success = 0
     purged = 0
+    duplicate = 0
     failed = 0
 
     for i, d in enumerate(raw):
@@ -214,13 +368,26 @@ def run_batch(n: int = BATCH_SIZE):
             logger.error(f"  ✗ {out.purge_reason}")
             continue
 
+        s1 = out.basic.to_dict()
+
+        # 查重守门：硬判据命中即跳过（不写库）；软判据（指纹）只告警不拦
+        soft = guard.fingerprint_hit(s1)
+        if soft:
+            logger.warning(f"  ⚠ L3 指纹与已有 {soft} 相近（仅告警，不拦截）")
+        layer, matched = guard.check(s1, d)
+        if layer:
+            duplicate += 1
+            logger.info(f"  ⏭ {layer} 命中已有 {matched}，跳过入库")
+            continue
+
         # 入库
         try:
             insert_accident(
-                conn, out.basic.to_dict(), out.causes, d,
+                conn, s1, out.causes, d,
                 out.text_type, out.classification, out.search, out.total_ms,
             )
             conn.commit()
+            guard.add(s1, d, generate_id(s1["title"], s1.get("date", ""), s1.get("city", "")))
             success += 1
             codes_str = ",".join(out.caics_codes) if out.causes else "?"
             logger.info(
@@ -234,9 +401,10 @@ def run_batch(n: int = BATCH_SIZE):
 
     conn.close()
     logger.info(f"\n{'='*50}")
-    logger.info(f"完成: 成功{success} | 过滤{purged} | 失败{failed}")
+    logger.info(f"完成: 成功{success} | 过滤{purged} | 重复{duplicate} | 失败{failed}")
     with open("data/audit/batch50_progress.json","w") as f:
-        json.dump({"success":success,"purged":purged,"failed":failed,"total":n,"timestamp":datetime.now().isoformat()}, f)
+        json.dump({"success":success,"purged":purged,"duplicate":duplicate,
+                   "failed":failed,"total":n,"timestamp":datetime.now().isoformat()}, f)
 
 
 if __name__ == "__main__":

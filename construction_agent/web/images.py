@@ -224,20 +224,29 @@ def suspicious_sha1s(min_accidents: int = 3) -> set[str]:
 def stats() -> dict[str, Any]:
     """图片覆盖统计（概览页与 `/api/images/stats`）。
 
-    三个 `return empty` 里有两个是「库不可用」、一个是「表是空的」——它们
-    以前长得一模一样。`state` 字段把这条信息带出去，与 `availability()`
+    三个降级返回点里有两个是「库不可用」、一个是「表是空的」——它们以前
+    长得一模一样。`state` 字段把这条信息带出去，与 `availability()`
     同一套取值。**注意 `available: False` 这条契约没动**：`overview.js`
-    靠它决定整张卡出不出现（`:642`），改语义会把概览页弄坏。
+    靠它决定整张卡出不出现（`:656`），改语义会把概览页弄坏。
+
+    **计数类字段在没量过的时候是 `None`，不是 `0`。** `0` 在这些字段上是
+    一个**可用的答案**（「确实没有」），拿它表示「不知道」会让读的人得出
+    相反的结论。`state` 只把这件事说给看 `state` 的人，而 `files` 这个
+    字段本身是自解释的——调用方不加判断地读它，读到的是撒谎的数字。
+    这是本项目第六次栽在同一个坑上（前五次见 `01_在线采集.md` §2.5.40 /
+    §2.5.41）：**判据的取值域里混进了「不适用」，而它与「没有」看起来一样。**
     """
-    empty: dict[str, Any] = {
-        "files": 0, "accidents_with_images": 0, "accidents_total": 0,
-        "accidents_with_images_legacy_only": 0,
-        "coverage": 0.0, "by_ext": [], "analyzed": 0, "generated_at": None,
+    # 计数类一律 `None`（JSON null = 未知）。`by_ext` 是列表，空列表的
+    # 空表示不歧义，留着 `[]`。
+    unknown: dict[str, Any] = {
+        "files": None, "accidents_with_images": None, "accidents_total": None,
+        "accidents_with_images_legacy_only": None,
+        "coverage": None, "by_ext": [], "analyzed": None, "generated_at": None,
         "available": False, "state": "unavailable",
     }
     con = _conn()
     if con is None:
-        return empty
+        return unknown
     con.row_factory = sqlite3.Row
     try:
         row = con.execute(
@@ -257,16 +266,24 @@ def stats() -> dict[str, Any]:
             "SELECT ext, COUNT(*) AS count FROM image_manifest "
             "GROUP BY ext ORDER BY count DESC")]
     except sqlite3.Error:
-        return empty
+        return unknown
     finally:
         con.close()
 
     files = row["files"] or 0
     if not files:
-        # 与上面两个 `return empty` 分开：库是好的、表也在，只是清单还没跑过。
+        # 与上面两处 `return unknown` 分开：库是好的、表也在，只是清单还没跑过。
         # 这是全新环境的正常状态，不是故障——页面上该说的是「去跑清单脚本」，
         # 不是「工作库不可用」。
-        return {**empty, "state": "empty"}
+        #
+        # 这一档里**前面四个计数是真值**（确实量过：清单表 0 行），**后两个不是**
+        # ——覆盖率和事故总数都要除以/取自 `accidents`，而那一步在这之后才执行。
+        # 旧写法把没查到的 `accidents_total` 也写成 0，于是「工作库建好了、
+        # 清单还没跑」这个**最常见的全新环境状态**对外报「事故总数 0」，
+        # 而真实的主库有 2,623 条。
+        return {**unknown, "files": 0, "accidents_with_images": 0,
+                "accidents_with_images_legacy_only": 0, "analyzed": 0,
+                "state": "empty"}
 
     accs = row["accs"] or 0
     total = int(rodb.scalar("SELECT COUNT(*) FROM accidents", default=0) or 0)

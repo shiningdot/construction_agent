@@ -184,12 +184,56 @@ def test_stats的available契约没被改坏(tmp_path, monkeypatch):
         assert s["state"] == ("ready" if want else s["state"])
 
 
-def test_stats在空态上仍然给零值而不是抛异常(tmp_path, monkeypatch):
-    """零值本身是旧的对外形状，保留——区别只在 `state` 说得清是哪种空。"""
+def test_stats在空态上的计数分两种零(tmp_path, monkeypatch):
+    """**「量过了，是 0」与「没量过」在响应里必须不同。**
+
+    这条测试上一版叫 `test_stats在空态上仍然给零值而不是抛异常`，断言
+    `files == 0 and coverage == 0.0`——它钉住的是**旧形状**，而旧形状的
+    问题正在这里：`state` 说得清是哪种空，可**读 `files` 的人不看 `state`**。
+    「工作库建好了、清单还没跑」是最常见的全新环境状态，此时旧代码对外报
+    `accidents_total: 0`，而真实主库有 2,623 条——那是撒谎，不是零值。
+
+    现在分两种零。这一档确实量过的（清单表 0 行）：`files` /
+    `accidents_with_images` / `analyzed` / `legacy_only` 都是真 0；
+    这一档没量的：覆盖率和事故总数要读 `accidents`，而代码在 `if not files`
+    就早退了，**从没查过那张表** → `None`（JSON 里是 null）。
+    """
     p = _staging(tmp_path, "emptytable")
     monkeypatch.setenv(ENV, str(p))
     s = images.stats()
 
-    assert s["files"] == 0 and s["coverage"] == 0.0
+    # 量过的：真 0
+    assert s["files"] == 0
+    assert s["accidents_with_images"] == 0
+    assert s["analyzed"] == 0
+    assert s["accidents_with_images_legacy_only"] == 0
+    assert s["by_ext"] == []
+    # 没量过的：None，不是 0
+    assert s["accidents_total"] is None, "这一格没查过 accidents 表"
+    assert s["coverage"] is None
     assert s["generated_at"] is None
     assert s["state"] == "empty"
+
+
+@pytest.mark.parametrize("kind", ["missing", "emptyfile", "notables"])
+def test_stats不可用时计数是None不是零(tmp_path, monkeypatch, kind):
+    """不可用那一档**一个数都没量过**，计数类字段全是 `None`。
+
+    `0` 在这些字段上是一个可用的答案（「确实没有」）。拿它表示「不知道」，
+    读的人只能得出相反的结论——而 `state` 是同一个响应里的另一个字段，
+    不加判断地读 `files` 的调用方根本不会看它。
+
+    这是本项目第六次栽在同一个坑（前五次见 `01_在线采集.md` §2.5.40 /
+    §2.5.41）：判据的取值域里混进了「不适用」，而它与「没有」看起来一样。
+    """
+    p = _staging(tmp_path, kind)
+    monkeypatch.setenv(ENV, str(p))
+    s = images.stats()
+
+    assert s["state"] == "unavailable"
+    assert s["available"] is False
+    for field in ("files", "accidents_with_images", "accidents_total",
+                  "accidents_with_images_legacy_only", "coverage", "analyzed"):
+        assert s[field] is None, f"{field} 在不可用时应当为 None，不是 0"
+    # 列表的空表示不歧义，留着 `[]`
+    assert s["by_ext"] == []

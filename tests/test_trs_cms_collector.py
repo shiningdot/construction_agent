@@ -1180,7 +1180,9 @@ def test_判据自检_判据改回endswith就收不到Word(tmp_path, monkeypatch
 # --------------------------------------------------------------------------
 #
 # `jx_em` 在健康检查表上一直是「列表 0 条」，与 `hub_em`（WAF 412 拦）、
-# `jl_em`（域名 DNS 解析不了）**逐格长得一模一样**。实测诊断到 TCP 层才发现
+# `jl_em`（域名 DNS 解析不了，**2026-10-05 已修**，见 `docs/web/01_在线采集.md`
+# §2.5.53——那是域名笔误 + 列表 JS 渲染两层，与本源毫不相干）
+# **逐格长得一模一样**。实测诊断到 TCP 层才发现
 # 三者毫不相干：本源的故障在**握手**上——服务器只认 RFC 5746 之前的老式
 # 重协商，而 OpenSSL 3.x 默认禁用它（CVE-2009-3555 的缓解措施）。放开后
 # TLSv1.2 谈成、HTTP 200 / 271,906 字节，站点本身完全健康。
@@ -1327,7 +1329,12 @@ def test_列表页取到正文时页数加一(tmp_path):
 
 
 def test_列表页压根取不到时页数为零(tmp_path):
-    """`hub_em`(412) / `jl_em`(DNS) 那一类：页面一张都没回来。"""
+    """`hub_em`(412) / `jl_em`(DNS，**2026-10-05 已修**) 那一类：页面一张都没回来。
+
+    `jl_em` 修好之后不再属于这一类（现在是「有数据」），保留它作例子会让这条
+    用例读起来像在描述一个已不存在的形态——更贴切的现役样本是 `hub_em`
+    （JS 挑战型 WAF）与 `news_aggregator`（百度拦截页）。
+    """
     c = _collector(tmp_path)
     c._fetch = lambda url: ""
     try:
@@ -1383,3 +1390,192 @@ def test_同一个零条两种来路只有页数分得开(tmp_path):
     finally:
         _close(down)
         _close(parsed)
+
+
+# --------------------------------------------------------------------------
+# M 组：412 JS 挑战页不重试
+# --------------------------------------------------------------------------
+#
+# 第四十九轮。`hub_em`（湖北省应急管理厅）在健康检查表上长期显示 412。
+# 2026-10-05 实测：六种请求头组合（只有 UA ／ +Accept ／ +Accept-Language ／
+# +Referer ／ +Upgrade-Insecure-Requests ／ 全套浏览器头）**全部 412**，
+# 响应体恒约 3.1 KB 的同一份挑战页——**不是缺头**。
+#
+# 挑战页要的是浏览器执行 `$_ss.cd` 那段混淆代码算 cookie 再重载。**不逆向**
+# （理由见 `_is_js_challenge` 的 docstring）。代码侧能做、也唯一该做的，是
+# 让 `_fetch` **认得出这是挑战页、别白重试三次**：退避 1s + 2s 之后拿回来的
+# 还是同一份挑战页，而反复打是对抗性 WAF 最容易被升级封禁的行为
+# （`news_aggregator` 已被风控挡死的形态）。
+#
+# 这里真东西只有一份：`hub_em_412.html` 里那段响应体。下面的
+# `_CHALLENGE_BODY` 是从它截的原文（`$_ss` 变量名 + `$_ss.cd` 赋值 +
+# 外部 js 三个特征都在）。
+
+_CHALLENGE_BODY = (
+    "<script type=\"text/javascript\" r='m'>$_ss=window['$_ss'];"
+    "if(!$_ss)$_ss={};$_ss.nsd=18589;"
+    "$_ss.cd=\"qhrqrpAlEf3qWqlarGgumGqarkqmkOWaqu9vmGqaqsqDkOWarkqmqflEtn"
+    "qKqkqrWq3iWS3qWqAar1lumGqAJA9KqkqcWqWiWuqXlA9lEkqDkPEkm\";"
+    "if($_ss.lcd)$_ss.lcd();</script>"
+    "<script type=\"text/javascript\" charset=\"utf-8\" "
+    "src=\"/8aLU4IL2XLG3/khy8TTLck25V.294cc83.js\" r='m'></script>"
+)
+
+# 一个**带脚本**但不是挑战页的 412：网关要登录。用来钉住判据的窄度。
+_PLAIN_412_BODY = (
+    "<html><body><h1>412 Precondition Failed</h1>"
+    "<p>您的会话已过期，请重新登录。</p>"
+    "<script>setTimeout(function(){location.href='/login';},3000);</script>"
+    "</body></html>"
+)
+
+
+def test_412挑战页只请求一次不重试(tmp_path):
+    """**这一组的主断言。** 改前 `_fetch` 会退避 1s + 2s 再打两次。"""
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    client = _FakeClient(resp)
+    c._client = client
+    try:
+        assert c._fetch("https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/") is None
+        assert len(client.calls) == 1, "挑战页不该重试，只允许打一次"
+        assert c._fetch_failed == 1, "要计成「没连上」，不能一声不响"
+    finally:
+        _close(c)
+
+
+def test_412挑战页的日志说得出这是什么(tmp_path, caplog):
+    """日志得让人一眼看出「重试无用」，而不是含糊的 `HTTP 412`。
+
+    含糊的日志会把人引去调请求头——**这一轮实测已经证伪了那条路**
+    （六种头组合全 412）。日志里必须点名「挑战」。
+    """
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    c._client = _FakeClient(resp)
+    try:
+        with caplog.at_level(logging.WARNING):
+            c._fetch("https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/")
+        hits = [r for r in caplog.records if "挑战" in r.getMessage()]
+        assert hits, f"没有一条日志点明是挑战页：{[r.getMessage() for r in caplog.records]}"
+    finally:
+        _close(c)
+
+
+def test_412但不是挑战页时仍然重试三次(tmp_path):
+    """**判据取窄的反向钉。** 带 `<script>` 的登录页不算挑战页。
+
+    若判据写成「含 `<script>` 就算」，这类页会被当成挑战页一次就打住——
+    可它们退避几秒再打**是可能好的**，白丢一个源。
+    """
+    c = _bare(tmp_path)
+    resp = _FakeResp(412)
+    resp.text = _PLAIN_412_BODY
+    client = _FakeClient(resp)
+    c._client = client
+    try:
+        assert c._fetch(_LIST_URL) is None
+        assert len(client.calls) == 3, "非挑战页要走原重试路径"
+        assert c._fetch_failed == 1
+    finally:
+        _close(c)
+
+
+def test_挑战页判据只认下划线双s那个变量名():
+    """直接钉函数：真挑战页认，别的都不认。"""
+    assert trs_cms_base._is_js_challenge(_CHALLENGE_BODY) is True
+    # 只留外部 js 那一行也要认（有的响应体省略内联那段）
+    assert trs_cms_base._is_js_challenge(
+        "<script src=\"/8aLU4IL2XLG3/khy8TTLck25V.294cc83.js\"></script>") is False
+    # 带脚本的普通 412 不认
+    assert trs_cms_base._is_js_challenge(_PLAIN_412_BODY) is False
+    # 普通的 200 页面不认
+    assert trs_cms_base._is_js_challenge("<html><body>列表</body></html>") is False
+    assert trs_cms_base._is_js_challenge("") is False
+
+
+def test_412挑战页在端到端里表现为零条零页(tmp_path):
+    """接到 `collect()` 上：挑战页 = 这个源这一轮一条也拿不到。
+
+    与 `test_列表页压根取不到时页数为零` 同一个形态——**这正是我们想要的**：
+    不是「解析出 0 条」，而是明确地「页面一张都没回来」。
+
+    `_collector` 会把 `_fetch` 换成假的（`_list_html`），所以这里必须先
+    `del` 掉那个实例属性，让真正的 `_fetch` 接上假 `_client`——**否则这条
+    测试压根没走 `_fetch`，是个恒真的假绿**。
+    """
+    c = _collector(tmp_path, n=2)
+    real_client = c._client
+    resp = _FakeResp(412)
+    resp.text = _CHALLENGE_BODY
+    fake = _FakeClient(resp)
+    del c._fetch
+    c._client = fake
+    try:
+        out = c.collect()
+        assert out == []
+        assert c._list_pages_ok == 0
+        assert c._total_listed == 0
+        assert c._fetch_failed > 0
+        assert len(fake.calls) == 1, "挑战页只该打一次"
+    finally:
+        fake.close()
+        real_client.close()
+
+
+# --------------------------------------------------------------------------
+# H 组：`tpl` 空集时的日志归因（2026-10-05）
+# --------------------------------------------------------------------------
+#
+# 空集有**两种**成因，旧日志把第二种也说成第一种：
+#
+#   ① 页数不够 —— `template_lines` 在 `len(pages) < min_pages` 时直接返回
+#      空集。`jl_em` 那轮是这一种（候选 1 页），措辞本来就是对的。
+#   ② 页数够、但各页**没有公共行** —— `sc_em` 首次踩到：3 条候选全是
+#      **PDF 直链**，`page_lines` 把 PDF 字节当 HTML 解析得 **0 行**，交集自然
+#      为空。旧日志照打「候选页只有 3 页（<3）」——**句子自相矛盾**
+#      （3 不小于 3），会把诊断引向"分页没配好"。
+#
+# 12 个 TRS 源此前只有 ① 的案例，所以这句话一直没被证伪。**判据（`tpl` 空就
+# 退化）一个字没动，改的只是归因**；下面两条互为对照——第二条证明改动不是
+# "把所有情况都换成了新措辞"。
+
+
+def test_页数不足时日志说页数(tmp_path, caplog):
+    from construction_agent.collector.boilerplate import MIN_PAGES
+    c = _collector(tmp_path, n=MIN_PAGES - 1)          # 2 < 3
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        with caplog.at_level(
+                logging.INFO,
+                logger="construction_agent.collector.sources.trs_cms_base"):
+            c.collect()
+        assert f"候选页只有 {MIN_PAGES - 1} 页（<{MIN_PAGES}）" in caplog.text
+        assert "之间没有公共行" not in caplog.text
+    finally:
+        _close(c)
+
+
+def test_页数够但无公共行时日志说没有公共行(tmp_path, caplog):
+    from construction_agent.collector.boilerplate import MIN_PAGES
+    c = _collector(tmp_path, n=MIN_PAGES)              # 恰等于阈值，不会因页数退化
+    # 每页一段**独有**文字：交集为空，但页数是够的。
+    # 独有后缀用**完整 url**——最初写的是 `url[-6:]`，三条地址的尾 6 字符
+    # 恰好都是 `.html` 的尾巴（`0.html`），于是真求出一行公共文字，用例
+    # 当场失效。**路径别名越长越容易撞**，这里直接用整串。
+    c._fetch = lambda url: (
+        _list_html(MIN_PAGES) if url == _LIST_URL
+        else "<html><body><div class='con'>"
+             f"只此一页才有的文字 {url}</div></body></html>")
+    c._download_and_extract_pdf = lambda u, t, d: ("", "")
+    try:
+        with caplog.at_level(
+                logging.INFO,
+                logger="construction_agent.collector.sources.trs_cms_base"):
+            c.collect()
+        assert f"{MIN_PAGES} 页之间没有公共行" in caplog.text
+        assert "候选页只有" not in caplog.text
+    finally:
+        _close(c)

@@ -5,7 +5,9 @@
    等于把数据当代码执行。
 
    `overview.js` 至今还带着一份等价的内联副本（早于本文件存在）。两份
-   实现目前不会同时加载，故不冲突；统一留到 M1 收尾时做。 */
+   实现目前不会同时加载，故不冲突。合并登记在蓝图 07 的 U1 表（「未完成
+   事项登记」）——原先那句把这笔债挂在 M1 里程碑上，而 M1 早在 2026-09-30
+   就收尾了，声明因此逾期（§2.5.96 查明）。 */
 
 (function (global) {
   'use strict';
@@ -25,6 +27,27 @@
      键会被**静默丢掉**——不报错、不告警，元素就是没拿到 id，之后 `$('x')`
      返回 null 再一路 null 下去。审核页的致因树与操作回执就这么丢过一次，
      而且是"页面看着正常、只是没内容"的那种丢法。 */
+  /* URL 属性的协议白名单。
+
+     本页要写进 href/src 的值来自采集到的原始网页与主库字段——直接
+     setAttribute 等于把数据当代码执行（javascript: 可执行脚本、data: 可
+     换出文档）。故凡带协议头而不是 http(s)/mailto/tel/blob 的值，一律
+     **不写该属性**：渲染成纯文本，与 textContent 那条纪律是同一件事的两面。
+
+     下面这段与另一份副本必须逐字相同（dom.js ↔ overview.js；两份 el() 是
+     历史遗留的等价拷贝，**且已双向分叉**，合并一事登记在蓝图 07 的 U1 表）
+     ——check_2595 的 A4 段核"逐字相同"这一条。 */
+  const URL_ATTRS = ['href', 'src', 'srcset', 'action', 'formaction', 'poster',
+                     'xlink:href', 'data', 'background', 'cite', 'ping',
+                     'manifest', 'longdesc', 'usemap'];
+  const SAFE_SCHEMES = ['http', 'https', 'mailto', 'tel', 'blob'];
+  function safeUrlValue(v) {
+    const s = String(v).replace(/[\x00-\x20]/g, '');
+    const m = /^([a-z][a-z0-9+.\-]*):/i.exec(s);
+    if (!m) return String(v);              // 无协议头 ⇒ 相对路径，安全
+    return SAFE_SCHEMES.indexOf(m[1].toLowerCase()) >= 0 ? s : null;
+  }
+
   function el(tag, opts, children) {
     const node = document.createElement(tag);
     const o = opts || {};
@@ -34,7 +57,10 @@
     if (o.attrs) {
       Object.keys(o.attrs).forEach(function (k) {
         const v = o.attrs[k];
-        if (v != null) node.setAttribute(k, String(v));
+        if (v == null) return;
+        if (URL_ATTRS.indexOf(String(k).toLowerCase()) >= 0 &&
+            safeUrlValue(v) == null) return;      // 危险协议 ⇒ 不写属性
+        node.setAttribute(k, String(v));
       });
     }
     (children || []).forEach(function (c) {
@@ -82,8 +108,8 @@
      `overview.js` 里还留着一份等价的内联实现（早于本文件）——**概览页的
      `{% block scripts %}` 里根本没引 dom.js**，它自带了 `$`/`num`/`jsonGet`
      全套（自包含 IIFE），而本文件是把工具挂到 global。两种模式并存，合并
-     是架构选择不是缺陷修复，留到 M1 收尾时做；**两处的库状态呈现必须一起改**
-     （第四十一轮就是两处一起改的）。
+     是架构选择不是缺陷修复，合并一事登记在蓝图 07 的 U1 表；**两处的库状态
+     呈现必须一起改**（第四十一轮就是两处一起改的）。
 
      第四十一轮之前这里无条件写 `h.tables.accidents`：`/api/health` 在空壳库
      上报 `ok: true` + `tables: {}`，于是徽标显示「xxx.db · NaN 条」，并因为

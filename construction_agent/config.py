@@ -14,6 +14,7 @@ class Settings:
 
     # Claude API（也支持 DeepSeek 等兼容 Anthropic 格式的 API）
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+
     ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
     ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     ANTHROPIC_MAX_TOKENS: int = int(os.getenv("ANTHROPIC_MAX_TOKENS", "4096"))
@@ -44,6 +45,7 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR}/caiems_v2.db")
 
     # MinerU PDF 解析
+
     MINERU_API_TOKEN: str = os.getenv("MINERU_API_TOKEN", "")
 
     # Logging

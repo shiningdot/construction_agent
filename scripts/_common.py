@@ -16,9 +16,14 @@ worktree 成立（`.claude/worktrees/<name>` 上溯三级正好是主仓库根�
 ### 为什么用 `.git` 的形态判主仓库，而不是「上溯找 data/caiems_v2.db」
 
 按文件存在性上溯更直觉，但实测会踩坑：worktree 的 `data/` 里**确实有**一个
-`caiems_v2.db`——它是 2026-09-30 在副本上验证 `add_indexes.py` 时留下的（28 MB，
-比主库还大，主库 26 MB / 它多了 9 个索引）。上溯第一步就命中了这个副本，而副本
-是会与主库分叉的。
+`caiems_v2.db`——它是 2026-09-30 在副本上验证 `add_indexes.py` 时留下的。上溯
+第一步就命中了这个副本，而**副本是会与主库分叉的**。
+
+⚠️（§2.5.94）那句"会分叉"**已经发生了**，见 `scripts/check_2594_data_replica.py`：
+它实测两份库逐表行数（`image_files` / `image_manifest` 已各差若干行）。该节还查明
+**本模块绕开了副本，但 `web/db.resolve_db_path()` 没有**——它按 `settings.DATA_DIR`
+（`__file__` 相对）解析，于是 app 侧读的正是这个副本。故写"该脚本读主库"时必须
+记住：**它驱动的 app 读的是另一份**，除非显式 `os.environ["CAIEMS_DB"] = …`。
 
 `.git` 的形态是 git 自己的结构约定，不会因为谁往 data/ 里丢了个副本而改变：
 **主仓库的 `.git` 是目录，worktree 的 `.git` 是指向 gitdir 的文件**。逐级上溯找

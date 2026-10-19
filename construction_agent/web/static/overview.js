@@ -17,13 +17,25 @@
   // 状态
   // ══════════════════════════════════════════════════════════
 
-  // 多选筛选维度。**必须与 /api/filters 返回的键一一对应**：这里少一维，
-  // 后端多给的那组值就白算了——蓝图 04 §256 的筛选条画了五格
+  // 多选筛选维度。**必须与 /api/filters 里"带 count 的那些键"一一对应**：
+  // 这里少一维，后端多给的那组值就白算了——蓝图 04 §256 的筛选条画了五格
   // （关键词 / 地区 / 等级 / 类型 / 工程类型），原先只渲染前三维，
   // 工程类型与施工阶段两维在后端与致因页都有、唯独列表页漏了。
+  // （`/api/filters` 比这五个多返回一个 `sort`，那是下拉选项集、不是多选维度，
+  //  故"一一对应"的口径是"带 count 的键"，不是"返回的全部键"。）
   const MULTI_KEYS = [
     'province', 'severity', 'accident_type', 'project_type', 'construction_phase',
   ];
+
+  /* 分页尺寸的两个界。**必须与后端 `accidents_query.py` 的同名常量一致**
+     ——前端在 `readHash` 里 clamp 一次、后端在 `ListParams.from_request` 里再
+     clamp 一次，两份数字对不上时，hash 里写的 size 与列表实际返回的条数就会
+     不一致（且不一致的方向是"前端以为改了、后端没认"）。
+     §2.5.73「同一个语义的 N 个实现」的账：三处引用（state 初值 / readHash /
+     writeHash 的省略判断）共用这一个来源，check_2599 的 A6 段跨语言核它与
+     后端常量相等。 */
+  const DEFAULT_SIZE = 50;
+  const MAX_SIZE = 200;
 
   const state = {
     q: '',
@@ -37,7 +49,7 @@
     has_causes: false,
     sort: 'date_desc',
     page: 1,
-    size: 50,
+    size: DEFAULT_SIZE,
   };
 
   let overviewData = null;
@@ -46,13 +58,38 @@
   // 小工具
   // ══════════════════════════════════════════════════════════
 
+  /* URL 属性的协议白名单。
+
+     本页要写进 href/src 的值来自采集到的原始网页与主库字段——直接
+     setAttribute 等于把数据当代码执行（javascript: 可执行脚本、data: 可
+     换出文档）。故凡带协议头而不是 http(s)/mailto/tel/blob 的值，一律
+     **不写该属性**：渲染成纯文本，与 textContent 那条纪律是同一件事的两面。
+
+     下面这段与另一份副本必须逐字相同（dom.js ↔ overview.js；两份 el() 是
+     历史遗留的等价拷贝，**且已双向分叉**，合并一事登记在蓝图 07 的 U1 表）
+     ——check_2595 的 A4 段核"逐字相同"这一条。 */
+  const URL_ATTRS = ['href', 'src', 'srcset', 'action', 'formaction', 'poster',
+                     'xlink:href', 'data', 'background', 'cite', 'ping',
+                     'manifest', 'longdesc', 'usemap'];
+  const SAFE_SCHEMES = ['http', 'https', 'mailto', 'tel', 'blob'];
+  function safeUrlValue(v) {
+    const s = String(v).replace(/[\x00-\x20]/g, '');
+    const m = /^([a-z][a-z0-9+.\-]*):/i.exec(s);
+    if (!m) return String(v);              // 无协议头 ⇒ 相对路径，安全
+    return SAFE_SCHEMES.indexOf(m[1].toLowerCase()) >= 0 ? s : null;
+  }
+
   function el(tag, opts, children) {
     const node = document.createElement(tag);
     opts = opts || {};
     if (opts.cls) node.className = opts.cls;
     if (opts.text != null) node.textContent = opts.text;
     if (opts.attrs) {
-      for (const k in opts.attrs) node.setAttribute(k, opts.attrs[k]);
+      for (const k in opts.attrs) {
+        if (URL_ATTRS.indexOf(String(k).toLowerCase()) >= 0 &&
+            safeUrlValue(opts.attrs[k]) == null) continue;   // 危险协议 ⇒ 不写属性
+        node.setAttribute(k, opts.attrs[k]);
+      }
     }
     if (opts.on) {
       for (const k in opts.on) node.addEventListener(k, opts.on[k]);
@@ -87,7 +124,8 @@
     state.has_causes = p.get('has_causes') === '1';
     state.sort = p.get('sort') || 'date_desc';
     state.page = Math.max(1, parseInt(p.get('page') || '1', 10) || 1);
-    state.size = Math.min(200, Math.max(1, parseInt(p.get('size') || '50', 10) || 50));
+    state.size = Math.min(MAX_SIZE, Math.max(
+      1, parseInt(p.get('size') || String(DEFAULT_SIZE), 10) || DEFAULT_SIZE));
     MULTI_KEYS.forEach((k) => { state[k] = p.getAll(k).filter(Boolean); });
   }
 
@@ -100,7 +138,7 @@
     if (state.has_causes) p.set('has_causes', '1');
     if (state.sort !== 'date_desc') p.set('sort', state.sort);
     if (state.page > 1) p.set('page', String(state.page));
-    if (state.size !== 50) p.set('size', String(state.size));
+    if (state.size !== DEFAULT_SIZE) p.set('size', String(state.size));
 
     const next = p.toString();
     const url = next ? '#' + next : location.pathname;
@@ -440,7 +478,12 @@
     return jsonGet('/api/filters').then((opts) => {
       pruneUnknown(opts);
       renderFilters(opts);
-    }).catch(() => {});
+    }).catch((e) => {
+      // 筛选器选项是辅助功能，失败不该拦住列表——但也不能一声不吭：chips
+      // 空着时用户分不清"这里本来就没有可选值"和"加载挂了"。写进 chips 区，
+      // 与本页列表侧的失败提示（init 末端的 chartArea）同一范式。
+      $('filterChips').textContent = '筛选选项加载失败：' + e.message;
+    });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -698,13 +741,22 @@
   }
 
   function loadQuality(ov) {
-    // 两个端点并行取。图片统计失败（工作库没建）不该拖垮整个质量面板，
-    // 所以那一路单独 catch 成 null，由 renderQuality 决定要不要出卡。
+    // 两个端点并行取，但**层级不同**：`/api/province/audit` 顶层直接就是统计量
+    // （`by_kind` / `rows`），`/api/images/stats` 的统计量在响应体的 `data` 下
+    // （`{ok, data:{files, available, ...}}`）。早先这条没解 `data` 这一层，
+    // `img.available` 恒为 `undefined`，整张「现场图片」卡因此从来没出现过。
+    // 图片统计失败（工作库没建）不该拖垮整个质量面板，所以那一路单独 catch 成
+    // null，由 renderQuality 决定要不要出卡。
     return Promise.all([
       jsonGet('/api/province/audit'),
-      jsonGet('/api/images/stats').catch(() => null),
+      jsonGet('/api/images/stats').then((r) => (r && r.data) || null)
+        .catch(() => null),
     ]).then(([a, img]) => renderQuality(ov, a, img))
-      .catch(() => {});
+      .catch((e) => {
+        // 走到这里只剩 `/api/province/audit` 失败（图片统计那一路已被上面单独
+        // 接成 null）。同样不能静默：面板空白分不清"没有数据"和"加载失败"。
+        $('qualityBody').textContent = '质量面板加载失败：' + e.message;
+      });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -731,10 +783,17 @@
       loadList();
     });
 
+    /* 重置 = 把 state 的每一个键写回文件顶部 `const state = {…}` 的初值。
+       **这份清单必须与那份声明一一对应**：漏一个键，那个维度就"重置不掉"，
+       而 `writeHash()` 又会把非默认值写回 hash —— 用户以为全清了，URL 里却还
+       留着它。`size` 就是这么漏的（§2.5.99 实测），而它偏偏是**唯一没有控件**
+       的维度（页面 21 个 id 里没有 `f_size`），用户连"看见它还在"的办法都没有。
+       check_2599 的 A5 段钉住"重置清单键集 == state 声明键集"。 */
     $('resetBtn').addEventListener('click', () => {
       MULTI_KEYS.forEach((k) => { state[k] = []; });
       state.q = ''; state.year_from = ''; state.year_to = '';
       state.has_causes = false; state.sort = 'date_desc'; state.page = 1;
+      state.size = DEFAULT_SIZE;
       writeHash();
       syncFormFromState();
       loadFilters();

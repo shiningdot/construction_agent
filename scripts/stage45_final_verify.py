@@ -6,8 +6,12 @@
    会失败——属预期现象，不代表数据异常。V2 的数字核验以 docs/paper_v2/修订对账记录.md 为准。
 """
 import json, re, sys, sqlite3
+from pathlib import Path
 
-PAPER = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'
+# 本仓库根：脚本在 scripts/ 下，上溯一级即仓库根（worktree 与主仓库都成立）
+ROOT = Path(__file__).resolve().parents[1]
+
+PAPER = str(ROOT / 'docs' / 'paper' / 'eswa_paper.md')
 paper = open(PAPER, encoding='utf-8').read()
 
 fails = []
@@ -17,7 +21,7 @@ def check(name, ok, detail=''):
         fails.append((name, detail))
 
 print('=== A. 表 7 消融数字（vs f1_summary.json） ===')
-f1s = json.load(open('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_original/f1_summary.json'))
+f1s = json.load(open(str(ROOT / 'experiments' / 'ablation_original' / 'f1_summary.json')))
 expect = {
     'v1': ('0.503', '0.423', '0.856', '21%', '0.141', '0.250', '0.111'),
     'v2a': ('0.665', '0.677', '0.709', '2%', '0.941', '0.667', '0.511'),
@@ -104,7 +108,7 @@ for s in ['Data availability', 'Code availability', 'Ethics declaration', 'CRedi
 
 print()
 print('=== G. 中英结构对齐 ===')
-zh = open('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper_zh.md', encoding='utf-8').read()
+zh = open(str(ROOT / 'docs' / 'paper' / 'eswa_paper_zh.md'), encoding='utf-8').read()
 check('ZH 表7 F1 数字', all(v in zh for v in ['0.503', '0.665', '0.653', '0.656', '0.941', '0.988']))
 check('ZH 表6 CI', '0.615, 0.722' in zh and '0.603, 0.695' in zh)
 

@@ -170,7 +170,7 @@ class TestRunBatchDispatch:
         mod.run_batch(1)
 
         progress = json.loads(Path("data/audit/batch50_progress.json").read_text(encoding="utf-8"))
-        assert progress == {"success": 0, "purged": 1, "failed": 0,
+        assert progress == {"success": 0, "purged": 1, "duplicate": 0, "failed": 0,
                             "total": 1, "timestamp": progress["timestamp"]}
         assert inserted == []
 
@@ -402,3 +402,108 @@ class TestInsertStatementsWellFormed:
         # 防止正则失效导致整条测试空跑——空转的测试是最危险的绿
         assert len(checked) >= 5, (
             f"只查到 {len(checked)} 条 INSERT（{checked}），正则或脚本结构变了")
+
+
+# ── 入库前查重守门 ──────────────────────────────────────────────────────
+
+
+class TestAdmissionGuard:
+    """`AdmissionGuard` 的三档判据。
+
+    守护的是它的**语义**：L1/L2 硬拦、L3 只告警、本地书源不被 URL 档误伤。
+    跑批前真库由它建索引，所以这里用真 schema + 内存库。
+    """
+
+    @pytest.fixture
+    def mod(self):
+        return load_script()
+
+    @pytest.fixture
+    def conn(self):
+        spec = importlib.util.spec_from_file_location(
+            "create_db_v2_for_guard", REPO_ROOT / "scripts" / "create_db_v2.py")
+        schema_mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = schema_mod
+        spec.loader.exec_module(schema_mod)
+        con = sqlite3.connect(":memory:")
+        con.executescript(schema_mod.SCHEMA)
+        yield con
+        con.close()
+
+    @staticmethod
+    def seed(conn, **cols):
+        """插一条已有事故。NOT NULL 且无默认值的列给最小合法值。"""
+        base = {
+            "id": "old", "title": "旧事故", "source_url": "",
+            "source_name": "safehoo", "project_type": "其他/未知",
+            "accident_type": "坍塌事故", "severity": "一般事故",
+            "report_type": "新闻报道", "text_type": "single",
+            "classification_verdict": "confirmed",
+            "classification_confidence": "high", "summary": "",
+            "raw_text": "", "pipeline_version": "caics_v1.0",
+            "created_at": "2020-01-01T00:00:00",
+        }
+        base.update(cols)
+        conn.execute(
+            f"INSERT INTO accidents ({','.join(base)}) "
+            f"VALUES ({','.join('?' * len(base))})",
+            list(base.values()),
+        )
+        conn.commit()
+
+    def test_L1_内容哈希命中即拦(self, mod, conn):
+        self.seed(conn, id="old1", raw_text="同一份原文")
+        g = mod.AdmissionGuard(conn)
+        layer, matched = g.check({}, {"content": "同一份原文"})
+        assert layer == "L1" and matched == "old1"
+
+    def test_L2_URL归一化后命中即拦(self, mod, conn):
+        self.seed(conn, id="old2", source_url="https://www.example.com/a/")
+        g = mod.AdmissionGuard(conn)
+        # 去 www、去尾斜杠后与已存的同一条 URL
+        layer, matched = g.check({}, {"source_url": "https://example.com/a"})
+        assert layer == "L2" and matched == "old2"
+
+    def test_本地书源不进URL索引(self, mod, conn):
+        """同书路径、不同正文 → 不该被 L2 判重（L1 也因正文不同而不命中）。"""
+        self.seed(conn, id="old3", source_url="/books/案例集.pdf",
+                  raw_text="案例甲的正文")
+        g = mod.AdmissionGuard(conn)
+        layer, matched = g.check(
+            {}, {"source_url": "/books/案例集.pdf", "content": "案例乙的正文"})
+        assert (layer, matched) == (None, None), (
+            "同一本书的路径不应把不同案例判成重复")
+
+    def test_本地书源仍受L1内容哈希约束(self, mod, conn):
+        """同书同案例全文相同 → L1 该判重（书源重复的正是这种）。"""
+        self.seed(conn, id="old4", source_url="/books/案例集.pdf",
+                  raw_text="案例甲的完整正文")
+        g = mod.AdmissionGuard(conn)
+        layer, matched = g.check(
+            {}, {"source_url": "/books/案例集.pdf", "content": "案例甲的完整正文"})
+        assert layer == "L1" and matched == "old4"
+
+    def test_L3_指纹只告警不拦(self, mod, conn):
+        self.seed(conn, id="old5", date="2024-03-16", city="南京市",
+                  deaths=1, injuries=2, accident_type="坍塌事故")
+        g = mod.AdmissionGuard(conn)
+        s1 = {"date": "2024-03-16", "city": "南京市", "deaths": 1,
+              "injuries": 2, "accident_type": "坍塌事故"}
+        assert g.fingerprint_hit(s1) == "old5", "指纹应命中"
+        # 但硬判据不该命中（正文与 URL 都没见过）
+        layer, matched = g.check(
+            s1, {"content": "另一份没人见过的正文", "source_url": "https://x.invalid/new"})
+        assert (layer, matched) == (None, None), "指纹不能做硬判据"
+
+    def test_空表不炸(self, mod, conn):
+        g = mod.AdmissionGuard(conn)  # schema 建好但无数据
+        assert g.check({"title": "新"}, {"content": "正文"}) == (None, None)
+
+    def test_无表库不炸(self, mod):
+        """测试/首次建库时 accidents 表可能还不存在，守门应退化不拦。"""
+        empty = sqlite3.connect(":memory:")
+        try:
+            g = mod.AdmissionGuard(empty)
+            assert g.check({}, {"content": "正文"}) == (None, None)
+        finally:
+            empty.close()

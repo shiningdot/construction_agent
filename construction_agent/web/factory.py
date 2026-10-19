@@ -21,7 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from flask import Flask
+from flask import Flask, jsonify, request
 
 from ..config import settings
 from .api import api_bp
@@ -31,6 +31,16 @@ from .review import review_bp
 from .views import views_bp
 
 WEB_DIR = Path(__file__).resolve().parent
+
+#: 可信 Host。本应用是**本机工具**（`FLASK_HOST` 默认 `127.0.0.1`），不该接受
+#: 任意 Host 头。不设它的话，浏览器里任意页面对 `127.0.0.1` 的请求都可能被
+#: 「DNS rebinding」打成**同源**——那是唯一能让外站**读到**本机接口内容的路子
+#: （同源策略拦的是「读」，不拦「发」）。端口由 Werkzeug 自动剥离，不必写进来；
+#: `127.0.0.1.evil.com` 这类后缀伪装也挡得住（实测）。
+TRUSTED_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
+
+#: 会改状态的方法
+UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
@@ -60,5 +70,43 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(extract_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(views_bp)
+
+    # ── 可达面：谁能把请求送到这些路由 ────────────────────────────────
+    # **不能用 `setdefault`**：Flask 的默认配置里本来就有 `TRUSTED_HOSTS: None`
+    # 这个键，`setdefault` 于是永远不生效（实测踩过，值是 None 而看着像设上了）。
+    # 判据改成「调用方有没有显式传」——显式传 None 即「自认在可信网络里、主动
+    # 关掉这一层」，不传则用上面那张表。
+    if "TRUSTED_HOSTS" not in (config or {}):
+        app.config["TRUSTED_HOSTS"] = TRUSTED_HOSTS
+
+    @app.before_request
+    def _same_origin_guard():
+        """跨源写请求一律拒掉。
+
+        **为什么要有**：`fetch` 与 HTML 表单能把请求**发**到任意源（同源策略拦的
+        是「读」不是「发」），所以浏览器里任意一个页面都能让它替自己 POST 本机的
+        写路由。本应用**没有身份校验**（唯一的保护是绑在 127.0.0.1），这一层是
+        防「浏览器被利用」，不是防「本机以外的客户端」。
+
+        判据用现成的 `Origin` 头——浏览器对每个 POST 都会带它，比维护一张 CSRF
+        token 表轻得多，且不需要前端配合。
+
+        两条边界（明写，别把它读强了）：
+        - **不带 `Origin` 的请求放行**（`curl`、`requests`、Flask 测试客户端都不
+          带）。它挡的是浏览器发起的跨源写，不是「本机以外的客户端」。
+        - 同源判定用 `request.host_url`，而它取自 `Host` 头 ⇒ **这一条依赖上面
+          的 `TRUSTED_HOSTS`**。两条必须同时在场：只留 `Origin` 校验，攻击者可以用
+          DNS rebinding 把 Host 伪装成 `127.0.0.1` 从而「同源」；只留
+          `TRUSTED_HOSTS`，跨源表单写照样能打到不需要 body 的路由。
+        """
+        if request.method not in UNSAFE_METHODS:
+            return None
+        origin = request.headers.get("Origin")
+        if origin is None or origin == request.host_url.rstrip("/"):
+            return None
+        return jsonify({
+            "ok": False,
+            "message": "跨源写请求被拒（Origin 与服务端不一致）",
+        }), 403
 
     return app

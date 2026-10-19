@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """修复论文文件中错位的章节 banner 注释（重排后 banner 附着到了错误章节）"""
 import re
+from pathlib import Path
+
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立
+ROOT = Path(__file__).resolve().parents[1]
 
 def fix_banners(path, is_zh):
     with open(path, encoding='utf-8') as f:
@@ -30,5 +34,6 @@ def fix_banners(path, is_zh):
         f.write(text)
     print('%s: OK' % path)
 
-fix_banners('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md', False)
-fix_banners('/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper_zh.md', True)
+_PAPER = ROOT / 'docs' / 'paper'
+fix_banners(str(_PAPER / 'eswa_paper.md'), False)
+fix_banners(str(_PAPER / 'eswa_paper_zh.md'), True)

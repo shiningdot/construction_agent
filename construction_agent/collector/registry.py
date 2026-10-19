@@ -155,8 +155,12 @@ SOURCES: dict[str, SourceSpec] = dict([
     _s("hub_em", "湖北省应急管理厅", "province", "湖北省应急管理厅",
        "https://yjt.hubei.gov.cn/yjgl/aqsc/sgdc/", 1.0,
        "hub_em", "HubEMCollector"),
+    # 域名 2026-10-05 更正：`yjglt.jl.gov.cn` **DNS 解析不出来**（各省应急厅
+    # 是 `yjglt.<省>.gov.cn` 的规律，吉林没有这个二级域名）。真实站点是省
+    # 政府信息公开专栏下的厅局子站。**这张表是健康检查显示 URL 的来源**，
+    # 写错这里，表上就只能是「没连上」——与「TLS 谈不成」「412」逐格相同。
     _s("jl_em", "吉林省应急管理厅", "province", "吉林省应急管理厅",
-       "https://yjglt.jl.gov.cn/zsjg/aqjg/xxgkmlqy/", 1.0,
+       "https://xxgk.jl.gov.cn/zsjg/aqjg/xxgkmlqy/", 1.0,
        "jl_em", "JlEMCollector"),
     _s("js_em", "江苏省应急管理厅", "province", "江苏省应急管理厅",
        "https://yjglt.jiangsu.gov.cn/col/col81395/index.html", 1.0,

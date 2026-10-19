@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """从三专家 LabelStudio 导出恢复策略实验 GT（多数投票）并核验"""
 import json, re, sys
+from pathlib import Path
 from collections import Counter
 
 EXP = {n: f'/home/suntianhao/TEM/expert{n}.json' for n in 'ABC'}
@@ -113,7 +114,8 @@ for L in LAYERS:
     k = fleiss_kappa(np.array(mat))
     print(f'  {L} 层: κ = {k:.4f}')
 
-out = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/experiments/ablation_gatekeeping/gt_recovered.json'
+out = str(Path(__file__).resolve().parents[1]
+          / 'experiments' / 'ablation_gatekeeping' / 'gt_recovered.json')
 json.dump(gt, open(out, 'w'), ensure_ascii=False, indent=1)
 print(f'\nGT 已保存: {out}')
 print('样例:', json.dumps(gt[list(gt.keys())[0]], ensure_ascii=False)[:300])

@@ -17,6 +17,25 @@
 
   const { $, clear, el, num, fetchJson } = window;
 
+  // ── 配色一律从 CSS 读，本文件不留第二份色值 ─────────────────────────
+  //
+  // §2.5.72 按 WCAG 调过 8 个 `:root` 色号，并在 `app.css` 里写了「同一件事在
+  // 两处出现，颜色不该有肉眼可辨的差别」。但**约定不是机制**：本文件当时把
+  // 五层色、品牌色、浅底各抄了一份十六进制（§2.5.73 实测 7 处），改 token 时
+  // 没人会想起来还有这一份——层标号已经是深棕 `#9B612C`，同一页的年代折线还是
+  // 旧橘 `#C77D3A`。现在一律 `getComputedStyle` 读，改 token 自动跟。
+  const cssVar = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  /** `#0D7867` → `13,120,103`（`rgba()` 拼色用）。只解析，不定义色值。 */
+  const rgbTriplet = (hex) => {
+    const h = String(hex).replace('#', '');
+    const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+    const n = parseInt(full, 16);
+    return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+  };
+
+
   // ══════════════════════════════════════════════════════════
   // 状态
   // ══════════════════════════════════════════════════════════
@@ -392,8 +411,8 @@
           // 对角（v=0）走浅底——rect 不写 fill 会被 SVG 默认填成黑色，
           // 21 个黑块看着像「最强的共现」。
           fill: v
-            ? `rgba(13,124,107,${(Math.sqrt(v / peak) * 0.92).toFixed(3)})`
-            : '#FAF8F4',
+            ? `rgba(${rgbTriplet(cssVar('--brand'))},${(Math.sqrt(v / peak) * 0.92).toFixed(3)})`
+            : cssVar('--surface-2'),
         });
         r.appendChild(svg('title', {}, [document.createTextNode(
           i === j
@@ -475,9 +494,8 @@
   // ⑦ 年代趋势
   // ══════════════════════════════════════════════════════════
 
-  const LAYER_COLOR = {
-    M: '#5B6ABF', F: '#C77D3A', T: '#3E8E7E', H: '#B5544A', C: '#7A6BA8',
-  };
+  /** 层色现读 `--layer-*`（见文件头的说明），取不到才退回中性色。 */
+  const layerColor = (key) => cssVar(`--layer-${key}`) || cssVar('--muted') || 'currentColor';
 
   function renderTimeline(t) {
     const host = clear($('timelineChart'));
@@ -530,14 +548,14 @@
       const pts = layer.counts.map((v, i) => `${x(i)},${y(v)}`).join(' ');
       root.appendChild(svg('polyline', {
         points: pts, fill: 'none',
-        stroke: LAYER_COLOR[layer.key] || '#8A827A',
+        stroke: layerColor(layer.key),
         'stroke-width': 1.8, 'stroke-linejoin': 'round',
       }));
       // 悬停点：折线本身太细，抓不住
       layer.counts.forEach((v, i) => {
         root.appendChild(svg('circle', {
           cx: x(i), cy: y(v), r: v ? 2.4 : 0,
-          fill: LAYER_COLOR[layer.key] || '#8A827A',
+          fill: layerColor(layer.key),
         }, [svg('title', {}, [document.createTextNode(
           `${years[i]} 年 · ${layer.label}：${num(v)} 条事故涉及该层`
         )])]));
@@ -557,7 +575,7 @@
     const legend = el('div', { cls: 'trend-legend' });
     t.by_layer.forEach((l) => {
       legend.appendChild(el('span', { cls: 'ev-item' }, [
-        el('i', { cls: 'trend-dot', attrs: { style: `background:${LAYER_COLOR[l.key]}` } }),
+        el('i', { cls: 'trend-dot', attrs: { style: `background:${layerColor(l.key)}` } }),
         el('span', { text: l.label }),
       ]));
     });

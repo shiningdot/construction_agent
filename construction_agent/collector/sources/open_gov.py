@@ -39,9 +39,18 @@ GOV_DATASETS: list[dict] = [
         "base_url": "https://data.shenyang.gov.cn",
         "description": "沈阳于洪区生产安全事故调查处理",
         "record_count": 1266,
+        # **标注与实际不符**（2026-10-05 实测，§2.5.50）：该端点 302 到辽宁政务
+        # 统一身份认证（`sso.lnzwfw.gov.cn` 的 `login.jsp`），**要登录才拿得到**。
+        # 仍写 `True`：数据集本身确实向社会开放，差的只是一个账号；但**它现在
+        # 拿不到数据**。是否为此申请账号/改为手工下载/下线该源，是作者的裁决项，
+        # 代码侧不擅自改这个开关。
         "open_access": True,
         "api_endpoint": "https://data.shenyang.gov.cn/api/dataset/{dataset_id}/data",
-        "dataset_id": "yuhong_shengchanshigu",  # 需要实际查询确认
+        # 2026-10-05 实测：这个 ID **服务端认得**——登录页把原始 URL 原样放在
+        # `surl` 里回传（base64 解码 = `http://data.shenyang.gov.cn:8080/api/
+        # dataset/yuhong_shengchanshigu/data`）。原先「需要实际查询确认」可以
+        # 划掉了，但 `:8080` 是内网/反代后端地址，外网直连三段全超时（§2.5.50）。
+        "dataset_id": "yuhong_shengchanshigu",
         "formats": ["json", "csv", "xlsx"],
         "keywords": ["事故", "生产安全"],
     },
@@ -86,6 +95,10 @@ GOV_DATASETS: list[dict] = [
         "keywords": ["建筑施工", "安全监督"],
     },
 ]
+
+# 五个数据集的 name，供 `_is_foreign` 判「这个本地文件是不是另一家的」。
+# 从 `GOV_DATASETS` 派生而不是另抄一份——抄的那份迟早与配置对不上。
+_DATASET_NAMES: list[str] = [ds["name"] for ds in GOV_DATASETS]
 
 
 class OpenGovCollector(BaseCollector):
@@ -203,6 +216,22 @@ class OpenGovCollector(BaseCollector):
           没有 `api_endpoint`**，本地也没有手工下载的文件——三条通路只剩两条，
           两条都空。
 
+        **上面 `shenyang` 与 `heze` 两条的推断，2026-10-05 直连实测后都不成立**
+        （见 `docs/web/01_在线采集.md` §2.5.50）：
+
+        - `shenyang`  那个 HTML **是辽宁政务 SSO 的登录页**，不是 404 页。
+          302 的 `Location` 把原始 URL 放在 `surl` 参数里回传（base64 解码 =
+          `http://data.shenyang.gov.cn:8080/api/dataset/yuhong_shengchanshigu/data`）
+          ——**服务端认得这个数据集 ID，端点是活的，只是要登录**。
+          旧推断把「拿到 HTML」等同于「端点失效」，把 64,943 字节的登录页与
+          156 字节的错误页混成了一件事。
+        - `heze`      强制 IPv4（猴补丁 `getaddrinfo` 只留 `AF_INET`）后
+          **从 `ENETUNREACH` 变成 `ConnectTimeout`**——路由有了、SYN 没人应。
+          两种错误不是一回事：前者是「没有到该网络的路由」（IPv6 无出口），
+          后者是「对端丢包」。**IPv4 也不通，所以换机器不一定能解决**。
+          且实测到的 IPv4 已是 `112.6.51.21`，与上面记的 `58.59.15.41` 不同，
+          DNS 已更新——那条观测本身也过了保质期。
+
         修前第二种会落进 `else: 无数据或需要手动获取`，与「这个平台今天确实
         没数据」**同形**；第一种更糟，连 INFO 都没有。
         """
@@ -258,13 +287,7 @@ class OpenGovCollector(BaseCollector):
 
         # 方式2: 搜索本地已下载文件
         for fmt in ds.get("formats", ["json", "csv"]):
-            pattern = f"{ds['name']}*.{fmt}"
-            matched = list(self.data_dir.glob(pattern))
-            if not matched:
-                # 也搜索无前缀的文件
-                matched = list(self.data_dir.glob(f"*.{fmt}"))
-
-            for filepath in matched:
+            for filepath in self._local_files(ds, fmt):
                 try:
                     file_items = self._load_file(filepath, fmt)
                     if file_items:
@@ -277,6 +300,58 @@ class OpenGovCollector(BaseCollector):
                     logger.debug(f"文件 {filepath.name} 加载失败: {e}")
 
         return items
+
+    def _local_files(self, ds: dict, fmt: str) -> list[Path]:
+        """找出可能属于 `ds` 的本地文件。
+
+        两级：先按 `{name}*.{fmt}` 精确匹配，没命中再退到全部 `*.{fmt}`
+        （用户手工下载时多半不会按我们的命名规则改文件名，这个回退是有意的）。
+        **两级都要过 `_is_foreign` 那一关**。
+
+        为什么非得加这一关（2026-10-05 实测，见 `docs/web/01_在线采集.md`
+        §2.5.51）——原来这两行 glob 各自咬人：
+
+        1. **缓存文件命中自己。** `_save_cache` 写的是 `{name}_cache.json`，
+           而它**匹配** `{name}*.json`。后果不是"多读一个文件"，是
+           **`_load_cache` 那道 30 天闸门被绕过去**：缓存过期 → `_load_cache`
+           按设计返回空 → 本该去平台重新取数 → 结果 `_fetch_dataset` 又从
+           缓存文件里把同一份旧数据读了回来 → `collect()` 再把它
+           `_save_cache` 续期。**实测**：放一份 `{name}_cache.json`，
+           `_fetch_dataset` 返回 1 条，内容正是那份缓存。
+        2. **捞到别的数据集的文件。** 无前缀回退是 `*.{fmt}`，会把
+           `open_gov_heze.csv` 交给 shandong。转换用的却是 shandong 的 `ds`
+           （关键词、字段映射全不对），`data_source` 还标成
+           `open_gov_shandong`——**张冠李戴且事后看不出来**。**实测**：
+           shandong 读出了 heze 的 CSV。更糟的是它会**持久化**：
+           `collect()` 紧接着把这份外来数据 `_save_cache("open_gov_shandong",
+           ...)`，污染从此留在盘上、下一轮 `_load_cache` 还会把它当 shandong
+           的正规缓存加载。
+        """
+        name = ds["name"]
+        found = list(self.data_dir.glob(f"{name}*.{fmt}"))
+        if not found:
+            found = list(self.data_dir.glob(f"*.{fmt}"))
+        return [p for p in found if not self._is_foreign(p, ds)]
+
+    @staticmethod
+    def _is_foreign(path: Path, ds: dict) -> bool:
+        """这个本地文件该不该由 `ds` 采用。`True` = 不该。
+
+        两条判据：①本类的缓存文件（`*_cache`）；②属于**另一个**已登记数据集
+        （按 `GOV_DATASETS` 里的 name 前缀认）。
+
+        用 `stem`（去扩展名）比 name 稳：用户若命名成
+        `open_gov_heze_data.csv`，`stem` = `open_gov_heze_data`，前缀判据照样
+        命中，而按完整文件名比会漏。五个 name 互不为前缀（`shenyang` 与
+        `shandong` 只共有前 8 个字符，不是包含关系），所以前缀判据不会误伤。
+        """
+        stem = path.stem
+        if stem.endswith("_cache"):
+            return True
+        return any(
+            other != ds["name"] and stem.startswith(other)
+            for other in _DATASET_NAMES
+        )
 
     def _load_file(self, filepath: Path, fmt: str) -> list[dict]:
         """加载数据文件。"""
@@ -479,7 +554,11 @@ class OpenGovCollector(BaseCollector):
             f"  操作步骤:\n"
             f"  1. 访问 {ds['base_url']}\n"
             f"  2. 搜索 '{ds['description']}'\n"
-            f"  3. 下载数据（CSV 或 JSON 格式）\n"
+            f"  3. 下载数据（{', '.join(f.upper() for f in ds['formats'])} 格式）\n"
             f"  4. 将文件放入: {self.data_dir}/\n"
+            f"     文件名**建议以 '{ds['name']}' 开头**（如 {ds['name']}.csv）——\n"
+            f"     不加前缀也能被认到，但加了才不会被当成别的数据集的文件：\n"
+            f"     平台上有 5 个数据集共用这个目录，无前缀时按扩展名回退匹配，\n"
+            f"     而属于其他数据集的文件会被明确排除（见 `_local_files`）。\n"
             f"  5. 重新运行采集器即可自动导入\n"
         )

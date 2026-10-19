@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 import sys, os, sqlite3, time
-sys.path.insert(0, "/home/suntianhao/construction_agent")
-sys.path.insert(0, "/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod")
+from pathlib import Path
+
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立。
+# 原先两行 sys.path 分别指主仓库与 classifier-mod worktree，后者写死。
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from construction_agent.extraction.vlm_analyzer import VLMAnalyzer
 
 db = sqlite3.connect("/home/suntianhao/construction_agent/data/caiems_v2.db")

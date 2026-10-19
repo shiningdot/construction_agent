@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """批量VLM分析: 全部226张V3图片 → Phase1+Phase2 → 入库 image_analyses"""
 import sys, os, sqlite3, json, time
+from pathlib import Path
 sys.path.insert(0, "/home/suntianhao/construction_agent")
-sys.path.insert(0, "/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from construction_agent.extraction.vlm_analyzer import VLMAnalyzer
 
 DB = "/home/suntianhao/construction_agent/data/caiems_v2.db"

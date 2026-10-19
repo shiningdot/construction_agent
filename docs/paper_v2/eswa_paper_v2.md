@@ -1,7 +1,7 @@
 # CAIEMS: An Exploratory LLM-Driven Pipeline for Structuring Construction Accident Narratives into a Queryable Database
 
 > V2 修订稿（英文主源）｜依据导师综合评阅意见修订 ｜ 2026-09-14
-> 图片位置为占位符（图X占位：待手绘），文字与数据已按评阅意见逐项对账
+> 六张插图已插入（Figure 1–6，见 `figures/`，由 `scripts/gen_paper_figures.py` 生成），文字与数据已按评阅意见逐项对账
 > V1 稿保存在 docs/paper/，本稿独立存放于 docs/paper_v2/
 
 ## Abstract
@@ -16,7 +16,7 @@ Construction accident reports constitute a large but underused source of safety 
 
 Construction remains among the most hazardous industries worldwide. Each fatal construction accident generates investigation reports and news narratives that record what happened, how it happened, and why. These texts contain causal information accumulated at national scale over decades, yet they remain unstructured natural language that resists systematic analysis. In China, accident narratives are dispersed across safety information portals, local emergency-management bureaus, news media, and published case compilations, which makes manual compilation expensive and automated compilation a recurring engineering challenge (Kong and Ahn, 2024).
 
-Existing computational approaches to this conversion problem fall into three groups. Supervised classifiers such as BERT and its distilled variants require labeled corpora that are expensive to produce in this domain (Togan et al., 2025). LLM-based studies have demonstrated extraction of accident attributes from OSHA narratives (Ahmadi et al., 2024), HFACS-guided classification of Korean fall accidents (Kim and Han, 2024), and knowledge-graph construction from construction reports (Liu and Luo, 2025). The resulting artifacts, however, are mostly study-bound: extraction feeds a single analysis or a static graph rather than an inspectable, updatable database.
+Existing computational approaches to this conversion problem fall into three groups. Supervised classifiers such as BERT (Devlin et al., 2019) and its distilled variants require labeled corpora that are expensive to produce in this domain (Togan et al., 2025). LLM-based studies have demonstrated extraction of accident attributes from OSHA narratives (Ahmadi et al., 2024), HFACS-guided classification of Korean fall accidents (Kim and Han, 2024), and knowledge-graph construction from construction reports (Liu and Luo, 2025). The resulting artifacts, however, are mostly study-bound: extraction feeds a single analysis or a static graph rather than an inspectable, updatable database.
 
 This paper reports on CAIEMS, an exploratory data engineering effort rather than a theory-confirming study. The single organizing question is practical: can a small team, using commodity LLM APIs and modest computing resources, turn publicly available Chinese accident narratives into a queryable database whose labels can be traced to the source text at defined confidence levels? We report what the pipeline produces, what we measured about its reliability, and what we could not yet establish.
 
@@ -84,17 +84,17 @@ The corpus combines two structurally different acquisition tracks. The **web-col
 | | *Subtotal* | *895* | *34.1%* | |
 | **Total** | | **2,623** | **100%** | |
 
-The two tracks are not interchangeable, and presenting them as a single homogeneous source would misrepresent the database. The digitization track carries the historical depth of the corpus: the 703 records drawn from the Fan compilation are the sole source of the 1978–1990 block, and no web source contributes to that period. The web track supplies the contemporary record, including all government investigation reports, which are the most detailed and most authoritative documents in the corpus. Because the two tracks differ systematically in writing register, length, and field completeness, the pipeline applies the same extraction and coding prompts to both but reports source composition alongside aggregate statistics, and the Web interface exposes the source track as a filterable attribute.
+The two tracks are not interchangeable, and presenting them as a single homogeneous source would misrepresent the database. The digitization track carries the historical depth of the corpus: the 703 records drawn from the Fan compilation are the sole source of the 1978–1990 block, and no web source contributes to that period. The web track supplies the contemporary record, including all government investigation reports, which are the most detailed and most authoritative documents in the corpus. Because the two tracks differ systematically in writing register, length, and field completeness, the pipeline applies the same extraction and coding prompts to both but reports source composition alongside aggregate statistics, and the Web interface exposes the source track as a filterable attribute. The difference is not confined to record counts: the digitization track accounts for 6,270 of the 16,323 causal annotations (38.4%) and 6,081 of the 14,784 verbatim-evidence annotations (41.1%).
 
 The corpus spans 1978 to 2026 with a pronounced gap. Of the 2,623 records, 698 (26.6%) fall in 1978–1990, 1,895 (72.2%) fall in 2005–2026, and 30 (1.1%) carry no resolvable date. **The period 1991–2004 is absent entirely.** This gap reflects the availability of digital sources rather than any discontinuity in construction safety: the historical compilation covers the early reform period, and sustained public web publication of accident investigation reports begins in the mid-2000s. A longitudinal claim drawn from this database is therefore a comparison between two separated windows, not a continuous trend, and we do not treat the corpus as representative of any underlying population.
 
 #### 3.2.2 Collection schemes
 
-**Web-collection track.** Twenty-five collectors acquire the web portion. Each implements a common interface and is registered in a central registry; the implementations fall into four families — one search-engine aggregator that issues predefined queries and admits results only from a domain whitelist; nineteen provincial emergency-management bureau collectors that parse HTML listing and detail pages and, in most cases, download and extract attached PDF investigation reports; two national-level collectors (Ministry of Emergency Management and MOHURD); and three auxiliary importers covering open-government datasets, a safety-news special-topic archive, and two published academic accident datasets.
+**Web-collection track.** Twenty-four collectors acquire the web portion. Each implements a common interface and is registered in a central registry; the implementations fall into four families — one search-engine aggregator that issues predefined queries and admits results only from a domain whitelist; eighteen provincial emergency-management bureau collectors that parse HTML listing and detail pages and, in most cases, download and extract attached PDF investigation reports; two national-level collectors (Ministry of Emergency Management and MOHURD); and three further sources — two industry safety-news portals that together supply 1,636 of the 2,623 records in the corpus (62.4%), and one open-government dataset importer.
 
 HTTP retrieval uses a single client library across all collectors (httpx, timeouts of 15–60 s). HTML is parsed with BeautifulSoup, using lxml or the standard-library parser according to the source's markup. Main-text extraction prefers trafilatura where page structure permits, falls back to a BeautifulSoup pass that removes script, style, navigation, footer, and form elements, and falls back again to tag stripping with entity unescaping. Attached PDFs are extracted with PyMuPDF when a text layer is present and routed to a document-parsing service with OCR capability when it is not.
 
-Query construction combines two mechanisms. The aggregator issues 17 predefined query templates covering collapse, fall from height, hoisting, excavation, scaffolding, electrocution, fire, poisoning, struck-by, and machinery, together with ministry-level report queries; per-record search enhancement (Section 3.4) later generates up to three additional queries from each accident's own place names and keywords. Admission of a search result is restricted to a whitelist of 15 news domains plus any `gov.cn` host, which keeps search-derived material inside the same source population as the targeted collectors.
+Query construction combines two mechanisms. The aggregator issues 17 predefined query templates covering collapse, fall from height, hoisting, excavation, scaffolding, electrocution, fire, poisoning, struck-by, and machinery, together with ministry-level report queries; per-record search enhancement (Section 3.4) later generates up to three additional queries from each accident's own place names and keywords. Admission of a search result is restricted to a whitelist of 19 news domains plus any `gov.cn` host, which keeps search-derived material inside the same source population as the targeted collectors.
 
 Politeness and robustness measures are deliberately conventional: a fixed desktop browser user-agent, complete request headers including language preference and, for search-derived requests, a referer, a serial inter-request delay of 1–5 s per collector, and three retrieval attempts per URL with a two-second backoff. **We did not implement proxy rotation, user-agent rotation, JavaScript rendering, or CAPTCHA handling, and collection is entirely serial rather than distributed.** We state this explicitly because it bounds both the collection rate and the extendability of the current corpus: sources that require session handling or dynamic rendering fall outside the present scheme and are represented only insofar as their reports are mirrored on admitted sites.
 
@@ -132,7 +132,29 @@ The Construction Accident Integrated Cause System (CAICS) is a 5-layer, 19-categ
 
 **Table 2.** The CAICS coding scheme: operational definitions.
 
-[表2占位：待手绘 — 5 层 19 类操作定义表]
+| Layer | Code | Category | Operational definition | Typical evidence keywords |
+|-------|------|----------|------------------------|---------------------------|
+| **M — Management foundation** | M1 | Deficient supervision | No competent supervisor present, or supervision failed to detect and halt an unsafe state | unsupervised work; supervisor absent; no on-site intervention |
+| | M2 | Hazard inspection failure | Hazards not inspected, not rectified, or allowed to persist over time | hazard left unrectified; perfunctory inspection; repeated reports ignored |
+| | M3 | Inadequate safety training | No induction training or an ineffective safety briefing; workers lacking required safety knowledge | no three-level education; no pre-shift briefing; procedure unknown to workers |
+| | M4 | Procedural and regulatory gaps | No safety plan, no emergency plan, or an incomplete site management system | no special construction scheme; emergency plan missing; rules not established |
+| | M5 | Irregular market conduct | Contracting without qualification, unlawful subcontracting, delegation, or compressed schedule | contractor unqualified; illegal subcontracting; schedule compressed |
+| **F — Protection failure** | F1 | Missing edge and opening protection | No guardrail, no safety net, an uncovered opening, or an unprotected edge | no guardrail at the shaft; safety net absent; opening left uncovered |
+| | F2 | Unstable support system | Formwork or scaffold instability, insufficient shoring, or temporary-structure failure | formwork support collapsed; scaffold unstable; shoring insufficient |
+| | F3 | Safety device failure | Limit switches defeated, fall arresters failed, or safety devices damaged or not fitted | limiter bypassed; arrester failed; device removed |
+| | F4 | Personal protective equipment unused | Safety harness, helmet, or other personal protective equipment not worn where required | harness not attached; helmet not worn; PPE absent |
+| **T — Trigger conditions** | T1 | Equipment and machinery failure | Equipment breakdown, wire-rope failure, mechanical fault, or brake failure | hoist failed; wire rope snapped; brake malfunction |
+| | T2 | Abnormal material state | Loading beyond design capacity, defective material, or material instability | stockpile over capacity; material defect; soaked material gained weight |
+| | T3 | Geological or ground change | Water ingress, slope instability, foundation settlement, or running sand | sudden water inflow; slope failure; foundation settlement |
+| | T4 | Meteorological or hydrological trigger | Heavy rain, high wind, ice and snow, lightning, or sustained rainfall | rainstorm; gale; sustained rainfall; lightning |
+| **H — Human acts** | H1 | Procedure violation | Work performed against the approved method, an unauthorized method change, or non-compliant erection | not built to the scheme; method changed without approval; erected off-code |
+| | H2 | Improper command or decision | Work ordered or continued despite a known, identified hazard | ordered to proceed; risk known and work continued |
+| | H3 | Risk-perception failure | Hazard not recognized, or recognized but misjudged | hazard not noticed; risk misjudged; inattention |
+| | H4 | Improper emergency behavior | Unprotected rescue attempts, delayed evacuation, or rescue methods that worsened the outcome | rescue rushed without protection; wrong rescue method; evacuation delayed |
+| **C — Consequence amplification** | C1 | Delayed rescue response | Rescue began late, no emergency plan was in force, or secondary collapse obstructed rescue | delayed rescue; secondary collapse; no emergency plan in force |
+| | C2 | Concealed or delayed reporting | Failure to report, under-reporting, or late reporting of the accident | accident unreported; casualty figure concealed; report filed late |
+
+*Keywords paraphrase the Chinese expressions that occur in the corpus. The share of codes resting on inference rather than direct quotation varies by layer — 12.0% in the management layer against 3.1% in the trigger layer — consistent with the three-tier evidence scheme of Section 3.1.*
 
 Two design features distinguish CAICS from aviation-derived HFACS adaptations (Shappell and Wiegmann, 2000; Liu et al., 2025a): the F layer captures physical protection failures endemic to construction, and the C layer records consequence-amplification factors such as delayed or concealed reporting. The scheme was derived through corpus-driven induction under the leak model: causal statements were extracted from the corpus, clustered into candidate categories, and consolidated into the five layers, with categories below a frequency floor merged or dropped; each retained category received an operational definition and corpus-derived evidence keywords. We emphasize the scope of this claim: the derivation protocol was an iterative engineering procedure rather than a formal content-validity study, and no comparative validation against 24Model (Xuecai et al., 2024), Accimap, or HFACS on independent data has yet been performed. CAICS is therefore positioned in this paper as an operational scheme for this database — a finite, LLM-oriented coding frame with explicit definitions — not as an established causal theory. Its usability evidence consists of the expert annotation agreement on the 100-record strategy sample (Fleiss' kappa 0.859–1.000 across layers, Section 4.1).
 
@@ -140,9 +162,9 @@ Two design features distinguish CAICS from aviation-derived HFACS adaptations (S
 
 Figure 1 shows the overall architecture. The pipeline consists of six processing stages followed by storage and access layers.
 
-**Figure 1.** CAIEMS system architecture.
+![](figures/fig1_architecture.png)
 
-[图1占位：待手绘 — 系统架构图]
+**Figure 1.** CAIEMS system architecture.
 
 **Stage 1: Multi-source collection.** Accident reports are acquired from public safety information portals (safehoo.com, esafety.cn), provincial and national emergency-management bureaus, and published case compilations, following the dual-track scheme and the collection, cleaning, and filtering procedures described in Section 3.2. Stage 1 yields the deduplicated working corpus of 2,623 records whose composition is reported in Table 1. Reports at overseas sites of Chinese contractors (22 records) are retained but excluded from provincial statistics.
 
@@ -152,9 +174,9 @@ Figure 1 shows the overall architecture. The pipeline consists of six processing
 
 **Stage 4: CAICS causal coding (Step 2).** The encoder applies the two-step judgment procedure — explicit matching followed by authorized inference — and records, per code, the evidence tier, the supporting text, and the inference chain (Section 3.1). Figure 2 illustrates the five-layer structure with an example from a real record.
 
-**Figure 2.** CAICS five-layer causal structure with an example evidence chain.
+![](figures/fig2_caics_tree.png)
 
-[图2占位：待手绘 — CAICS 五层结构与示例证据链]
+**Figure 2.** CAICS five-layer causal structure with an example evidence chain.
 
 **Stage 5: LLM-first MECE enum standardization.** Five free-text fields (work task, equipment, material, worker type, building structure) are normalized through an LLM-first procedure: the LLM reviews the value distribution across the corpus, designs a MECE framework, and maps every observed value. Table 3 reports the resulting enumerations with non-null denominators stated explicitly.
 
@@ -162,7 +184,7 @@ Figure 1 shows the overall architecture. The pipeline consists of six processing
 
 | Field | Categories | Non-null records (share of 2,623) | Largest category (share of non-null) | Residual "other" (share of non-null) |
 |-------|-----------:|----------------------------------:|--------------------------------------|--------------------------------------|
-| Work task (WT) | 11 | 2,202 (83.9%) | WT02 main structure works (397, 18.0%) | 2.9% |
+| Work task (WT) | 11 | 2,202 (83.9%) | WT02 main structure works (397, 18.0%) | 2.8% |
 | Equipment involved (EQP) | 13 | 1,373 (52.3%) | EQP01 hoisting machinery (335, 24.4%) | 1.9% |
 | Material involved (MAT) | 7 | 1,465 (55.9%) | MAT01 concrete and cement products (423, 28.9%) | 11.1% |
 | Worker type (WKR) | 13 | 1,905 (72.6%) | WKR01 general laborers (928, 48.7%) | 6.3% |
@@ -192,11 +214,13 @@ Table 4 summarizes the database with counts that close against the total.
 | CLIP-filtered images | 226 |
 | VLM analyses | 282 across 176 accidents |
 
+The severity distribution follows the Chinese classification standard for production safety accidents (general, relatively major, major, and particularly major). The twelve accident types consolidate the standard Chinese occupational-injury classification (GB 6441-86) with construction-specific granularity: collapse and earthwork collapse are separated because they dominate construction fatalities and require distinct preventive regimes, while drowning and poisoning/asphyxiation are retained as distinct types despite their lower frequency.
+
 Figure 3 shows the distribution of the nineteen CAICS categories; the top codes (M1 deficient supervision, H1 procedure violation, H3 failed risk perception) partly reflect the production prompt's authorized prior inference, which is why the tier breakdown is reported alongside the totals.
 
-**Figure 3.** Distribution of causal annotations across the nineteen CAICS categories.
+![](figures/fig3_code_dist.png)
 
-[图3占位：待手绘 — CAICS 编码分布条形图]
+**Figure 3.** Distribution of causal annotations across the nineteen CAICS categories.
 
 ---
 
@@ -218,9 +242,9 @@ The evaluation addresses three questions with explicitly stated scopes: which ba
 
 Figure 4 summarizes the sample hierarchy.
 
-**Figure 4.** Dataset hierarchy and the three evaluation samples.
+![](figures/fig4_sampling.png)
 
-[图4占位：待手绘 — 样本关系流程图]
+**Figure 4.** Dataset hierarchy and the three evaluation samples.
 
 ### 4.2 Evaluation metrics
 
@@ -277,7 +301,7 @@ Six prompting strategies were compared on the strategy sample (n = 100, three-ex
 
 #### 4.4.2 Few-Shot outperforms domain CoT on this model–task pair
 
-S1's examples perform joint format-content calibration: they demonstrate the output schema, the expected code density, code combination patterns, and inference depth. S1's average code density matched the ground truth closely (5.0 vs. 5.1), while S0 under-coded (3.6) and S4 over-coded (6.5). The comparison with Liu et al. (2025a) is informative but confounded: their study and ours differ simultaneously in model (GPT-4o vs. DeepSeek V4), task (aviation HFACS vs. construction CAICS), corpus, and evaluation conditions. The observed ranking difference is therefore consistent with model dependence, task dependence, or both; we do not claim to have isolated model dependence, and the practical reading is simply that the optimal strategy for a new model–task pair cannot be assumed from a single published ranking.
+Table 7 reports the comparison. S1's examples perform joint format-content calibration: they demonstrate the output schema, the expected code density, code combination patterns, and inference depth. S1's average code density came closest to the ground truth of any strategy (4.2 vs. 5.1), while S0 under-coded (2.8) and S4 over-coded (9.2). The comparison with Liu et al. (2025a) is informative but confounded: their study and ours differ simultaneously in model (GPT-4o vs. DeepSeek V4), task (aviation HFACS vs. construction CAICS), corpus, and evaluation conditions. The observed ranking difference is therefore consistent with model dependence, task dependence, or both; we do not claim to have isolated model dependence, and the practical reading is simply that the optimal strategy for a new model–task pair cannot be assumed from a single published ranking.
 
 #### 4.4.3 The Lexical Gatekeeping observation and its remedy
 
@@ -287,9 +311,9 @@ We term this observed pattern the **Lexical Gatekeeping Effect**: interrogative 
 
 The remedy replaced the gate with a two-step judgment: (1) explicit matching — does the text support this code directly, under any paraphrase? (2) authorized inference — given the accident's nature and construction-safety knowledge, is this cause necessarily present even without explicit phrasing? The conservative instruction was also replaced by a coverage preference. The combined v1→v2 change raised F1 from 0.503 to 0.656, recall from 0.423 to 0.872, M1 recall from 0.141 to 0.988, and eliminated empty outputs (21% → 0). Figure 5 visualizes the change.
 
-**Figure 5.** The Lexical Gatekeeping observation and its remedy.
+![](figures/fig5_gatekeeping.png)
 
-[图5占位：待手绘 — 门控效应观察与补救双面板图]
+**Figure 5.** The Lexical Gatekeeping observation and its remedy.
 
 #### 4.4.4 A constrained ablation of the phrasing change
 
@@ -331,9 +355,9 @@ On the agreement sample (n = 289), the LLM and the annotator labeled the six fie
 
 Two further boundaries apply. First, agreement does not establish accuracy: both parties can share errors, and no independent arbitration labels exist for this sample. Second, the comparison spans six basic fields only; the causal codes — the paper's core annotation object — have no analogous large-sample agreement study, and the three-expert annotation covers only the 100-record strategy subset. The earlier draft cited an expert inter-rater range from a separate 100-record three-expert sample as an equivalence band; because that sample differs from the 289-record sample in composition and difficulty, we no longer present it as a bound and report the agreement values on their own terms. Figure 6 plots the kappa values with their confidence intervals.
 
-**Figure 6.** Agreement between the LLM and one annotator on six fields.
+![](figures/fig6_kappa.png)
 
-[图6占位：待手绘 — 一致性森林图]
+**Figure 6.** Agreement between the LLM and one annotator on six fields.
 
 ---
 
@@ -377,6 +401,8 @@ We list the limitations that bound the main conclusions, organized by their seve
 (7) *Data governance.* The pipeline collects and plans to redistribute text and images from news portals and government sites. Public accessibility does not by itself settle re-publication rights; per-source permissions, takedown mechanisms, and access controls for traumatic imagery are discussed in Section 7 and require completion before any public release.
 
 (8) *Reproducibility.* Data, code, and full prompts are released upon publication rather than at submission; single-run configurations and family-level model identifiers limit exact reproduction. We commit to releasing an anonymous read-only database, verbatim prompts, a minimal reproduction package, and a system demo before resubmission.
+
+(9) *Description fidelity.* The system description in Section 3 is an author-written account of the implementation rather than an artifact generated from it. A manual audit of that account against the collector registry after drafting found four discrepancies within a single paragraph of Section 3.2.2 — the total collector count, the provincial collector count, the composition of the auxiliary-source family, and the size of the news-domain whitelist — all of which have been corrected. The episode bounds how the remainder of the description should be read: narrative statements about the implementation rest on manual reconciliation with the code, and a reader who needs to verify a specific claim should treat the registry and the released code as authoritative rather than the prose.
 
 ---
 
@@ -478,4 +504,4 @@ The six prompting strategies are summarized below; verbatim prompts are included
 
 ---
 
-*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。图片为占位符，待作者手绘后替换。*
+*V2 修订说明（供作者与导师查阅，投稿时删除本段）：本版依据综合评阅意见完成以下文字级修订——①主线确定为"探索性数据工程系统与数据资源"，删除"首次/推翻/证明模型依赖/因果机制/专家级/替代人工/全部编码有证据"等结论；②致因标注重构为 explicit/inferred/prior 三层证据分级（对应数据库 evidence_quality 字段），全文统一分层统计口径；③银标准构建方式如实描述并标注独立性边界；④开发集与测试集重叠风险在 4.1 显式声明；⑤2×2 消融降级为"措辞敏感性观察+实用补救"，删除机制性归因与"排除替代解释"表述；⑥人机一致性限定为"一名标注者、六项字段、协议一致性"，κ/ICC/匹配率分列不再统称 Kappa；⑦全部计数对账闭合（类型 2,617+未标注6、等级 2,622+未标注1、表2 补非空分母列）；⑧M1 数字全文统一为 0.847/0.800；⑨表引用勘误（4.5 节表 7→表 8）、表 6 脚注与数值矛盾修正；⑩数据治理声明扩充（逐源许可/撤回机制/创伤影像访问控制）；⑪局限性扩为 8 项分级；⑫新增 3.2 节"数据来源与语料构建"（含 4 个子节与表 1），端到端呈现采集、清洗、筛选与整合流程，原 3.2–3.5 节顺延为 3.3–3.6 节、表 1–9 顺延为表 2–10，并修正阶段 2 的两处表述（文本类型实为六类而非三类；895 条数字化记录经独立的文献切分路径入库，并非在该阶段被删除）及 5.3 节(6)枚举字段非空率上限（52.3%→83.9%）。六张插图已由 `scripts/gen_paper_figures.py` 生成并插入（Figure 1–6），图中分布数字随主库现读；表 2（5 层 19 类操作定义）已按生产提示词补全，定义与落库类名逐条核对一致，表注给出实测的各层推断占比。*

@@ -1,4 +1,13 @@
-# Cover Letter（投稿信草稿）
+# Cover Letter（V1 版，存档）
+
+> ⚠️ **存档，勿投。** 本版写于 V2 修订之前，**有 3 处论断须处置**：声称反转了
+> Liu et al. 的排序、称 MECE other 类由 18.9% 降到 2.9%（这两者在 V2 正文中
+> **已不存在**），以及 "verified expert applicability (Fleiss' Kappa
+> 0.859–1.000 across layers)"——**这一处不同**：该数字 V2 正文中英**各 2 处
+> 确在**（§3.3/§4.1），问题在把**标注者之间的一致性**说成了**体系已被验证为
+> 可用**（过度解读，对应导师第 8 条）。另有 4 处禁用措辞。详见
+> `docs/paper_v2/修订对账记录.md` 第十五节。
+> **投稿请用 `docs/paper_v2/cover_letter_v2.md`**（校验：`scripts/check_cover_letter_v2.py`）。
 
 ---
 

@@ -19,40 +19,89 @@
   --surface-2:   #FAF8F4;
   --border:      #E4DED4;
   --border-soft: #EFEAE2;
+  /* 输入控件的边界**单独一个色**：WCAG 1.4.11 要求「识别用户界面组件的视觉
+     信息」达 3:1，而输入框底色就是白、只靠边框界定，用 --border（1.34:1）是
+     硬违规。--border 仍用于卡片/面板这类装饰性分隔（1.4.11 不管装饰）。 */
+  --border-input: #8F8B84;
 
   /* 文字 */
   --text:        #2A2724;
   --text-2:      #55504A;
-  --muted:       #8A827A;
+  /* ⚠️ 这几个色号按 WCAG 2.1 AA 定过（§2.5.72）。改动前先跑
+     `scripts/check_contrast_a11y.py`——它量的是**浏览器算出来的**前景/背景
+     实际比，会逐个报出低于 4.5:1（大字 3:1）的文字。原值 `#8A827A` 在三种
+     底色上分别只有 3.78 / 3.56 / 3.39，全站 757 处文字不合格。 */
+  --muted:       #756E67;
 
   /* 主色：绿。品牌色保留，但只承担一个角色（主行动 + 数据主色） */
-  --brand:       #0D7C6B;
+  --brand:       #0D7867;
   --brand-dark:  #0A6355;
   --brand-soft:  #E3F0ED;
   --link:        #2E6B9E;
 
   /* 事故等级 */
   --sev-1: #8E2F2F;  /* 特别重大 */
-  --sev-2: #B5544A;  /* 重大 */
-  --sev-3: #C77D3A;  /* 较大 */
-  --sev-4: #6B7B8C;  /* 一般 */
+  --sev-2: #AA4F46;  /* 重大 */
+  --sev-3: #9B612C;  /* 较大 */
+  --sev-4: #616F7E;  /* 一般 */
 
-  /* CAICS 五层 */
+  /* CAICS 五层。与上面的等级色同值是有意的：同一件事（F 层≈较大事故）
+     在两处出现，颜色不该有肉眼可辨的差别。 */
   --layer-M: #5B6ABF;
-  --layer-F: #C77D3A;
-  --layer-T: #3E8E7E;
-  --layer-H: #B5544A;
-  --layer-C: #7A6BA8;
+  --layer-F: #9B612C;
+  --layer-T: #377E70;
+  --layer-H: #AA4F46;
+  --layer-C: #7969A7;
 
   /* 证据三级 */
-  --ev-direct:   #0D7C6B;
-  --ev-indirect: #C77D3A;
-  --ev-weak:     #9A9A9A;
+  --ev-direct:   #0D7867;
+  --ev-indirect: #9B612C;
+  --ev-weak:     #737373;
 
   --radius:    10px;
   --radius-sm: 6px;
   --shadow:    0 1px 2px rgba(42, 39, 36, .06), 0 4px 12px rgba(42, 39, 36, .04);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 吸顶元素的高度。**这两个数全站只写一次**：下面 `.grid thead th` 的 `top`
+     与 `--scroll-pad` 都由它算出来，改高度时不会两处打架（此前 `top` 硬编码
+     57px 而顶栏实测 55px，已经漂了 2px 没人发现）。
+
+     ⚠️ `--topbar-h` 只是**首帧初值**，真正的值由 `static/layout.js` 在运行时
+     量出来写回——顶栏高度是响应式的：宽屏 55px，而 900px 宽时品牌文字与导航
+     折行，实测 **78px**。写死 55px 会让表头停到顶栏底下、`--scroll-pad` 也偏小。
+     `--thead-h` 是常量（表头 padding 9px + 字号 12.5px + 下边框 1px = 39px，
+     不随宽度变），保持写死即可。 */
+  --topbar-h: 55px;
+  --thead-h:  39px;
+
+  /* 顶部被吸顶元素占掉的总高度（宽屏 = 55 + 39 = 94px；900px 宽时顶栏折行
+     成 78px，自动跟着变 117px）。
+     WCAG 2.4.11「Focus Not Obscured (Minimum)」(AA) 要求拿到焦点的组件不得被
+     作者创建的内容**完全遮住**。浏览器把视口外的元素滚进来时按「元素顶 → 视口
+     顶」对齐，它不知道 sticky 顶栏与吸顶表头占着上面那一段——于是键盘用户按
+     Tab 时，被滚进来的按钮/标题整条压在表头底下（实测 5 个采样点全被挡住）。
+     `scroll-padding-top` 即「上边这一段别放东西」，同时管住 Tab 焦点滚动与
+     锚点跳转，是这条准则的标准解法。
+     定档实测（§2.5.75，三视口 × 五页 × 完整往返遍历）：0px 有 8 个组合被挡、
+     55px（只让开顶栏）仍剩 6 个（漏在表头那一带），94px 与 96px 全消——取 94
+     是最小充分值。⚠️ 判据必须复现「先滚动、后 Tab」才测得出来：纯 Tab 遍历时
+     浏览器一路把焦点留在视口内，永远绿。 */
+  --scroll-pad: calc(var(--topbar-h) + var(--thead-h));
+
+  /* 视口**底部**的遮挡者：批量裁决条 `.bulkbar`（`fixed; bottom: var(--bulkbar-gap)`）。
+     与顶栏同理，浏览器把视口外的元素滚进来时按「元素底 → 视口底」对齐，不知道
+     这条浮在下面 74px 高——实测（§2.5.75）勾选出批量条后，采集页底部的链接与
+     按钮被**整条盖住**（5 个采样点全被挡，WCAG 2.4.11 硬违规）。
+     `scroll-padding-bottom` 是顶部那个的镜像解法。
+     ⚠️ 与 `--scroll-pad` 不同，它**常驻**（不能写成「只在批量条出现时才生效」）：
+     用 `html:has(.bulkbar:not([hidden]))` 更精确，但浏览器不支持 `:has()` 时整条
+     规则会被静默丢弃，退回遮挡状态且毫无提示——而常驻对没有批量条的页面没有
+     代价（它只改变「滚动一个元素进视口时底部留多少白」，不改变页面能滚到多远）。
+     窄屏（<790px）批量条会 `flex-wrap: wrap` 换行变高，届时改 `--bulkbar-h`。 */
+  --bulkbar-h:   56px;
+  --bulkbar-gap: 18px;
+  --scroll-pad-bottom: calc(var(--bulkbar-h) + var(--bulkbar-gap));
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -60,6 +109,13 @@
    ══════════════════════════════════════════════════════════ */
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/* 见 `:root` 的 `--scroll-pad` / `--scroll-pad-bottom`：让浏览器在替键盘用户
+   滚动元素进视口时，把顶部的吸顶区与底部的批量条预留出来（WCAG 2.4.11）。 */
+html {
+  scroll-padding-top: var(--scroll-pad);
+  scroll-padding-bottom: var(--scroll-pad-bottom);
+}
 
 body {
   margin: 0;
@@ -273,7 +329,7 @@ code { font-family: var(--mono); font-size: .88em;
   font: inherit; font-size: 13.5px;
   padding: 7px 10px; min-height: 36px;
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   min-width: 110px;
 }
 .field input:focus, .field select:focus {
@@ -338,10 +394,12 @@ code { font-family: var(--mono); font-size: .88em;
 
 .grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
-/* top 值对应 topbar 的高度（见 .topbar-inner 的 padding），改顶栏高度时
-   要一起改，否则表头会浮在顶栏下沿的错位处。 */
+/* 表头停在**顶栏正下方**，所以 top 就是顶栏高度，不再另写一个数——此前这里
+   硬编码 57px 而顶栏实测 55px，表头底下多出一段 2px 的缝（滚过页面时能看见
+   内容从缝里划过），注释还写着「改顶栏高度时要一起改」，只是没人改到。
+   表头高度（--thead-h）也参与 `--scroll-pad`，见 `:root`。 */
 .grid thead th {
-  position: sticky; top: 57px; z-index: 5;
+  position: sticky; top: var(--topbar-h); z-index: 5;
   background: var(--surface);
   text-align: left; font-weight: 600; font-size: 12.5px;
   color: var(--muted); letter-spacing: .02em;
@@ -1243,7 +1301,7 @@ body.lb-locked { overflow: hidden; }
 /* 固定在底部而不是表格上方：勾选发生在滚到表格中段的时候，操作条得跟
    着视线走。胶囊形状让它明显浮在内容之上，不会被误当成页面的一部分。 */
 .bulkbar {
-  position: fixed; left: 50%; bottom: 18px; z-index: 30;
+  position: fixed; left: 50%; bottom: var(--bulkbar-gap); z-index: 30;
   transform: translateX(-50%);
   display: flex; align-items: center; gap: 9px;
   padding: 9px 14px;
@@ -1389,7 +1447,7 @@ body.lb-locked { overflow: hidden; }
 .edit-grid input {
   width: 100%; padding: 5px 8px; font: inherit; font-size: 13px;
   color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
 }
 .edit-grid input:focus { border-color: var(--brand); outline: none; }
 
@@ -1418,14 +1476,14 @@ body.lb-locked { overflow: hidden; }
 .cause-row-head .cause-name { margin-right: auto; }
 .ev-select {
   padding: 3px 6px; font: inherit; font-size: 12px;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .ev-text {
   width: 100%; box-sizing: border-box; margin-top: 5px;
   padding: 6px 8px; font: inherit; font-size: 12.5px; line-height: 1.6;
   color: var(--text-2); background: var(--surface-2);
-  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
   resize: vertical;
 }
 .ev-text:focus { border-color: var(--brand); outline: none; background: var(--surface); }
@@ -1437,7 +1495,7 @@ body.lb-locked { overflow: hidden; }
 #noteIn {
   width: 100%; box-sizing: border-box; margin-top: 8px; padding: 6px 9px;
   font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
 }
 .task-error.is-ok { color: var(--brand-dark); }
 

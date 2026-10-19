@@ -585,10 +585,17 @@ def promote():
 
 @review_bp.post("/rollback")
 def rollback():
+    """撤销一次并入。**必须指名** `promote_id`，见 `pm.rollback()` 的说明。
+
+    回滚删的是**最终库**的事故与编码，是这套系统里破坏性最强的一个动作；
+    `promote` 有一次性令牌挡着，回滚此前却一个入参都不读——§2.5.92 实测：
+    副本上一个空 body 的 POST 就删掉了 1 条事故与它下面的编码。
+    """
     if not staging_db.has_table("promote_log"):
         return jsonify(staging_db.unavailable_payload(missing="promote_log"))
+    body = request.get_json(silent=True) or {}
     try:
-        out = pm.rollback()
+        out = pm.rollback(expect_id=body.get("promote_id"))
     except pm.PromoteError as e:
         return jsonify({"ok": False, "message": str(e)}), 409
     return jsonify({"ok": True, "data": out})

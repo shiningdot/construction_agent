@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Stage 2.5 数据完整性验证：论文关键数字 vs 数据源文件"""
 import sqlite3, json, re, sys
+from pathlib import Path
 
+# 本仓库根（脚本在 scripts/ 下，上溯一级），worktree 与主仓库都成立
+ROOT = Path(__file__).resolve().parents[1]
 DB = '/home/suntianhao/construction_agent/data/caiems_v2.db'
 E1 = '/home/suntianhao/construction_agent/experiments/experiment-models/experiment1_metrics_20260626_102135.json'
 KAPPA = '/home/suntianhao/construction_agent/experiments/experiment_kappa/Basic/289/analysis/agreement_metrics.json'
-PAPER = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'
+PAPER = str(ROOT / 'docs' / 'paper' / 'eswa_paper.md')
 
 paper = open(PAPER, encoding='utf-8').read()
 results = []

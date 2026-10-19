@@ -2,9 +2,13 @@
 """ESWA 编号引用转换: 作者-年份 → [n] 数字编号式
 产出 docs/paper/eswa_paper_numbered.md（投稿版引用格式）"""
 import re, json
+from pathlib import Path
 
-SRC = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper.md'
-OUT = '/home/suntianhao/construction_agent/.claude/worktrees/classifier-mod/docs/paper/eswa_paper_numbered.md'
+# 本仓库根：脚本在 scripts/ 下，上溯一级即仓库根（worktree 与主仓库都成立）
+ROOT = Path(__file__).resolve().parents[1]
+
+SRC = str(ROOT / 'docs' / 'paper' / 'eswa_paper.md')
+OUT = str(ROOT / 'docs' / 'paper' / 'eswa_paper_numbered.md')
 
 paper = open(SRC, encoding='utf-8').read()
 body, refs = paper.split('## References')

@@ -13,9 +13,9 @@ import re
 import time
 from typing import Optional
 
-from anthropic import Anthropic
-
-from construction_agent.config import settings
+from construction_agent.llm_client import (
+    create_llm_client, resolve_max_tokens, resolve_model,
+)
 from construction_agent.extraction.claude_extractor import EXTRACTION_TOOL
 from construction_agent.models.accident import (
     Accident, AccidentExtractionResult,
@@ -82,11 +82,8 @@ class V2Pipeline(BasePipeline):
     version = "v2"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client = None
-        api_key = api_key or settings.ANTHROPIC_API_KEY
-        if api_key:
-            self.client = Anthropic(api_key=api_key)
-        else:
+        self.client = create_llm_client(api_key=api_key)
+        if self.client is None:
             logger.warning("API Key 未配置")
 
     def process_single(self, text: str, **kwargs) -> PipelineResult:
@@ -97,8 +94,8 @@ class V2Pipeline(BasePipeline):
 
         try:
             response = self.client.messages.create(
-                model=settings.ANTHROPIC_MODEL,
-                max_tokens=settings.ANTHROPIC_MAX_TOKENS,
+                model=resolve_model(),
+                max_tokens=resolve_max_tokens(),
                 system=V2_SYSTEM_PROMPT,
                 tools=[EXTRACTION_TOOL],
                 messages=[{
@@ -165,5 +162,5 @@ class V2Pipeline(BasePipeline):
                 "5 个高质量 few-shot 示例（坍塌/土方坍塌/高处坠落/起重伤害/中毒窒息）",
                 "更精细的致因分类引导",
             ],
-            "model": settings.ANTHROPIC_MODEL,
+            "model": resolve_model(),
         }

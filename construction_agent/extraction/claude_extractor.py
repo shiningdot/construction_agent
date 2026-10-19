@@ -6,9 +6,9 @@ import json
 import logging
 from typing import Optional
 
-from anthropic import Anthropic
-
-from construction_agent.config import settings
+from construction_agent.llm_client import (
+    create_llm_client, resolve_max_tokens, resolve_model,
+)
 from construction_agent.models.accident import (
     Accident,
     AccidentExtractionResult,
@@ -188,15 +188,13 @@ class ClaudeExtractor:
     """基于 Claude API 的事故特征提取器。"""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.ANTHROPIC_API_KEY
-        self.model = settings.ANTHROPIC_MODEL
-        self.max_tokens = settings.ANTHROPIC_MAX_TOKENS
-        self.client: Anthropic | None = None
+        self.api_key = api_key
+        self.model = resolve_model()
+        self.max_tokens = resolve_max_tokens()
+        self.client = create_llm_client(api_key=self.api_key)
 
-        if self.api_key:
-            self.client = Anthropic(api_key=self.api_key)
-        else:
-            logger.warning("Anthropic API Key 未配置")
+        if self.client is None:
+            logger.warning("LLM API Key 未配置")
 
     def extract(self, text: str) -> Optional[AccidentExtractionResult]:
         """从文本中提取事故特征。
@@ -208,7 +206,7 @@ class ClaudeExtractor:
             提取结果，失败返回 None
         """
         if not self.client:
-            logger.error("无法提取：Anthropic 客户端未初始化")
+            logger.error("无法提取：LLM 客户端未初始化")
             return None
 
         try:
@@ -253,7 +251,7 @@ class ClaudeExtractor:
             提取结果
         """
         if not self.client:
-            logger.error("Anthropic 客户端未初始化")
+            logger.error("LLM 客户端未初始化")
             return None
 
         # 构建增强提示

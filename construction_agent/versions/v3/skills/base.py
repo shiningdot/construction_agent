@@ -9,11 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Optional
+from typing import Any, Optional
 
-from anthropic import Anthropic
-
-from construction_agent.config import settings
+from construction_agent.llm_client import resolve_max_tokens, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +101,14 @@ class HFACSSkill:
             },
         }
 
-    def extract(self, text: str, client: Anthropic) -> Optional[list[dict]]:
+    def extract(self, text: str, client: Any) -> Optional[list[dict]]:
         """调用 LLM 提取本技能的致因。"""
         import re
 
         try:
             response = client.messages.create(
-                model=settings.ANTHROPIC_MODEL,
-                max_tokens=settings.ANTHROPIC_MAX_TOKENS,
+                model=resolve_model(),
+                max_tokens=resolve_max_tokens(),
                 system=self.system_prompt,
                 messages=[{
                     "role": "user",

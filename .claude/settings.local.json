@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s http://localhost:5000/causes)"
+      "Bash(curl -s http://localhost:5000/causes)",
+      "Bash(grep -n \"不知道.\\\\{0,2\\\\}冒充\" docs/web/01_在线采集.md)"
     ]
   }
 }

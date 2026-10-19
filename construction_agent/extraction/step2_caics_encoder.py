@@ -25,6 +25,7 @@ from typing import Optional
 
 from construction_agent.config import settings
 from construction_agent.llm_usage import usage_of
+from construction_agent.rag.context import RagContext, build_coding_context
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,13 @@ STEP2_TOOL = {
                         "inference": {
                             "type": "string",
                             "description": "推理链: 从原文证据到编码结论的逻辑过程"
+                        },
+                        "basis": {
+                            "type": "string",
+                            "description": "支撑该编码的规范依据编号（如 \"R1\"），多条用逗号分隔；无依据留空字符串"
                         }
                     },
-                    "required": ["code", "name", "evidence", "inference"]
+                    "required": ["code", "name", "evidence", "inference", "basis"]
                 },
                 "minItems": 1,
                 "maxItems": 15
@@ -170,6 +175,17 @@ STEP2_SYSTEM_PROMPT = """你是一名建筑施工事故致因分析专家。使�
    {"code":"H1","name":"违反操作规程","evidence":"原文未直接描述","inference":"高处作业规范要求工人应在有防护条件下作业，或在无防护时必须系挂安全带"}]"""
 
 
+RAG_USAGE_RULES = """
+## 依据使用规则（重要）
+1. **不漏**：事故文本明确描述到的致因，无论依据里是否提到，都必须编码。
+2. **不多**：依据里出现、但事故文本没有对应事实的类目，不要编码。
+3. 判定要点用于判断证据归属，**不是二选一**：同一事实可以同时支撑多个编码（堆载压垮支架 → T2 记载荷、F2 记结构失效；无防护且未系安全带 → F1 与 F4 并存）。
+   只有当文本中确实没有对应事实时，才不编该码。
+4. **每条编码都要填 basis**：判定依赖某条依据就写编号（如 "R1"，多条用逗号），纯靠原文证据、不依赖依据的填空字符串。依据里没有的条号不要编造。
+5. 依据与事故原文冲突时，以事故原文描述的事实为准。
+"""
+
+
 # ══════════════════════════════════════════════════════════════════
 # 输出数据类
 # ══════════════════════════════════════════════════════════════════
@@ -181,6 +197,9 @@ class CauseItem:
     name: str = ""
     evidence: str = ""
     inference: str = ""
+    # 支撑该编码的依据编号（R1/R2…）。不进 to_dict()：该方法被既有脚本当作
+    # 固定 4 键结构使用，加键会破坏其统计口径。
+    basis: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -200,6 +219,10 @@ class Step2Result:
     tokens_in: int = 0
     tokens_out: int = 0
     _processing_time: float = 0.0
+    # RAG 溯源（不进 to_dict()，同上）。citations 每条含 chunk_id/条号/出处，
+    # 供审计「为什么记这个码」；rag_meta 记录注入了哪些卡、占多少字符。
+    citations: list = field(default_factory=list)
+    rag_meta: dict = field(default_factory=dict)
 
     @property
     def caics_codes(self) -> list[str]:
@@ -219,6 +242,16 @@ class Step2Result:
             "_processing_time": self._processing_time,
         }
 
+    def to_dict_with_citations(self) -> dict:
+        """含 basis 与 RAG 引用的完整序列化。论文评测与审计用这个。"""
+        d = self.to_dict()
+        d["causes"] = [
+            {**c.to_dict(), "basis": c.basis} for c in self.causes
+        ]
+        d["citations"] = self.citations
+        d["rag"] = self.rag_meta
+        return d
+
 
 # ══════════════════════════════════════════════════════════════════
 # 编码器
@@ -233,42 +266,87 @@ class Step2CaicsEncoder:
         print(result.caics_codes)  # ["M1","F2","T2","H1"]
     """
 
-    def __init__(self, api_key: Optional[str] = None):
-        from anthropic import Anthropic
-        key = api_key or settings.ANTHROPIC_API_KEY
-        self.client = Anthropic(api_key=key, base_url=settings.ANTHROPIC_BASE_URL) if key else None
-        self._model = settings.ANTHROPIC_MODEL
-        self._max_tokens = getattr(settings, 'ANTHROPIC_MAX_TOKENS', 4096)
+    def __init__(self, api_key: Optional[str] = None, *, rag: Optional[bool] = None,
+                 retriever=None):
+        from construction_agent.llm_client import (
+            create_llm_client, resolve_max_tokens, resolve_model,
+        )
+        self.client = create_llm_client(api_key=api_key)
+        self._model = resolve_model()
+        self._max_tokens = resolve_max_tokens()
+        # rag=None 时取配置；配置默认关闭，保证既有实验可复现
+        self._rag = settings.RAG_ENABLED if rag is None else rag
+        self._retriever = retriever
+
+    def _get_retriever(self):
+        """懒加载检索器。构造约 0.2s，只在真正用到 RAG 时付出。"""
+        if self._retriever is None:
+            from construction_agent.rag.retriever import Retriever
+            corpus = settings.RAG_CORPUS or None
+            self._retriever = Retriever(corpus) if corpus else Retriever.from_default()
+        return self._retriever
+
+    def _rag_context(self, text: str, basic_info: Optional[dict],
+                     codes: Optional[list[str]], top_k: Optional[int]) -> Optional[RagContext]:
+        try:
+            return build_coding_context(
+                text, basic_info,
+                retriever=self._get_retriever(),
+                codes=codes,
+                top_k=top_k or settings.RAG_TOP_K,
+                budget_chars=settings.RAG_BUDGET_CHARS,
+            )
+        except Exception as e:  # 检索失败不能让编码整体失败
+            logger.warning(f"RAG 检索失败，退化为无依据编码: {type(e).__name__}: {e}")
+            return None
 
     def encode(
         self, text: str, basic_info: Optional[dict] = None,
+        *, use_rag: Optional[bool] = None,
+        rag_codes: Optional[list[str]] = None,
+        rag_top_k: Optional[int] = None,
     ) -> Optional[Step2Result]:
         """对事故文本进行 CAICS 致因编码。
 
         Args:
             text: 事故原文
             basic_info: Step 1 提取的基础信息（可选，用于提供上下文）
+            use_rag: 本次是否启用检索增强；None 取构造参数/配置
+            rag_codes: 指定要注入的概念卡（边界复核场景传待比对的码）
+            rag_top_k: 注入的条文数，默认取配置
         """
         if not self.client:
-            logger.error("Anthropic 客户端未初始化")
+            logger.error("LLM 客户端未初始化")
             return None
 
         t0 = time.time()
 
         # 构建上下文
-        user_msg = f"请分析以下建筑施工事故的致因：\n\n{text}"
+        rag_ctx: Optional[RagContext] = None
+        if use_rag if use_rag is not None else self._rag:
+            rag_ctx = self._rag_context(text, basic_info, rag_codes, rag_top_k)
+
+        head = "请分析以下建筑施工事故的致因。"
         if basic_info:
-            ctx = (
+            head = (
                 f"【已知事实】\n"
                 f"事故类型: {basic_info.get('accident_type','未知')}\n"
                 f"严重等级: {basic_info.get('severity','未知')}\n"
                 f"死亡{basic_info.get('deaths',0)}人 受伤{basic_info.get('injuries',0)}人\n"
             )
             if basic_info.get('work_task'):
-                ctx += f"事发作业: {basic_info['work_task']}\n"
+                head += f"事发作业: {basic_info['work_task']}\n"
             if basic_info.get('project_type'):
-                ctx += f"工程类型: {basic_info['project_type']}\n"
-            user_msg = f"{ctx}\n【事故原文】\n{text}"
+                head += f"工程类型: {basic_info['project_type']}\n"
+
+        # 顺序刻意如此：事实 → 依据 → 原文。原文放最后（近因效应），
+        # 避免模型把依据里的条文当成待编码内容。
+        if rag_ctx is not None and not rag_ctx.empty:
+            user_msg = f"{head}\n\n{rag_ctx.text}\n{RAG_USAGE_RULES}\n\n【事故原文】\n{text}"
+        elif basic_info:
+            user_msg = f"{head}\n【事故原文】\n{text}"
+        else:
+            user_msg = f"请分析以下建筑施工事故的致因：\n\n{text}"
 
         try:
             response = self.client.messages.create(
@@ -282,6 +360,7 @@ class Step2CaicsEncoder:
             parsed = self._parse_response(response)
             if parsed:
                 result = self._build_result(parsed)
+                self._attach_rag(result, rag_ctx)
                 result._processing_time = time.time() - t0
                 result.tokens_in, result.tokens_out = usage_of(response)
                 return result
@@ -296,6 +375,7 @@ class Step2CaicsEncoder:
             parsed = self._parse_response(retry)
             if parsed:
                 result = self._build_result(parsed)
+                self._attach_rag(result, rag_ctx)
                 result._processing_time = time.time() - t0
                 # 与 S3 一致：两次调用的 token 都算，失败的调用也是真花钱
                 f_in, f_out = usage_of(response)
@@ -333,6 +413,21 @@ class Step2CaicsEncoder:
         return None
 
     @staticmethod
+    def _attach_rag(result: Step2Result, ctx: Optional[RagContext]) -> None:
+        """把引用写回结果，并统计「有依据支撑的编码占比」。"""
+        if ctx is None:
+            return
+        result.citations = ctx.citations
+        supported = sum(1 for c in result.causes if c.basis)
+        result.rag_meta = {
+            "codes": ctx.codes,
+            "chars": ctx.chars,
+            "n_citations": len(ctx.citations),
+            "n_causes": len(result.causes),
+            "n_with_basis": supported,
+        }
+
+    @staticmethod
     def _build_result(parsed: dict) -> Step2Result:
         causes = []
         for c in parsed.get("causes", []) or []:
@@ -341,6 +436,7 @@ class Step2CaicsEncoder:
                 name=c.get("name", ""),
                 evidence=c.get("evidence", ""),
                 inference=c.get("inference", ""),
+                basis=str(c.get("basis", "") or "").strip(),
             ))
         return Step2Result(
             primary_cause=parsed.get("primary_cause", ""),

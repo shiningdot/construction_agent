@@ -31,7 +31,6 @@ from typing import Optional
 
 from construction_agent.collector.base import RawAccidentText
 from construction_agent.collector.classifier import classify_v2
-from construction_agent.config import settings
 from construction_agent.llm_usage import usage_of
 
 logger = logging.getLogger(__name__)
@@ -316,22 +315,21 @@ class AccidentClassifier:
     MIN_TEXT_LENGTH = 30
 
     def __init__(self, llm_client=None):
+        from construction_agent.llm_client import (
+            create_llm_client, resolve_model,
+        )
         if llm_client is None:
-            from anthropic import Anthropic
-            api_key = settings.ANTHROPIC_API_KEY
-            if api_key:
-                self.client = Anthropic(
-                    api_key=api_key,
-                    base_url=getattr(settings, 'ANTHROPIC_BASE_URL', None),
-                )
-                self._model = settings.ANTHROPIC_MODEL
+            self.client = create_llm_client()
+            if self.client is not None:
+                self._model = resolve_model()
             else:
-                self.client = None
                 self._model = None
-                logger.warning("未配置 ANTHROPIC_API_KEY，LLM 分类将不可用")
+                logger.warning(
+                    "未配置 LLM API Key（ANTHROPIC_API_KEY / SILICONFLOW_API_KEY），"
+                    "LLM 分类将不可用")
         else:
             self.client = llm_client
-            self._model = getattr(llm_client, 'model', settings.ANTHROPIC_MODEL)
+            self._model = getattr(llm_client, 'model', None) or resolve_model()
 
         self._checkpoint: dict[str, dict] = {}
 

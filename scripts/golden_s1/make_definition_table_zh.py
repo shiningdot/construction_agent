@@ -107,6 +107,55 @@ def _set_run_font(run, size: float = 10.5, bold: bool = False) -> None:
     run._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
 
 
+def _replace_tbl_child(tbl_pr, tag: str):
+    """替换 tblPr 下的同名子元素，避免重复。"""
+    for child in tbl_pr.findall(qn(tag)):
+        tbl_pr.remove(child)
+    element = OxmlElement(tag)
+    tbl_pr.append(element)
+    return element
+
+
+def _set_table_three_line_borders(table) -> None:
+    """三线表：顶线、底线 1.5 pt；左右与内部无边框。"""
+    tbl_pr = table._tbl.tblPr
+    borders = _replace_tbl_child(tbl_pr, "w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        element = OxmlElement(f"w:{edge}")
+        if edge in ("top", "bottom"):
+            element.set(qn("w:val"), "single")
+            element.set(qn("w:sz"), "12")  # 1.5 pt
+        else:
+            element.set(qn("w:val"), "none")
+            element.set(qn("w:sz"), "0")
+        element.set(qn("w:color"), "000000")
+        borders.append(element)
+
+
+def _set_cell_bottom_border(cell) -> None:
+    """表头单元格下边框：0.75 pt。"""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    tc_borders = tc_pr.first_child_found_in("w:tcBorders")
+    if tc_borders is None:
+        tc_borders = OxmlElement("w:tcBorders")
+        tc_pr.append(tc_borders)
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")  # 0.75 pt
+    bottom.set(qn("w:color"), "000000")
+    tc_borders.append(bottom)
+
+
+def _set_table_fixed_width(table, total_cm: float) -> None:
+    """固定表格总宽（cm），避免 Word 自动布局改变列宽。"""
+    tbl_pr = table._tbl.tblPr
+    width = _replace_tbl_child(tbl_pr, "w:tblW")
+    width.set(qn("w:w"), str(int(total_cm * 567)))  # 1 cm = 567 twips
+    width.set(qn("w:type"), "dxa")
+    layout = _replace_tbl_child(tbl_pr, "w:tblLayout")
+    layout.set(qn("w:type"), "fixed")
+
+
 def write_docx(rows: list[dict[str, str]], path: Path) -> None:
     doc = Document()
 
@@ -116,9 +165,10 @@ def write_docx(rows: list[dict[str, str]], path: Path) -> None:
     style.font.size = Pt(10.5)
     style.element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
 
-    # 表题
+    # 表题（左对齐，与例图一致）
     title = doc.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    title.paragraph_format.space_after = Pt(3)
     _set_run_font(
         title.add_run("表 1. CAICS 五层十九类致因编码操作定义"),
         size=10.5,
@@ -126,19 +176,22 @@ def write_docx(rows: list[dict[str, str]], path: Path) -> None:
     )
 
     table = doc.add_table(rows=1, cols=len(HEADERS))
-    table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
+    _set_table_fixed_width(table, 15.5)
 
-    # 表头
+    # 表头（常规字重，与例图一致）
     for index, header in enumerate(HEADERS):
         cell = table.rows[0].cells[index]
         cell.text = header
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
         for run in paragraph.runs:
-            _set_run_font(run, bold=True)
+            _set_run_font(run, bold=False)
+        _set_cell_bottom_border(cell)
 
     # 数据行；层名只写在每组首行，后续留空供合并
     for row_index, row in enumerate(rows):
@@ -153,6 +206,9 @@ def write_docx(rows: list[dict[str, str]], path: Path) -> None:
             cell.text = value
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.space_after = Pt(0)
+                paragraph.paragraph_format.line_spacing = 1.15
                 for run in paragraph.runs:
                     _set_run_font(run)
 
@@ -174,15 +230,24 @@ def write_docx(rows: list[dict[str, str]], path: Path) -> None:
             merged.text = rows[index]["layer"]
             merged.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             for paragraph in merged.paragraphs:
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.space_after = Pt(0)
                 for run in paragraph.runs:
                     _set_run_font(run)
         index = end + 1
 
-    # 列宽
-    widths = [Cm(2.6), Cm(1.2), Cm(3.4), Cm(9.0)]
+    # 三线：顶线、表头下线、底线；无竖线与内部横线
+    _set_table_three_line_borders(table)
+
+    # 列宽（合计 15.5 cm）
+    widths = [Cm(2.3), Cm(1.2), Cm(3.2), Cm(8.8)]
     for table_row in table.rows:
         for index, width in enumerate(widths):
             table_row.cells[index].width = width
+
+    # 编码列居中
+    for table_row in table.rows[1:]:
+        table_row.cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     # 表头跨页重复
     header_row = table.rows[0]._tr
@@ -193,6 +258,7 @@ def write_docx(rows: list[dict[str, str]], path: Path) -> None:
 
     # 表注
     note = doc.add_paragraph()
+    note.paragraph_format.space_before = Pt(4)
     _set_run_font(
         note.add_run(
             "注：文本示例为语料中典型证据关键词的概括；完整操作定义见 "

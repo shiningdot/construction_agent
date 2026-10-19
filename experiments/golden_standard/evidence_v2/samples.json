@@ -1,0 +1,176 @@
+[
+ {
+  "id": "50b24ffd6e47",
+  "title": "上海石化总厂热交换器气密性试验爆炸事故",
+  "accident_type": "其他",
+  "gt_codes": 7
+ },
+ {
+  "id": "05ed7405ac02",
+  "title": "江苏启东恒大威尼斯水城运动中心高支模坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 9
+ },
+ {
+  "id": "87958a32a5db",
+  "title": "秦山核电站取水隧道放炮爆炸事故",
+  "accident_type": "火灾爆炸",
+  "gt_codes": 6
+ },
+ {
+  "id": "d0319527298f",
+  "title": "广州花园公寓钢井架吊篮坠落事故",
+  "accident_type": "高处坠落",
+  "gt_codes": 6
+ },
+ {
+  "id": "5c2597f44431",
+  "title": "六盘水市鱼塘西路隧道坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 15
+ },
+ {
+  "id": "d94b6b4a53d7",
+  "title": "常州自动化研究所工地砼搅拌机夹击事故",
+  "accident_type": "机械伤害",
+  "gt_codes": 4
+ },
+ {
+  "id": "72ad9459474c",
+  "title": "新余钢铁厂棒线材轧钢车间屋面坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 4
+ },
+ {
+  "id": "5ce34934f882",
+  "title": "成都地铁5号线土建9标“1·29”生产安全事故",
+  "accident_type": "淹溺",
+  "gt_codes": 6
+ },
+ {
+  "id": "585170d86a8e",
+  "title": "重庆储运公司仓库塔吊检修高处坠落事故",
+  "accident_type": "高处坠落",
+  "gt_codes": 5
+ },
+ {
+  "id": "1cd02155cf8d",
+  "title": "湖北齿轮厂总装车间翻斗车伤害事故",
+  "accident_type": "车辆伤害",
+  "gt_codes": 6
+ },
+ {
+  "id": "e19e7dfe5c53",
+  "title": "山东省威海市\"3·21\"塔机倾覆事故",
+  "accident_type": "起重伤害",
+  "gt_codes": 9
+ },
+ {
+  "id": "e73e80c953cc",
+  "title": "上海宝林路下水道沟槽土方坍塌事故",
+  "accident_type": "土方坍塌",
+  "gt_codes": 6
+ },
+ {
+  "id": "22f5fdfd02b6",
+  "title": "驻马店市交通街居民楼绞车触高压线触电事故",
+  "accident_type": "触电",
+  "gt_codes": 7
+ },
+ {
+  "id": "411824395e6d",
+  "title": "四川旅行车制造厂基坑物体打击事故",
+  "accident_type": "物体打击",
+  "gt_codes": 5
+ },
+ {
+  "id": "fabf93b6fb6d",
+  "title": "鸡西市中兴立交桥框构顶进土方坍塌事故",
+  "accident_type": "土方坍塌",
+  "gt_codes": 8
+ },
+ {
+  "id": "c3dd925e102c",
+  "title": "重庆江北区住宅工程塔吊安装折断倒塌事故",
+  "accident_type": "起重伤害",
+  "gt_codes": 7
+ },
+ {
+  "id": "2e6ee2e7a707",
+  "title": "郑州富田太阳城商业广场B2区模板坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 10
+ },
+ {
+  "id": "2d705435b251",
+  "title": "内蒙古乌兰察布市\"7·5\"排水沟塌方事故",
+  "accident_type": "土方坍塌",
+  "gt_codes": 10
+ },
+ {
+  "id": "14ff1a63ff0d",
+  "title": "双城市银行办公楼一氧化碳中毒事故",
+  "accident_type": "中毒窒息",
+  "gt_codes": 5
+ },
+ {
+  "id": "e9b1facb1248",
+  "title": "武汉高压研究所门式铁塔吊装倒塔坠臂事故",
+  "accident_type": "起重伤害",
+  "gt_codes": 6
+ },
+ {
+  "id": "ec2da8b3f074",
+  "title": "常州斜桥式输送带检修高处坠落事故",
+  "accident_type": "高处坠落",
+  "gt_codes": 8
+ },
+ {
+  "id": "b8ee7bf2b315",
+  "title": "苏州水岸清华高层二期地下室墙体坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 7
+ },
+ {
+  "id": "779334aaca49",
+  "title": "铁道部大桥局潼关黄河桥起重伤害事故",
+  "accident_type": "起重伤害",
+  "gt_codes": 4
+ },
+ {
+  "id": "e82c4c745019",
+  "title": "景谷县半坡乡中心小学教室拆除坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 6
+ },
+ {
+  "id": "115aad9fb72e",
+  "title": "湖北省税务学校教学楼门吊安装倾覆倒塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 6
+ },
+ {
+  "id": "e05644b49e11",
+  "title": "广东省惠州市\"9·20\"塔吊倒塌事故",
+  "accident_type": "起重伤害",
+  "gt_codes": 8
+ },
+ {
+  "id": "2c69c26ec689",
+  "title": "长春市建筑公司变电室高压触电事故",
+  "accident_type": "触电",
+  "gt_codes": 5
+ },
+ {
+  "id": "476cb4d06df1",
+  "title": "广州市六塘镇公租房项目模架坍塌事故",
+  "accident_type": "坍塌",
+  "gt_codes": 8
+ },
+ {
+  "id": "c968100f7673",
+  "title": "重庆扬子江饭店工地高处坠落事故",
+  "accident_type": "高处坠落",
+  "gt_codes": 7
+ }
+]

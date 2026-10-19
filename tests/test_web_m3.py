@@ -686,7 +686,11 @@ def test_回滚撤销最近一次并入(client, env):
     client.post("/api/review/promote", json={
         "stage_ids": ["a"], "dry_run": False, "confirm_token": token})
 
-    d = client.post("/api/review/rollback", json={}).get_json()["data"]
+    # §2.5.92：回滚是 L2 写操作，必须指名 promote_log 里「生效中」那条的 id
+    promote_id = client.get("/api/review/history").get_json()["data"][0]["id"]
+    d = client.post(
+        "/api/review/rollback", json={"promote_id": promote_id}
+    ).get_json()["data"]
     assert d["removed_accidents"] == 1 and d["removed_causes"] == 1
 
     con = sqlite3.connect(final_path(env))
@@ -713,7 +717,8 @@ def test_回滚后已并入计数归零(client, env):
         "stage_ids": ["a"], "dry_run": False, "confirm_token": token})
     assert client.get("/api/review/stats").get_json()["data"]["funnel"][3]["count"] == 1
 
-    client.post("/api/review/rollback", json={})
+    promote_id = client.get("/api/review/history").get_json()["data"][0]["id"]
+    client.post("/api/review/rollback", json={"promote_id": promote_id})
     assert client.get("/api/review/stats").get_json()["data"]["funnel"][3]["count"] == 0
 
 

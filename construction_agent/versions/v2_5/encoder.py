@@ -11,9 +11,9 @@ import json
 import logging
 from typing import Optional
 
-from anthropic import Anthropic
-
-from construction_agent.config import settings
+from construction_agent.llm_client import (
+    create_llm_client, resolve_max_tokens, resolve_model,
+)
 from construction_agent.hfacs import HfacsTaxonomy
 from construction_agent.models.accident import HfacsCode
 
@@ -117,10 +117,7 @@ class HfacsEncoder:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client: Optional[Anthropic] = None
-        api_key = api_key or settings.ANTHROPIC_API_KEY
-        if api_key:
-            self.client = Anthropic(api_key=api_key)
+        self.client = create_llm_client(api_key=api_key)
         self.taxonomy = HfacsTaxonomy()
         self.taxonomy.load()
 
@@ -221,8 +218,8 @@ class HfacsEncoder:
         )
 
         response = self.client.messages.create(
-            model=settings.ANTHROPIC_MODEL,
-            max_tokens=2000,
+            model=resolve_model(),
+            max_tokens=resolve_max_tokens(),
             system=HFACS_ENCODING_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
         )

@@ -21,6 +21,8 @@ from typing import Optional
 
 import httpx
 
+from construction_agent.llm_client import resolve_model
+
 logger = logging.getLogger(__name__)
 
 QIANFAN_SEARCH_URL = "https://qianfan.baidubce.com/v2/ai_search/web_search"
@@ -370,7 +372,7 @@ class SearchEnhancer:
 
         try:
             response = self._llm.messages.create(
-                model="deepseek-v4-flash",
+                model=resolve_model(),
                 max_tokens=1000,
                 temperature=0.0,
                 timeout=30,

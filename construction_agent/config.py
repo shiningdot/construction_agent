@@ -19,6 +19,21 @@ class Settings:
     ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     ANTHROPIC_MAX_TOKENS: int = int(os.getenv("ANTHROPIC_MAX_TOKENS", "4096"))
 
+    # 硅基流动 SiliconFlow（OpenAI 兼容聚合网关：一把 key 通过 model 参数切换所有模型）
+    # 后续若只保留硅基流动，把此处作为统一入口；注意它是 OpenAI 协议，
+    # 调用点统一走 construction_agent.llm_client.create_llm_client() 的适配层。
+    SILICONFLOW_API_KEY: str = os.getenv("SILICONFLOW_API_KEY", "")
+    SILICONFLOW_BASE_URL: str = os.getenv(
+        "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+    SILICONFLOW_MODEL: str = os.getenv(
+        "SILICONFLOW_MODEL", "deepseek-ai/DeepSeek-V4.1-Flash")
+    # 推理模型先花预算写思维链，4096 容易返回空文本，给一个更大的默认值
+    SILICONFLOW_MAX_TOKENS: int = int(os.getenv("SILICONFLOW_MAX_TOKENS", "16384"))
+
+    # LLM 供应商开关：anthropic（默认，含 DeepSeek 的 Anthropic 兼容端点）
+    # 或 siliconflow（OpenAI 兼容）。改这一行即可全项目切换。
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic")
+
     # Baidu Search API
     BAIDU_SEARCH_API_KEY: str = os.getenv("BAIDU_SEARCH_API_KEY", "")
 
@@ -47,6 +62,14 @@ class Settings:
     # MinerU PDF 解析
 
     MINERU_API_TOKEN: str = os.getenv("MINERU_API_TOKEN", "")
+
+    # RAG（法规/标准/类目卡检索，供 Step2 编码注入依据）
+    # 默认关闭：既有 440 条标注与论文实验必须可复现，不能被检索增强悄悄改变。
+    # 需要时在 .env 设 RAG_ENABLED=true，或在调用处显式传 use_rag=True。
+    RAG_ENABLED: bool = os.getenv("RAG_ENABLED", "false").lower() in ("1", "true", "yes")
+    RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "5"))
+    RAG_BUDGET_CHARS: int = int(os.getenv("RAG_BUDGET_CHARS", "2400"))
+    RAG_CORPUS: str = os.getenv("RAG_CORPUS", "")  # 留空用 corpus/chunks.jsonl
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

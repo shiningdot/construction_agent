@@ -19,7 +19,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-from construction_agent.config import settings
 from construction_agent.llm_usage import usage_of
 
 logger = logging.getLogger(__name__)
@@ -484,16 +483,17 @@ class Step1BasicExtractor:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        from anthropic import Anthropic
-        key = api_key or settings.ANTHROPIC_API_KEY
-        self.client = Anthropic(api_key=key, base_url=settings.ANTHROPIC_BASE_URL) if key else None
-        self._model = settings.ANTHROPIC_MODEL
-        self._max_tokens = getattr(settings, 'ANTHROPIC_MAX_TOKENS', 4096)
+        from construction_agent.llm_client import (
+            create_llm_client, resolve_max_tokens, resolve_model,
+        )
+        self.client = create_llm_client(api_key=api_key)
+        self._model = resolve_model()
+        self._max_tokens = resolve_max_tokens()
 
     def extract(self, text: str, metadata: Optional[dict] = None) -> Optional[Step1Result]:
         """从文本中提取基础信息。"""
         if not self.client:
-            logger.error("Anthropic 客户端未初始化")
+            logger.error("LLM 客户端未初始化")
             return None
 
         publish_date = (metadata or {}).get("publish_date", "")

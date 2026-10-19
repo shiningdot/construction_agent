@@ -1,8 +1,7 @@
 """V4 Agent Core: ReAct 循环。"""
 
 import json, logging, time
-from anthropic import Anthropic
-from construction_agent.config import settings
+from construction_agent.llm_client import create_llm_client, resolve_model
 from construction_agent.versions.v4.tools.base import ALL_TOOLS
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ AGENT_SYSTEM_PROMPT = """你是一名建筑施工事故分析 Agent。
 
 class AgentCore:
     def __init__(self):
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY) if settings.ANTHROPIC_API_KEY else None
+        self.client = create_llm_client()
 
     def run(self, text: str, max_steps: int = 5) -> dict:
         """运行 Agent ReAct 循环处理一条事故文本。"""
@@ -36,7 +35,7 @@ class AgentCore:
         for step in range(max_steps):
             t0 = time.time()
             response = self.client.messages.create(
-                model=settings.ANTHROPIC_MODEL,
+                model=resolve_model(),
                 max_tokens=2000,
                 system=AGENT_SYSTEM_PROMPT,
                 tools=tool_defs,

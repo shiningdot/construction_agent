@@ -17,7 +17,6 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from construction_agent.config import settings
 from construction_agent.models.accident import (
     Accident,
     HumanFactor,
@@ -28,8 +27,7 @@ from construction_agent.models.accident import (
 from construction_agent.versions.base import BasePipeline, PipelineResult, BatchResult
 from construction_agent.versions.registry import register
 from construction_agent.versions.v3.skills import ALL_SKILLS
-
-from anthropic import Anthropic
+from construction_agent.llm_client import create_llm_client, resolve_model
 
 
 # ── HFACS 编码 → V1 四维度映射 ──
@@ -78,14 +76,11 @@ class V3Pipeline(BasePipeline):
     version = "v3"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client: Optional[Anthropic] = None
-        api_key = api_key or settings.ANTHROPIC_API_KEY
-        if api_key:
-            self.client = Anthropic(api_key=api_key)
-        else:
+        self.client = create_llm_client(api_key=api_key)
+        if self.client is None:
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning("Anthropic API Key 未配置")
+            logger.warning("LLM API Key 未配置")
 
     def process_single(self, text: str, **kwargs) -> PipelineResult:
         """处理单条事故文本。
@@ -183,5 +178,5 @@ class V3Pipeline(BasePipeline):
                 f"L{s.level} {s.name} ({len(s.subcategories)} subcategories)"
                 for s in [cls() for cls in ALL_SKILLS]
             ],
-            "model": settings.ANTHROPIC_MODEL,
+            "model": resolve_model(),
         }

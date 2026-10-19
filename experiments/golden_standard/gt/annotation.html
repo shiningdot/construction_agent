@@ -144,6 +144,9 @@ function renderText(txt, needle){
 
 // ── 渲染 ──
 let kw = '', onlyPend = true, onlyHard = false;
+// 展开状态与卡内查找词存在 DOM 之外，避免局部更新/重渲染后丢失
+const openIds = new Set();
+const findVals = {};
 function accDone(a){ return a.items.every(it => isDone(a.id, it.f)); }
 function accCount(a){ return a.items.filter(it => isDone(a.id, it.f)).length; }
 
@@ -156,17 +159,18 @@ function render(){
   if(!list.length){ el.innerHTML = '<div style="text-align:center;color:#8b929e;padding:40px">没有符合条件的条目 🎉</div>'; updateProgress(); return; }
   el.innerHTML = list.map(a => {
     const d = accCount(a), tot = a.items.length;
-    return `<div class="acc ${accDone(a)?'done':''}" data-id="${a.id}">
+    const fv = findVals[a.id] || '';
+    return `<div class="acc ${accDone(a)?'done':''} ${openIds.has(a.id)?'open':''}" data-id="${a.id}">
       <div class="ah">
-        <span class="pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
+        <span class="pill prog-pill ${accDone(a)?'ok':'miss'}">${d}/${tot}</span>
         <span class="t">${esc(a.t)}</span>
         <span class="pill">${a.items.map(it=>S.fieldCn[it.f]||it.f).join(' · ')}</span>
       </div>
       <div class="abody">
         <div class="pane left">
           <h4>原始语料 <input class="q" style="margin-left:6px;font-size:11.5px;padding:2px 7px"
-                placeholder="在语料中查找…" data-find="${a.id}"></h4>
-          <div class="raw" id="raw-${a.id}">${esc(a.txt)}</div>
+                placeholder="在语料中查找…" data-find="${a.id}" value="${esc(fv)}"></h4>
+          <div class="raw" id="raw-${a.id}">${renderText(a.txt, fv)}</div>
         </div>
         <div class="pane right">${a.items.map(it => fieldRow(a.id, it)).join('')}</div>
       </div>
@@ -174,8 +178,10 @@ function render(){
   }).join('');
 
   el.querySelectorAll('input[data-find]').forEach(inp => inp.addEventListener('input', e => {
-    const a = DATA.find(x => x.id === e.target.dataset.find);
-    document.getElementById('raw-' + a.id).innerHTML = renderText(a.txt, e.target.value.trim());
+    const id = e.target.dataset.find;
+    findVals[id] = e.target.value;
+    document.getElementById('raw-' + id).innerHTML = renderText(
+      DATA.find(x => x.id === id).txt, e.target.value.trim());
   }));
   updateProgress();
 }
@@ -198,11 +204,46 @@ function fieldRow(id, it){
     : `<input class="cust" data-k="${k}" data-custom="1" placeholder="自定义…"
         value="${cur&&cur.source==='custom'?esc(String(cur.value)):''}">`;
   const mark = cur ? `<span class="mark-ok">✓ 已选：${esc(String(cur.value===''?'（空）':cur.value))}</span>` : '';
-  return `<div class="it">
+  return `<div class="it" data-row="${k}">
     <div class="lab"><b>${S.fieldCn[it.f]||it.f}</b><code>${it.f}</code>
       <span class="pill miss">三方互异</span>${mark}</div>
     <div class="opts">${opts}${custom}</div>
   </div>`;
+}
+
+// ── 局部刷新：选中后只改这一行/这张卡，不重建列表 ──
+function refreshItem(id, f){
+  const k = itemKey(id, f), cur = state[k];
+  const rowEl = document.querySelector(`.it[data-row="${k}"]`);
+  if(!rowEl) return;
+  rowEl.querySelectorAll('.opt').forEach(o =>
+    o.classList.toggle('sel', !!cur && o.dataset.s === cur.source));
+  const sel = rowEl.querySelector('select.cust');
+  if(sel) sel.value = (cur && cur.source === 'custom') ? String(cur.value) : '';
+  let mk = rowEl.querySelector('.mark-ok');
+  const txt = cur ? `✓ 已选：${cur.value === '' ? '（空）' : cur.value}` : '';
+  if(txt && !mk){
+    mk = document.createElement('span'); mk.className = 'mark-ok';
+    rowEl.querySelector('.lab').appendChild(mk);
+  }
+  if(mk) mk.textContent = txt;
+  if(!txt && mk) mk.remove();
+}
+function refreshCard(id){
+  const card = document.querySelector(`.acc[data-id="${id}"]`);
+  if(!card) return;
+  const a = DATA.find(x => x.id === id);
+  const d = accCount(a), tot = a.items.length, done = d === tot;
+  const pill = card.querySelector('.prog-pill');
+  pill.textContent = `${d}/${tot}`;
+  pill.classList.toggle('ok', done);
+  pill.classList.toggle('miss', !done);
+  card.classList.toggle('done', done);
+  if(done && openIds.has(id)){        // 全部裁完才折叠
+    openIds.delete(id);
+    card.classList.remove('open');
+  }
+  updateProgress();
 }
 
 function updateProgress(){
@@ -220,23 +261,33 @@ document.getElementById('list').addEventListener('click', e => {
     const a = DATA.find(x => x.id === id), it = a.items.find(x => x.f === f);
     const idx = {flash:0, pro:1, db:2}[s];
     state[k] = {value: it.c[idx], source: s};
-    save(); render(); return;
+    save(); refreshItem(id, f); refreshCard(id);   // 局部更新，卡片保持展开
+    return;
   }
   const head = e.target.closest('.ah');
-  if(head) head.parentElement.classList.toggle('open');
+  if(head){
+    const card = head.parentElement, id = card.dataset.id;
+    const opened = card.classList.toggle('open');
+    if(opened) openIds.add(id); else openIds.delete(id);
+  }
 });
 document.getElementById('list').addEventListener('change', e => {
   const t = e.target.closest('.cust'); if(!t) return;
   const k = t.dataset.k; const v = t.value.trim();
   if(v === '') { delete state[k]; } else { state[k] = {value: v, source: 'custom'}; }
-  save(); render();
+  save();
+  const [id, f] = k.split('::');
+  refreshItem(id, f); refreshCard(id);
 });
 document.getElementById('q').oninput = e => { kw = e.target.value.trim(); render(); };
 document.getElementById('fPend').onclick = e => { onlyPend = !onlyPend; e.target.classList.toggle('on', onlyPend); render(); };
 document.getElementById('fHard').onclick = e => { onlyHard = !onlyHard; e.target.classList.toggle('on', onlyHard); render(); };
 document.getElementById('btnExpand').onclick = e => {
   const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on);
-  document.querySelectorAll('.acc').forEach(a => a.classList.toggle('open', on));
+  document.querySelectorAll('.acc').forEach(a => {
+    a.classList.toggle('open', on);
+    if(on) openIds.add(a.dataset.id); else openIds.delete(a.dataset.id);
+  });
 };
 document.getElementById('btnNext').onclick = () => {
   const acc = document.querySelector('.acc:not(.done)');

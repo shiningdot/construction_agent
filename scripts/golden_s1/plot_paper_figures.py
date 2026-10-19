@@ -593,16 +593,26 @@ def plot_fig4(doc: dict, out_dir: Path, formats: tuple[str, ...], dpi: int) -> l
         start += len(layer["codes"])
         ax.axhline(start - 0.5, color="#999999", linewidth=0.6)
 
-    # 底部中文图注（替代 1/0 图例，直接说明颜色含义）
-    fig.subplots_adjust(bottom=0.14)
+    # 图例 1/0，与参考论文一致
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.13),
+        ncol=2,
+        frameon=False,
+        fontsize=6.3,
+    )
+
+    # 底部英文图注：蓝色（1）= 事故致因，橘色（0）= 相反
+    fig.subplots_adjust(bottom=0.20)
     fig.text(
         0.5,
         0.02,
-        "蓝色代表是事故致因，橘色则不是",
+        "Fig. 4. Frequency distribution of CAICS cause codes: A value of 1 indicates that the code was identified\n"
+        "as a contributing factor to the accident, while a value of 0 indicates the opposite.",
         ha="center",
         va="bottom",
-        fontsize=7,
-        fontproperties=font_manager.FontProperties(family="WenQuanYi Zen Hei"),
+        fontsize=6.2,
+        linespacing=1.35,
     )
     return save_figure(fig, out_dir, "fig4_cause_distribution", formats, dpi)
 

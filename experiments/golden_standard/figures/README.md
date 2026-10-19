@@ -53,16 +53,16 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 - **Exact**：预测编码集合与 GT 完全相同的比例。
 - **基础特征准确率**：只覆盖 13 个字段（GT 未敲定其余 18 个字段），不能表述为 31 字段全量准确率。
 - **图 2** 是 4 模型均值，模型间差异见图 3 的散点；三角标记表示 S4′/S5′ 相对 S0′–S3′ 均值变化 ≥2 个百分点。
-- **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部中文图注说明「蓝色代表是事故致因，橘色则不是」，每行总长固定为 300。
+- **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部英文图注说明「1 = contributing factor，0 = opposite」，每行总长固定为 300。
 - **图 3** 的 y 轴为非零基线（a–d 60–100，e 0–30，f 90–100），图注需说明；误差棒是 4 个模型间的 SEM，不是重复运行的方差（每格只运行一次）。
 - **类别英文名**为初译，集中在 `scripts/golden_s1/build_figure_data.py` 的 `CLASS_DISPLAY`，审校后可直接替换并重绘。
 - **S4′/S5′ 的 C1 解读**：S4′ 的 C1 接近崩塌（7.3%），S5′ 恢复至 51.1%，不要将两者等同。
 
 ## 图 4 图注（可直接用于正文）
 
-**English.** Frequency distribution of the 19 CAICS cause codes across the 300 accidents (expert GT). Blue segments (1) indicate that the code was assigned to the accident; orange segments (0) indicate that it was not. Codes are grouped by CAICS layer (M/F/T/H/C) and sorted by frequency within each layer.
+**English.** Fig. 4. Frequency distribution of CAICS cause codes: A value of 1 indicates that the code was identified as a contributing factor to the accident, while a value of 0 indicates the opposite. Codes are grouped by CAICS layer (M/F/T/H/C) and sorted by frequency within each layer.
 
-**中文.** 300 条事故中 19 个 CAICS 致因编码的频率分布（专家 GT）。蓝色段（1）表示该事故被标注为该致因，橙色段（0）表示未被标注；编码按 CAICS 层级（M/F/T/H/C）分组，层内按频次降序排列。
+**中文.** 图 4. CAICS 致因编码的频率分布：值为 1 表示该编码被认定为事故的促成因素，值为 0 表示相反情况。编码按 CAICS 层级（M/F/T/H/C）分组，层内按频次降序排列。
 
 ## 关键数值
 

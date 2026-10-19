@@ -13,6 +13,9 @@
 | `fig2_class_strategy_f1.{pdf,png}` | 19 类 × 6 策略 F1 热力图（4 模型均值，按 M/F/T/H/C 分层，右侧标 GT 正例数） |
 | `fig3_strategy_multimetric.{pdf,png}` | 策略级 2×3 多指标对比（Ave+ F1/R/P、Micro-F1、Exact、13 字段准确率） |
 | `fig4_cause_distribution.{pdf,png}` | 19 类致因频率分布（水平堆叠条形图：蓝=事故致因，橙=非致因；左侧只显示编码） |
+| `table_cause_distribution.tex` | LaTeX `booktabs` 三线表代码（需导言区 `\usepackage{booktabs}`） |
+| `table_cause_distribution.md` | Markdown 三线表（可复制到 Word / 网页） |
+| `table_cause_distribution.{pdf,png}` | 三线表图片（PDF 矢量 / PNG 300 DPI，可直接插入 Word） |
 
 ## 复现
 
@@ -28,6 +31,13 @@
 # 2. 绘图
 MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
   scripts/golden_s1/plot_paper_figures.py \
+  --data-json experiments/golden_standard/figures/figure_data.json \
+  --out-dir experiments/golden_standard/figures \
+  --formats pdf,png --dpi 300
+
+# 3. 19 类致因编码三线表
+/home/suntianhao/construction_agent/.venv/bin/python \
+  scripts/golden_s1/make_cause_table.py \
   --data-json experiments/golden_standard/figures/figure_data.json \
   --out-dir experiments/golden_standard/figures \
   --formats pdf,png --dpi 300
@@ -54,6 +64,7 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 - **基础特征准确率**：只覆盖 13 个字段（GT 未敲定其余 18 个字段），不能表述为 31 字段全量准确率。
 - **图 2** 是 4 模型均值，模型间差异见图 3 的散点；三角标记表示 S4′/S5′ 相对 S0′–S3′ 均值变化 ≥2 个百分点。
 - **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部英文图注说明「1 = contributing factor，0 = opposite」，每行总长固定为 300。
+- **三线表**的 `Frequency (%)` 分母是 300 条事故，各编码占比不能相加；19 类合计 2,355 个编码，平均 7.85 条/事故。表题号 `Table 1.` 为占位，论文排版时按实际编号替换。
 - **图 3** 的 y 轴为非零基线（a–d 60–100，e 0–30，f 90–100），图注需说明；误差棒是 4 个模型间的 SEM，不是重复运行的方差（每格只运行一次）。
 - **类别英文名**为初译，集中在 `scripts/golden_s1/build_figure_data.py` 的 `CLASS_DISPLAY`，审校后可直接替换并重绘。
 - **S4′/S5′ 的 C1 解读**：S4′ 的 C1 接近崩塌（7.3%），S5′ 恢复至 51.1%，不要将两者等同。

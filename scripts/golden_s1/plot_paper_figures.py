@@ -520,13 +520,101 @@ def plot_fig3(doc: dict, out_dir: Path, formats: tuple[str, ...], dpi: int) -> l
     return save_figure(fig, out_dir, "fig3_strategy_multimetric", formats, dpi)
 
 
+def plot_fig4(doc: dict, out_dir: Path, formats: tuple[str, ...], dpi: int) -> list[Path]:
+    """19 个致因编码在 300 条事故中的频率分布（水平堆叠条形图）。
+
+    仿照例图：每行一个编码，蓝色段 = 该编码被标注（1），
+    橙色段 = 未被标注（0），每行总长固定为 300。
+    编码按 CAICS 层级分组，层内按频次降序，便于看出高频与长尾编码。
+    """
+    total = doc["gt"]["n_ids"]
+    layers = doc["labels"]["layers"]
+
+    rows: list[tuple[str, str]] = []
+    for layer in layers:
+        codes = sorted(
+            layer["codes"],
+            key=lambda code: doc["gt"]["n_gt"][code],
+            reverse=True,
+        )
+        rows.extend((layer["key"], code) for code in codes)
+
+    y = np.arange(len(rows))
+    present = np.array([doc["gt"]["n_gt"][code] for _, code in rows])
+    absent = total - present
+
+    fig, ax = plt.subplots(figsize=(7.4, 5.8), dpi=dpi)
+    ax.barh(
+        y,
+        present,
+        height=0.72,
+        color="#9DC3E6",
+        edgecolor="white",
+        linewidth=0.4,
+        label="1",
+    )
+    ax.barh(
+        y,
+        absent,
+        left=present,
+        height=0.72,
+        color="#F4B183",
+        edgecolor="white",
+        linewidth=0.4,
+        label="0",
+    )
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(
+        [
+            f"{code}  {doc['labels']['class_display'][code]}"
+            for _, code in rows
+        ],
+        fontsize=6.0,
+    )
+    ax.invert_yaxis()
+    ax.set_xlim(0, 345)
+    ax.set_xticks([0, 50, 100, 150, 200, 250, 300])
+    ax.set_xlabel("Number of accidents (n = 300)")
+    ax.grid(axis="x", color="#DDDDDD", linewidth=0.4)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    # 右侧标注频次与占比
+    for yi, (_, code), count in zip(y, rows, present):
+        ax.text(
+            total + 6,
+            yi,
+            f"{count} ({count / total * 100:.1f}%)",
+            va="center",
+            ha="left",
+            fontsize=5.7,
+        )
+
+    # 层分隔线（M / F / T / H / C）
+    start = 0
+    for layer in layers[:-1]:
+        start += len(layer["codes"])
+        ax.axhline(start - 0.5, color="#999999", linewidth=0.6)
+
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=2,
+        frameon=False,
+        fontsize=6.3,
+    )
+    return save_figure(fig, out_dir, "fig4_cause_distribution", formats, dpi)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="绘制论文核心三图")
+    parser = argparse.ArgumentParser(description="绘制论文图表")
     parser.add_argument("--data-json", required=True, help="figure_data.json 路径")
     parser.add_argument("--out-dir", default=None, help="输出目录")
     parser.add_argument("--formats", default="pdf,png", help="输出格式，逗号分隔")
     parser.add_argument("--dpi", type=int, default=300)
-    parser.add_argument("--figs", default="1,2,3", help="要绘制的图，逗号分隔")
+    parser.add_argument("--figs", default="1,2,3,4", help="要绘制的图，逗号分隔")
     args = parser.parse_args()
 
     data_path = Path(args.data_json).expanduser().resolve()
@@ -557,6 +645,9 @@ def main() -> None:
     if "3" in wanted:
         print("fig3: 策略级多指标对比")
         plot_fig3(doc, out_dir, formats, args.dpi)
+    if "4" in wanted:
+        print("fig4: 19 类致因频率分布")
+        plot_fig4(doc, out_dir, formats, args.dpi)
 
 
 if __name__ == "__main__":

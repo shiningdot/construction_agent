@@ -1,0 +1,1053 @@
+"""TRS CMS 通用采集器基类。
+
+中国各省应急管理厅大多使用 TRS CMS 或类似政府CMS发布事故调查报告。
+这些网站共享相同的爬取模式：
+
+1. 分页列表页 → 解析文章链接（标题、URL、日期）
+2. 标题关键词初筛 → 过滤非建筑施工事故
+3. 逐条爬取详情页 → 提取正文/PDF附件
+4. classify_v2 二级文本分类 → 高置信度自动分类 / 低置信度入审核队列
+5. 存储到 RawAccidentStore
+
+本模块提供 TrsCmsCollector(BaseCollector)，封装上述通用逻辑。
+各省只需提供 URL 和 CSS 选择器配置即可。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import re
+import ssl
+import time
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urljoin
+
+import httpx
+from bs4 import BeautifulSoup
+
+from construction_agent.collector.attachments import attachment_kind, sort_into
+from construction_agent.collector.base import (BODY_MIN_CHARS, BaseCollector,
+                                               RawAccidentText)
+from construction_agent.collector.boilerplate import (
+    MIN_PAGES as BOILERPLATE_MIN_PAGES, page_lines, strip_template,
+    template_lines, text_lines)
+from construction_agent.collector.classifier import classify_v2, is_construction_candidate
+from construction_agent.collector.images import extract_page_images
+from construction_agent.collector.pdf_text import extract_pdf_text
+from construction_agent.collector.stores import RawAccidentStore
+from construction_agent.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+# ── 默认建筑施工关键词（可被各省覆盖）──
+DEFAULT_CONSTRUCTION_KW = [
+    "建筑", "建设", "施工", "坍塌", "倒塌", "工地", "坠落", "工程",
+    "地铁", "电梯", "拆除", "基坑", "模板", "脚手架", "项目", "标段",
+    "塔吊", "高处", "触电", "起重", "物体打击", "火灾", "爆炸",
+]
+
+
+@dataclass
+class TrsSiteConfig:
+    """TRS CMS 站点配置。
+
+    所有字段均可被具体站点覆盖。
+    """
+
+    # ── 必填 ──
+    source_name: str = ""          # 采集器名称（如 "beijing_em"）
+    authority_name: str = ""       # 发布机构（如 "北京市应急管理局"）
+
+    # ── URL 配置 ──
+    base_url: str = ""             # 站点基础 URL（如 "https://yjglj.beijing.gov.cn"）
+    list_url: str = ""             # 列表页 URL（第一页）
+    list_page_pattern: str = ""    # 分页 URL 模式（如 "index_{n}.html"，None 表示无分页）
+    list_page_start: int = 1       # 分页起始页码
+    list_page_max_probe: int = 20  # 最大探测页数
+
+    # ── 解析选择器 ──
+    list_item_selector: str = ""          # 列表项 CSS 选择器（如 "li a[href]"）
+    list_link_pattern: str = ""           # 链接 URL 正则模式（如 r'/art/\d{8}/'）
+    list_title_attr: str = "text"         # 标题提取方式: "text" / "title" / "aria-label"
+    list_date_pattern: str = ""           # 日期提取正则（从 URL 或文本中提取）
+
+    # ── 详情页配置 ──
+    detail_title_selector: str = "title"  # 详情标题提取: "title"(<title>标签) / "h1" / CSS选择器
+    detail_text_selector: str = "body"    # 详情正文容器: "body" / "article" / CSS选择器
+    # 从哪里找附件链接。**它只负责「在哪儿找」，不负责「什么算附件」**
+    # （2026-10-01 第三十五轮改）。原值是 `a[href$='.pdf']`——一个把
+    # 「附件」这个概念直接写死成「PDF」的选择器，于是 Word 附件**一个都
+    # 不进视野**。实测 `shaanxi_em`：全站 473 条详情页**没有一条挂 PDF**
+    # （该选择器选中的是空集），而其中 5 条挂着 Word 附件共 17 个文件，
+    # 一个都没登记。类型判断交给 `attachments.attachment_kind`。
+    detail_pdf_selector: str = "a[href]"  # 附件链接候选选择器
+    detail_pdf_max: int = 5               # 一条详情页最多下载几个 PDF 附件
+    # 一条详情页最多登记几张内容图（0 = 不抽取）。**200 不是随手定的**：
+    # 原为 50，而 `gd_em` 实测有一条 59 张的扫描件报告被截掉 9 张，理由见
+    # `collector.images.extract_page_images` 的 docstring。
+    detail_image_max: int = 200
+
+    # ── 筛选配置 ──
+    construction_keywords: list[str] = field(default_factory=lambda: DEFAULT_CONSTRUCTION_KW)
+    enable_classify_v2: bool = True       # 是否启用 classify_v2 二级文本分类
+    # 原有一个 `min_text_length: int = 30`（最小正文长度，低于此值入审核队列），
+    # 2026-10-01 第二十三轮删掉：阈值改用共享常量 `BODY_MIN_CHARS`。留着这个
+    # 字段会是个死配置——**改了它不会生效**，比没有更糟。删前的实测见
+    # `collect()` 里那行注释（30 会把 `hain_em` 98 字 / `tj_em` 61 字 /
+    # `sx_em` 140 字 / `gz_em` 103 字这四条全部放行）。
+
+    # ── 请求配置 ──
+    delay: float = 1.0                    # 请求间隔（秒）
+    timeout: int = 30                     # HTTP 超时（秒）
+    max_retries: int = 3                  # 最大重试次数
+    user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+    # 站点服务器太老、必须放开「不安全重协商」才谈得成 TLS 时置 True
+    # （2026-10-01 第三十七轮，为 `jx_em` 增设）。**默认 False，只给确实
+    # 需要的源开**——`OP_LEGACY_SERVER_CONNECT` 放开的是 CVE-2009-3555 的
+    # 缓解措施，全局打开等于把所有源一起降级。判据与来由见 `build_ssl_verify`。
+    allow_legacy_renegotiation: bool = False
+
+
+def build_ssl_verify(allow_legacy_renegotiation: bool) -> "ssl.SSLContext | bool":
+    """按站点配置决定传给 `httpx.Client(verify=...)` 的值。
+
+    ## 为什么需要它（2026-10-01 第三十七轮）
+
+    `jx_em` 在健康检查表上一直是「列表 0 条」。实测诊断到 TCP 层：
+
+    ```
+    DNS      ✓  yjglt.jiangxi.gov.cn 可解析
+    TCP      ✓  443 端口连得上
+    TLS      ✗  UNSAFE_LEGACY_RENEGOTIATION_DISABLED
+    ```
+
+    站点服务器仍在用**老式重协商**（RFC 5746 之前的做法），而 OpenSSL 3.x
+    默认禁用它——那是 CVE-2009-3555 的缓解措施，禁得对，但代价是与旧服务器
+    谈不成。放开 `OP_LEGACY_SERVER_CONNECT` 后 TLSv1.2 谈成，**HTTP 200 /
+    271,906 字节**，站点完全健康，只是协议版本太老。
+
+    ## 判据为什么是「逐源显式开关」而不是「失败后自动降级」
+
+    自动降级的写法更省事，但它把一次**安全降级**变成了悄悄发生的事：任何源
+    握手失败——包括真正被中间人劫持的那种——都会被自动放开重协商后重试。
+    `TrsSiteConfig.allow_legacy_renegotiation` 默认 False，需要它的源在自己的
+    配置文件里写清楚，是一句可以 review 的话。
+
+    ## 拿不到 `OP_LEGACY_SERVER_CONNECT` 时
+
+    该常量要求 OpenSSL 3.x + Python 3.10+（本机 Python 3.14.4 / OpenSSL 3.5.5
+    `hasattr` 为 True）。拿不到就退回默认严格校验并留一条 WARNING——**不静默
+    地什么都不做**，否则同一个源在两台机器上会一个抓得到一个抓不到，而日志里
+    看不出区别。
+    """
+    if not allow_legacy_renegotiation:
+        return True
+    if not hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+        logger.warning(
+            "站点配置要求放开老式重协商，但当前 SSL 库没有 "
+            "OP_LEGACY_SERVER_CONNECT（需 OpenSSL 3.x + Python 3.10+），"
+            "退回默认严格校验——该源可能仍然连不上。"
+        )
+        return True
+    ctx = ssl.create_default_context()
+    ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+    return ctx
+
+
+# ── PDF 文本提取工具函数 ──
+#
+# 原实现在这里，2026-10-01 收敛到 `construction_agent.collector.pdf_text`：
+# 这份函数被复制了三份（本文件 + `nmg_em` + `hebei_em`），而 `beijing_em` /
+# `ln_em` / `henan_em` 三个模块调它却没有定义。收敛成一份，见那个模块的
+# docstring。
+
+
+# ═══════════════════════════════════════════════════════════════════
+# TRS CMS 通用采集器
+# ═══════════════════════════════════════════════════════════════════
+
+def _unwrap_data_islands(html: str) -> str:
+    """把 `<script type="text/xml">` 数据岛里的列表条目提出来，让 BeautifulSoup 看得见。
+
+    **这是 `js_em` 一条都抓不到的原因**（2026-10-01 动态试跑查出）。
+    那个站的列表页长这样：
+
+        <div id="397082"><script type="text/xml"><datastore>
+        <recordset><record><![CDATA[
+        <li class="cf"><a title="…" href="/art/2026/4/22/art_81395_11761062.html">…</a>…
+        ]]> </record> … </recordset></script></div>
+
+    两道坎叠在一起，缺一不可：
+    1. `html.parser` 对 `<script>` 的内容**一律当文本**（script 是 CDATA 元素），
+       里面的 `<a>` 不会成为标签；
+    2. 那条 `CDATA` 声明也不被识别，整段仍是文本。
+
+    于是那一页的 45 条链接一条都进不了 DOM，`find_all("a")` 只能看见 16 个导航
+    链接——而链接正则只在 `<a href>` 上匹配，结果恒为 0。**正则、URL、状态码
+    全是好的**，问题在解析之前。
+
+    只对真含这种数据岛的页面动手：正则匹配不上时原样返回，其余 11 个 TRS 源
+    的页面结构不受影响。
+
+    正则放宽了三处（`js_em` 实测用的是双引号、无 charset 后缀，另外两处属于
+    **防御性**，没有实测样本）：引号单双皆可、`type` 值允许带参数后缀、
+    `type` 关键字大小写不限。放宽的理由是这三处一旦不匹配，表现与「这个源
+    没数据」完全一样——又是沉默失效，宁可多认几种写法。
+    """
+    def _one(m: "re.Match[str]") -> str:
+        return re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", m.group(1), flags=re.S)
+
+    return re.sub(r"""<script[^>]*type=["']text/xml[^"']*["'][^>]*>(.*?)</script>""",
+                  _one, html, flags=re.S | re.I)
+
+
+def _absolute(page_url: str, href: str) -> str:
+    """把列表页里的 href 还原成绝对 URL。
+
+    **必须拿列表页自己的地址去 `urljoin`，不能拿 `base_url` 拼。**
+    TRS 的列表页常把详情链接写成相对当前目录的形式——`./202609/t20260918_…html`。
+    原先写的是 `base_url.rstrip("/") + "/" + href.lstrip("/")`，而 `lstrip("/")`
+    **不去掉开头的 `./`**，拼出来是 `https://yjj.cq.gov.cn/./202609/…`，
+    服务器对 `/./` 一律 404。
+
+    于是一个源会呈现成**最容易被放过的那种样子**：列表页正常、条目正常解析出
+    15 条、每条都有标题，只是详情页全 404、正文一个字都没有。健康检查若只看
+    「抓到几条」，这四个源全部判绿。实测三种拼法（2026-10-01，`cq_em` 第一条）：
+
+    | 拼法 | 结果 |
+    |---|---|
+    | 旧拼法（含 `/./`） | **404** |
+    | `urljoin(列表页, href)` | **200，49,969 字符** |
+    | `base_url` + href 去掉 `./` | **404** |
+
+    第三行说明它也**不是相对于站点根**：`./202609/…` 相对的是列表页所在目录
+    `/zwgk_230/…/dcbg/`，所以只能拿列表页 URL 去 join。顺带地，`urljoin` 还
+    正确对待三种旧拼法处理不了的写法：`//host/x`（协议相对）、`../x`（上一级）、
+    已是绝对 URL 的 href。
+    """
+    return urljoin(page_url, href)
+
+
+def _date_from_url(href: str) -> str:
+    """从详情页 URL 的路径里抠出日期，返回 `YYYY-MM-DD`；抠不到返回空串。
+
+    两种写法都要认：
+
+    - 斜杠分段、**月/日不补零**——`/art/2019/4/18/…`（TRS 常见）、
+      `/scyjt/dcbg/2023/8/14/…`
+    - 连续八位——`/20230101/`
+
+    原先写的是 `(\\d{4})[/-](\\d{2})[/-](\\d{2})`，`\\d{2}` 要求月日补零，
+    于是上面两种主流写法**一条都匹配不上**，列表页日期字段恒为空串。
+    空值本身不报错，看起来就像「这个站列表页不写日期」——**又一个恒空的判据**。
+    2026-10-01 补数据岛测试时撞出来的：URL 里明摆着 `2019/4/18`，`date` 却是空串。
+
+    连续八位那种额外加 `(?<!\\d)` / `(?!\\d)`，免得从 `art_81395_8732508`
+    这类长数字串中间切出一段假的八位数。抠出来的三组数还做范围校验，
+    `1234/56/78` 这种不返回。
+    """
+    for pattern in (
+        r"(?<!\d)(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?!\d)",
+        r"(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)",
+    ):
+        m = re.search(pattern, href)
+        if not m:
+            continue
+        year, month, day = (int(g) for g in m.groups())
+        if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+    return ""
+
+
+class TrsCmsCollector(BaseCollector):
+    """TRS CMS 通用采集器基类。
+
+    封装了政府 CMS 网站的通用爬取流程。子类只需提供 site_config 即可。
+
+    使用方式:
+        config = TrsSiteConfig(
+            source_name="beijing_em",
+            authority_name="北京市应急管理局",
+            base_url="https://yjglj.beijing.gov.cn",
+            list_url="https://yjglj.beijing.gov.cn/art/",
+            ...
+        )
+        collector = TrsCmsCollector(config)
+        results = collector.collect()  # → list[RawAccidentText]
+    """
+
+    def __init__(self, site_config: TrsSiteConfig, data_dir: Optional[Path] = None):
+        self.cfg = site_config
+        self.data_dir = data_dir or (settings.DATA_DIR / site_config.source_name)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        self._client = httpx.Client(
+            timeout=self.cfg.timeout,
+            follow_redirects=True,
+            headers={"User-Agent": self.cfg.user_agent},
+            # 只有把 `allow_legacy_renegotiation` 打开的那些源才拿到 SSLContext，
+            # 其余 11 个源传的是 `True`（默认严格校验），一字未变。
+            verify=build_ssl_verify(self.cfg.allow_legacy_renegotiation),
+        )
+        self.raw_store = RawAccidentStore()
+        # `_discover_pages` 探测分页时已经 GET 到正文，存这里供 `_fetch` 复用，
+        # 免得列表页各请求两遍（见 `_fetch`）。
+        self._page_cache: dict[str, str] = {}
+
+        # 统计计数器
+        self._total_listed = 0
+        self._filtered_title = 0
+        self._filtered_classify = 0
+        self._collected = 0
+        self._review = 0
+        # 网络层失败次数（重试耗尽）。**它和「列表 0 条」不是一回事。**
+        # 站点通了但栏目本来就空、DNS 挂了、TLS 谈不成、被 412 拦——
+        # 这四种在 `_total_listed` 上全是 0，日志里也只有一行 WARNING。
+        # 2026-10-01 实测：`jl_em`（DNS 解析失败）、`jx_em`（SSL 老式重协商
+        # 被禁）、`hub_em`（HTTP 412）三个源——三种毫不相干的故障——在健康
+        # 检查表上逐格相同地显示成「空」。有了这个计数才分得开。
+        self._fetch_failed = 0
+        # 成功取到正文的**列表页**个数（2026-10-01 第三十八轮）。
+        #
+        # 它和 `_total_listed` 是两个数：前者说「列表页拿到了几页」，后者说
+        # 「从里面解析出几条」。`_total_listed == 0` 时，只有把这两个数放在
+        # 一起才答得出「是栏目本来就没内容，还是页面拿到了但对不上判据」。
+        #
+        # 实测（本轮全源快照）：`jx_em` 的 TLS 修好之后变成
+        # `_fetch_failed = 0` + `_total_listed = 0`——**与「站点通了、栏目确实
+        # 没内容」逐格相同**。而它的真相是列表页 HTTP 200 / 271,906 字节
+        # （SPA 壳，条目全在 JSON 里）。加了本计数器之后：
+        #   `hub_em` / `jl_em`  net_failed=1  → 没连上
+        #   `jx_em`             pages_ok=1    → 解析空
+        #   （真·空栏目）        pages_ok≥1 且 listed=0 → 也落在「解析空」
+        # 最后一行是**已知的不可分**：两者都要靠人去看页面。计数器至少把
+        # 「压根没取到页面」这条排除了。
+        self._list_pages_ok = 0
+
+    # ── BaseCollector 接口 ──
+
+    def source_name(self) -> str:
+        return self.cfg.source_name
+
+    def collect(self) -> list[RawAccidentText]:
+        """执行完整采集流程，返回 RawAccidentText 列表。"""
+        t_start = time.time()
+        logger.info(f"[{self.cfg.source_name}] 开始采集: {self.cfg.list_url}")
+
+        # 1. 发现所有列表页
+        pages = self._discover_pages()
+        logger.info(f"[{self.cfg.source_name}] 发现 {len(pages)} 个列表页")
+
+        # 2. 解析列表，提取所有文章链接
+        all_links: list[dict] = []
+        for page_url in pages:
+            html = self._fetch(page_url)
+            if html:
+                # 列表页真取到了正文——与「取不到」分开记（见 `__init__`）。
+                self._list_pages_ok += 1
+                # 传 `page_url` 而不是让 `_parse_list` 自己去猜：相对链接
+                # （`./202609/…`）要对着**这一页**的地址解析，分页时页页不同。
+                all_links.extend(self._parse_list(html, page_url))
+
+        self._total_listed = len(all_links)
+        logger.info(f"[{self.cfg.source_name}] 列表共 {self._total_listed} 篇文章")
+
+        # 3. 一级筛选：标题关键词
+        #
+        # **先筛完再抓，不边筛边抓**（2026-10-01 第二十三轮改）——下面统计
+        # 模板文字要一次看到全部候选页。这一步不动请求数：抓到的 HTML 会在
+        # 主循环里复用。
+        candidates: list[dict] = []
+        for link in all_links:
+            is_candidate, _ = is_construction_candidate(
+                link["title"], keywords=self.cfg.construction_keywords
+            )
+            if not is_candidate:
+                self._filtered_title += 1
+                continue
+            candidates.append(link)
+
+        # 3b. 抓一遍候选详情页，统计「跨页恒定行」= 模板文字（缺陷 G）
+        #
+        # 修之前 `combined_text` 是 `body` 全文，导航与页脚全在里面：实测
+        # `hain_em` 的 `body` 1,226 字里模板占 1,128 字，真正文只有 98 字——
+        # 而 98 这个数**从来没有任何一道防线看到过**，因为 `min_text_length`
+        # 量的是 1,226。判据与实测见 `collector/boilerplate.py`。
+        detail_html: dict[str, str] = {}
+        for link in candidates:
+            time.sleep(self.cfg.delay)
+            h = self._fetch(link["url"])
+            if h:
+                detail_html[link["url"]] = h
+        tpl = template_lines(
+            [page_lines(h, self.cfg.detail_text_selector)
+             for h in detail_html.values()],
+            min_pages=BOILERPLATE_MIN_PAGES,
+        )
+        # 页数不够时 `tpl` 是空集，后面自动退化成「不剥」——**退化不无声**，
+        # 日志里说得出来。
+        if tpl:
+            logger.info(f"[{self.cfg.source_name}] 模板文字 {len(tpl)} 行 / "
+                        f"{sum(len(x) for x in tpl)} 字（取自 "
+                        f"{len(detail_html)} 页）")
+        elif detail_html:
+            logger.info(f"[{self.cfg.source_name}] 候选页只有 "
+                        f"{len(detail_html)} 页（<{BOILERPLATE_MIN_PAGES}），"
+                        f"本轮不剥模板文字")
+
+        # 4. 逐条爬取
+        results: list[RawAccidentText] = []
+        for i, link in enumerate(candidates):
+            title = link["title"]
+            url = link["url"]
+            list_date = link.get("date", "")
+
+            logger.info(f"[{self.cfg.source_name}] 候选({i+1}/{len(candidates)}): "
+                        f"[{title[:50]}]")
+
+            # 爬取详情页（HTML 已在 3b 抓过，复用）
+            detail = self._crawl_detail(url, detail_html.get(url))
+            detail_title = (detail or {}).get("title") or title
+            detail_date = (detail or {}).get("date") or list_date
+            detail_text = (detail or {}).get("text") or ""
+            # 剥掉跨页恒定的模板行（导航、页脚、备案号）。`tpl` 是空集时
+            # `strip_template` 原样拼回，等价于旧行为。
+            if detail and tpl:
+                detail_text = strip_template(detail.get("text_lines") or [], tpl)
+            pdf_urls = (detail or {}).get("pdf_urls") or []
+            # Word 附件（2026-10-01 第三十五轮）。**只登记、不下载**——见下面
+            # `extra` 里 `office_urls` 那段注释：转换器还没接。
+            office_urls = (detail or {}).get("office_urls") or []
+            image_urls = (detail or {}).get("image_urls") or []
+
+            # 下载全部 PDF 并提取全文，**合并**成一份正文。
+            #
+            # 逐份下载而不是只取第一份：`sh_em` 有页面同时挂两个不同事故的
+            # 评估报告（见 `_crawl_detail` 里的注释）。凡是提出正文的都要并进
+            # 来——`combined_text` 是「PDF 正文 **或** 页面正文」，一个页面挂了
+            # 两份报告时只留第一份，等于丢掉一份事故记录。
+            #
+            # 上限 `detail_pdf_max` 是防病态页面：附件列表页（一次挂十几份
+            # 报告的汇总页）会让下载耗时线性膨胀，而那种页面本身不是事故条目。
+            # 超限记 debug 而不是静默截断——漏了要让日志说得出来。
+            pdf_parts: list[str] = []
+            for pu in pdf_urls[: self.cfg.detail_pdf_max]:
+                # 落盘只是为了提取正文，**路径不往外传**。`_run_source` 传来的
+                # `data_dir` 是临时目录，任务结束就被 `shutil.rmtree` 删掉
+                # （刻意的设计：采集产出不散在文件系统）。传出去的路径任务一
+                # 完就指向不存在的文件——空着是缺信息，填错值是在撒谎。
+                one_text, _ = self._download_and_extract_pdf(
+                    pu, detail_title, detail_date
+                )
+                if one_text:
+                    pdf_parts.append(one_text)
+            if len(pdf_urls) > self.cfg.detail_pdf_max:
+                logger.debug(f"[{self.cfg.source_name}] 附件 {len(pdf_urls)} 个，"
+                             f"只取了前 {self.cfg.detail_pdf_max} 个: {url}")
+            pdf_text = "\n\n".join(pdf_parts)
+
+            # 合并正文
+            combined_text = pdf_text or detail_text
+            # 阈值改用共享常量 `BODY_MIN_CHARS`（2026-10-01 第二十三轮）。
+            #
+            # 原来是 `min_text_length(30)`。30 这个数是在「正文里混着 1,226 字
+            # 模板文字」的前提下定的——那时它相当于没定，因为任何一页都能过。
+            # 剥掉模板之后，真正文落回 **61–140 字**的那四条（`hain_em` 98 /
+            # `tj_em` 61 / `sx_em` 140 / `gz_em` 103）才第一次被量到，
+            # **它们全都该进审核队列**，而 30 会把它们全部放行。
+            #
+            # 与 `nmg_em` 用同一个常量，理由同 `base.py` 里那段：口径不一致
+            # 会出现「同一个页面在一个源上标了 `needs_ocr`、在另一个源上没标」。
+            if not combined_text or len(combined_text) < BODY_MIN_CHARS:
+                # 无有效正文 → 入审核队列
+                self._review += 1
+                classification = "pending_review"
+                class_reason = "无有效正文"
+                class_confidence = "low"
+                status = "review"
+            elif self.cfg.enable_classify_v2:
+                # 二级筛选：classify_v2 文本分类
+                cr = classify_v2(detail_title, combined_text)
+                if cr["is_construction"] and cr["confidence"] == "high":
+                    classification = "auto_construction"
+                    class_reason = cr["reason"]
+                    class_confidence = "high"
+                    status = "new"
+                    self._collected += 1
+                elif not cr["is_construction"] and cr["confidence"] == "high":
+                    self._filtered_classify += 1
+                    continue  # 高置信度非施工 → 跳过
+                else:
+                    classification = "pending_review"
+                    class_reason = cr["reason"]
+                    class_confidence = "low"
+                    status = "review"
+                    self._review += 1
+            else:
+                classification = "pending_review"
+                class_reason = "未启用分类"
+                class_confidence = "low"
+                status = "review"
+                self._review += 1
+
+            # 构建 RawAccidentText
+            raw = RawAccidentText(
+                source=self.cfg.source_name,
+                title=detail_title,
+                raw_text=combined_text[:50000],
+                source_url=url,
+                fetch_time=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                extracted_date=self._parse_date_str(detail_date),
+                # 下面三个不是 `RawAccidentText` 的字段。dataclass 的 `__init__`
+                # 不收未声明的关键字，多给一个就 `TypeError`。原先写成平铺的
+                # 关键字参数，12 个 TRS 源里凡是走到这一步的全部当场崩掉
+                # （2026-10-01 动态试跑：cq/gz/hain/sh/shaanxi/sx/tj 七个报
+                # `unexpected keyword argument 'classification'`）。
+                # 扩展数据本来就该走 `extra`，`stores/__init__.py` 也是按这几个
+                # 键名从 extra 里读的。
+                extra={
+                    "classification": classification,
+                    "classification_reason": class_reason,
+                    "classification_confidence": class_confidence,
+                    "status": status,
+                    # ── 附件通路（2026-10-01 补）─────────────────────────
+                    #
+                    # 这两行之前**根本不存在**，于是 PDF 那条路断在这里：
+                    # `_download_and_extract_pdf` 下载了、提取了、落盘了，
+                    # 但 URL 和本地路径谁都没往外传。后果有两层——
+                    #
+                    # 1. `executor._ASSET_KEYS` 是按**键名**认附件的
+                    #    （`pdf_urls` → `asset_type="pdf"`）。产出里没有这个
+                    #    键，`raw_accident_assets` 就永远是 0 行：12 个 TRS 源
+                    #    的 PDF 一条都登记不上，阶段② 无从知道该去取哪些文件。
+                    # 2. `local_pdf_path` 在 `collect()` 里被赋值后**再无任何
+                    #    引用**，是个死变量——落盘的文件成了无人认领的孤儿。
+                    #
+                    # 影响面比「少登记几行」大得多：实测 `sh_em` 与 `sx_em`
+                    # 是**全 PDF 型**站点（各 5/5 条样本都挂 PDF），页面 HTML
+                    # 正文只有 631 / 717 字，而 PDF 里有 8,635 / 7,523 字——
+                    # 正文的主体在附件里，附着的是正文本身而不是什么补充材料。
+                    "pdf_urls": pdf_urls,
+                    # ── Word 附件通路（2026-10-01 第三十五轮补）────────────
+                    #
+                    # 判据修好之后（`detail_pdf_selector` 由 `a[href$='.pdf']`
+                    # 改为 `a[href]`，类型交给 `attachments.attachment_kind`），
+                    # 这一类附件才第一次被看见。`executor._ASSET_KEYS` 里**早
+                    # 就**有 `("office_urls", "office")` 这一项——和
+                    # `image_urls` 一样，声明了很久却没有采集器往外传，
+                    # `raw_accident_assets.asset_type='office'` 至今 0 行。
+                    #
+                    # **本轮只登记 URL，不做正文提取**：`_download_and_extract_pdf`
+                    # 那条路走的是 PyMuPDF（`pdf_text.py`），Word 需要完全不同的
+                    # 解析器（docx→python-docx / doc→LibreOffice 或无解），
+                    # 是另一个量级的工程，塞进这一轮会把「判据修好」这件事
+                    # 淹掉。所以代价是明确的：`shaanxi_em` 那 5 条挂 Word 的页面
+                    # （共 17 个文件，其中西安「9·10」重大建筑施工坍塌事故、
+                    # 西安「11·14」液化石油气泄漏爆炸重大事故的**报告本体就在
+                    # `.doc` 里**）正文仍然只有页面那一段通报。**URL 先落下**，
+                    # 阶段② 至少知道去哪儿取。
+                    #
+                    # 不并进 `pdf_parts` 的循环：那个循环的每一步都假设手上有
+                    # 一个能出文本的 PDF，混进 Word 只会让 `pdf_text` 这个变量
+                    # 名字和内容对不上。
+                    "office_urls": office_urls,
+                    # 判据有**两条并列**，因为「文字还没拿到」在这两处形态不同
+                    # （2026-10-01 第二十七轮补第二条）。
+                    #
+                    # ① 附件里的文字没提出来：判据是「有 PDF **且** 一份都没
+                    #    提出正文」——不是「`combined_text` 为空」。`sh_em` 实测
+                    #    HTML 正文 631 字、PDF 里 8,635 字，HTML 那份非空不影响
+                    #    「附件里的主体还没拿到」这个事实。
+                    #
+                    #    这一支**故意不看正文长度**，两个理由：全 PDF 型站点的
+                    #    HTML 正文（631/717 字）会让长度判据恒过；而长度够不够
+                    #    是审核队列那条线在管（上面那个 `BODY_MIN_CHARS` 分支），
+                    #    一个字段管一件事。
+                    #
+                    # ② 报告本体是图片：图片没有「提出文字」这个事件——采集层
+                    #    不做 OCR，图片的文字永远提不出来——所以只能拿「正文区
+                    #    够不够」当代理。没有这一条，`sc_em` 那条「正文 154 字、
+                    #    24 张扫描页就是内容本身」的记录会标成 `needs_ocr=False`
+                    #    （第二十六轮实测就是这么发现的）。
+                    #
+                    #    主语取 `detail_text` 而不是 `combined_text`：后者是
+                    #    `pdf_text or detail_text`，有 PDF 文本时它就等于 PDF 的
+                    #    长度，问「页面正文区够不够」会问到错的东西上。
+                    #
+                    #    带 `len(...) < BODY_MIN_CHARS` 这一半是为了**别把队列
+                    #    稀释掉**：`gz_em` 有一条挂 30 张图却有 16,670 字正文的
+                    #    记录，标 OCR 没有意义。方向与 `nmg_em`（第二十二轮）
+                    #    一致。
+                    #
+                    # ③ **Word 附件有意不并进来**（2026-10-01 第三十五轮）。
+                    #    `needs_ocr` 这个名字指的是**光学字符识别**，而 Word
+                    #    文件里的文字本来就是字符——它缺的是格式转换，不是识别。
+                    #    西安「9·10」那条挂两份 `.doc`、正文只有 6,973 字通报，
+                    #    确实「报告主体还没拿到」，但那不是 OCR 能解决的事。
+                    #    把 Word 折进 `needs_ocr` 会让这个字段名开始撒谎，而
+                    #    下游真要处理时得到的是一批需要装 LibreOffice 的任务。
+                    #    代价照实记在这里：**Word 附件的正文，采集层没有任何人
+                    #    负责**——`pdf_parts` 只收 PDF，`combined_text` 因此可能
+                    #    只是页面上那段通报。**留到下一轮裁决**（要么起一个
+                    #    `needs_convert` 之类的新字段，要么在阶段② 做）。
+                    "needs_ocr": (
+                        (bool(pdf_urls) and not pdf_text)
+                        or (bool(image_urls)
+                            and len(detail_text) < BODY_MIN_CHARS)
+                    ),
+                    # ── 内容图通路（2026-10-01 第十八轮补）─────────────
+                    #
+                    # 与 `pdf_urls` 同一套机制：`executor._ASSET_KEYS` 里早有
+                    # `("image_urls", "image")` 这一项，**声明了很久却没有任何
+                    # 采集器往外传**——所以 `raw_accident_assets` 里
+                    # `asset_type='image'` 一直是 0 行。这一行把它接上。
+                    "image_urls": image_urls,
+                },
+            )
+            # 附加信息通过 metadata 传递
+            raw.raw_html = ""
+            results.append(raw)
+
+            # 周期性存储到 RawAccidentStore
+            if len(results) % 5 == 0:
+                self.raw_store.add_batch(
+                    [self._to_store_item(r) for r in results[-5:]])
+
+        # 最后一批写入。**必须是 `add_batch`，不能只 `_save()`**——
+        # 这行原先是孤零零一句 `self.raw_store._save()`，于是不足 5 的余数
+        # **从未进过 `_data`**（只有 `add_batch` → `add()` 才会 append 并
+        # 落盘）。更要命的是在线采集：`sink` 也是在 `add()` 里被调的，所以
+        # 那些条目**根本交不出去**——executor 收不到，库里就没有。
+        #
+        # 实测（2026-10-01，同一份 HTML，`collect()` 返回值当真值）：
+        #
+        #     产出 3 条 → store 0 条 / sink 0 条     （全丢）
+        #     产出 5 条 → store 5 条 / sink 5 条     （5 的倍数才全到）
+        #     产出 6 条 → store 5 条 / sink 5 条     （丢 1）
+        #     产出 7 条 → store 5 条 / sink 5 条     （丢 2）
+        #
+        # 其余 9 个 store-backed 源用的是另一套写法（`batch_items` 累积 +
+        # 末尾 `if batch_items: add_batch(...)`），**没有这个缺陷**。同族的
+        # 「同一件事各源各写一遍、只有一处写错」还有 `pdf_text.py` 被抄三份
+        # 与 `attachments.py` 判据不统一——本源此处是这一族的又一例。
+        remainder = len(results) % 5
+        if remainder:
+            self.raw_store.add_batch(
+                [self._to_store_item(r) for r in results[-remainder:]])
+
+        elapsed = time.time() - t_start
+        logger.info(
+            f"[{self.cfg.source_name}] 采集完成: "
+            f"列表{self._total_listed} → 初筛过滤{self._filtered_title} → "
+            f"分类过滤{self._filtered_classify} → "
+            f"收录{self._collected} + 审核{self._review} "
+            f"({elapsed:.1f}s)"
+        )
+
+        return results
+
+    # ── 内部方法 ──
+
+    def _to_store_item(self, raw: RawAccidentText) -> dict:
+        """`RawAccidentText` → `RawAccidentStore.add_batch` 的一项。
+
+        **每一项的字段都从这个 `raw` 自己身上取，不碰任何循环外的变量。**
+        原先这里是一段内联的列表推导式，`publish_date` / `status` /
+        `classification` 直接引用外层变量，而 `results[-5:]` 取的是**前五条**：
+        于是同一批 5 条全部被写上**最后一条**的日期与状态。
+
+        这种错位单条测试永远测不出来——`results` 不足 5 条时压根不走这条分支，
+        恰好 5 条时最后一条又是对的。只有跨批次（第 6 条开始）才现形。
+
+        `status` 从 `extra` 里取：它是在构造 `RawAccidentText` 时连同分类结果
+        一起存进去的，这里取回来交给 `add_batch` 当标准字段——`add_batch` 的
+        `standard_fields` 里有 `status`，放在 dict 顶层就会被正确识别。
+        """
+        extra = dict(raw.extra or {})
+        extra["issuing_authority"] = self.cfg.authority_name
+        status = extra.pop("status", "new")
+        return {
+            "title": raw.title,
+            "content": raw.raw_text,
+            "source_url": raw.source_url,
+            "source_name": raw.source,
+            "publish_date": (raw.extracted_date.isoformat()
+                             if raw.extracted_date else ""),
+            "status": status,
+            **extra,
+        }
+
+    def _discover_pages(self) -> list[str]:
+        """发现所有分页 URL。
+
+        **判据是 GET 的状态码，不是 HEAD 的。** `shaanxi_em` 整站拒 HEAD：
+        第 2、3、4 页 HEAD 全 403，而 GET 全 200、每页 38,000 字符内容完整。
+        用 HEAD 判「还有没有下一页」，这个源的结论是「只有一页」——
+        **而且是静默的，看上去与「这个站确实只有一页」没有任何区别**。
+
+        `list_page_start` 的语义是「`list_url` 对应的页码」，默认 1，
+        所以从 `start + 1` 开始往后探。
+
+        探测时把响应正文收进 `_page_cache`，`collect()` 随后对同一页
+        `_fetch` 时直接取用，不重复发请求。
+        """
+        if not self.cfg.list_page_pattern:
+            return [self.cfg.list_url]
+
+        pages = [self.cfg.list_url]
+        for n in range(self.cfg.list_page_start + 1, self.cfg.list_page_max_probe + 1):
+            page_url = self._build_page_url(n)
+            try:
+                resp = self._client.get(page_url, timeout=15)
+            except Exception as e:
+                logger.warning(f"[{self.cfg.source_name}] 第 {n} 页探测失败，停止分页: {e}")
+                break
+            if resp.status_code != 200:
+                logger.info(
+                    f"[{self.cfg.source_name}] 第 {n} 页 HTTP {resp.status_code}，"
+                    f"判定分页结束（共 {len(pages)} 页）"
+                )
+                break
+            # **0 条也停**：超出末页时不一定给 404。`hain_em` 的 `index_2.html`
+            # 返回 HTTP 200，正文却是空列表模板——只看状态码会一路探到 `max_probe`。
+            if not self._parse_list(resp.text, page_url):
+                logger.info(f"[{self.cfg.source_name}] 第 {n} 页 0 条，判定分页结束")
+                break
+            self._page_cache[page_url] = resp.text
+            pages.append(page_url)
+        return pages
+
+    def _build_page_url(self, page_num: int) -> str:
+        """根据分页模式构建第 `page_num` 页的 URL。子类可覆盖以定制分页逻辑。
+
+        **一律 `urljoin`，不许字符串拼接。** 站点给的 `list_page_pattern` 有两种形状，
+        而 `list_url` 本身也有两种形状，组合起来四种，拼接只对其中一种成立：
+
+        | `list_page_pattern` | `list_url` | 拼接结果 | `urljoin` |
+        |---|---|---|---|
+        | `index_{n}.html` | `…/sgdc/index_1.html`（**文件**） | `…/index_1.html/index_2.html` ✗ | `…/sgdc/index_2.html` ✓ |
+        | `index_{n}.html` | `…/sgdcbg/`（**目录**） | `…/sgdcbg/index_2.html` ✓ | 同上 ✓ |
+        | `https://…/index_{n}.html` | 任意 | 取决于拼接 | 原样返回 ✓ |
+
+        **曾经的写法的害处不在拼错，在于错得看不出来**：
+        ```python
+        if "{n}" in pattern:
+            return pattern.format(n=page_num)   # ← `index_{n}.html` 命中这里
+        if "index_" in pattern:                 # ← 这个分支从没执行过
+            return f"{self.cfg.list_url.rstrip('/')}/{pattern.format(n=page_num)}"
+        ```
+        `index_{n}.html` **同时**含 `{n}` 和 `index_`，而第一个分支在前面，
+        于是返回的是裸文件名 `index_2.html`——**没有协议头的相对路径**。
+        `_discover_pages` 对它发 HEAD 必然抛 `UnsupportedProtocol`，
+        落进那里的 `except Exception: break`，**静默只剩第一页**，
+        返回「1 页」看起来与「这个站只有一页」完全一样。
+        """
+        return urljoin(self.cfg.list_url, self.cfg.list_page_pattern.format(n=page_num))
+
+    def _parse_list(self, html: str, page_url: str = "") -> list[dict]:
+        """解析列表页 HTML，提取文章链接。
+
+        Args:
+            html: 列表页 HTML。
+            page_url: **这一页**的 URL。用来把相对链接还原成绝对 URL——
+                列表页里的 href 可能是 `./202609/…` 这种相对当前目录的写法，
+                只能对着列表页地址解析。省略时退回 `cfg.list_url`，
+                对第一页是对的，对分页不对——**分页的循环必须传**。
+
+        Returns:
+            [{"title": str, "url": str, "date": str}, ...]
+        """
+        base = page_url or self.cfg.list_url
+        html = _unwrap_data_islands(html)
+        soup = BeautifulSoup(html, "html.parser")
+        records: list[dict] = []
+
+        # 方法1: 使用配置的链接正则模式
+        if self.cfg.list_link_pattern:
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"]
+                if re.search(self.cfg.list_link_pattern, href):
+                    title = a_tag.get_text(strip=True)
+                    title = re.sub(r"\s+", "", title)
+                    if len(title) < 5:
+                        continue
+                    full_url = _absolute(base, href)
+                    date = _date_from_url(href)
+                    if title:
+                        records.append({"title": title, "url": full_url, "date": date})
+            return records
+
+        # 方法2: 尝试匹配包含日期路径的链接
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"]
+            if re.search(r"/\d{4,8}/", href):
+                title = a_tag.get_text(strip=True)
+                title = re.sub(r"\s+", "", title)
+                if len(title) < 5:
+                    continue
+                full_url = _absolute(base, href)
+                date = _date_from_url(href)
+                if title:
+                    records.append({"title": title, "url": full_url, "date": date})
+
+        return records
+
+    def _crawl_detail(self, url: str,
+                      html: Optional[str] = None) -> Optional[dict]:
+        """爬取详情页，提取标题、日期、正文和 PDF 链接。
+
+        `html` 传了就不自己抓——`collect()` 为了统计模板文字会**先把候选页
+        全抓一遍**，主循环复用那一份，总请求数不变。
+        """
+        html = html if html is not None else self._fetch(url)
+        if not html:
+            return None
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 标题
+        title = ""
+        if self.cfg.detail_title_selector == "title":
+            t_tag = soup.find("title")
+            if t_tag:
+                title = t_tag.get_text(strip=True)
+
+        # 日期
+        date = ""
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", html)
+        if m:
+            date = m.group(1)
+
+        # PDF 链接
+        # 同样要用 `_absolute` 对着**详情页自己的地址**解析。TRS 的附件链接也写作
+        # `./P020240905567173081196.pdf`——旧拼法会把它接到站点根上，拼出
+        # `https://yjt.shanxi.gov.cn/P020240905567173081196.pdf`，**整条路径都丢了**，
+        # 下载必然 404。而 PDF 恰恰是省级源的主要载体：`sx_em` 的详情页正文
+        # 一个字都不在 HTML 里，全在这个附件中。
+        #
+        # **取全部而不是第一个**（2026-10-01 第十五轮查出）。原先这里是
+        # `pdf_url = ...; break`，只留第一个——而一条详情页挂多个附件是真实
+        # 存在的形态，且往往是**最要紧的那种**：
+        #
+        #   sh_em  /xxgk/…/202507/36eba1e4….html
+        #         ├ 上海崇明兴海联公司「2·26」起重伤害一般事故…评估报告.pdf
+        #         └ 上海崇明江南造船（集团）「12·17」一般车辆伤害事故…评估报告.pdf
+        #
+        # **一份页面装着两个不同事故的报告**，正是三分类里 `multi` 的典型场景。
+        # 旧写法下第二份从不被下载、也不被登记——与第十四轮修的缺陷 B 是两回事
+        # （B 是「下载了却不登记」，这里是「根本没进入视野」）。
+        #
+        # 去重是必需的：`sc_em` 实测存在**同一个 PDF 挂两个链接**的页面
+        # （正文里链接一次、附件区再列一次），不去重会重复下载同一份。
+        # **判据是「附件」，不是「PDF 附件」**（2026-10-01 第三十五轮改）。
+        # 原先这里是 `a[href$='.pdf']` + `href.endswith(".pdf")`——两处都只认
+        # PDF，`.docx` / `.doc` 从选择器那一层就进不来，连 warning 都没有。
+        #
+        # 实测 `shaanxi_em`（该源全 PDF 型假设的最强反例）：
+        #   全站 473 条详情页，`a[href$='.pdf']` 选中的是**空集**——一条 PDF
+        #   附件都没有；而其中 5 条挂着 Word 附件共 17 个文件。其中两条的
+        #   **报告本体就在 `.doc` 里**：西安「9·10」重大建筑施工坍塌事故与
+        #   西安「11·14」液化石油气泄漏爆炸重大事故，页面正文是一份 6,973 字
+        #   的**通报**，第 114 行「附：」之后紧跟着两行锚文本「西安“9·10”…
+        #   调查报告」「西安“11·14”…调查报告」——**报告本体各自一个 `.doc`**。
+        #
+        # 类型判据走 `collector.attachments`（`pdf_text.py` 被抄三份、附件判据
+        # 各写一套的教训）：加一种类型只改那个文件。
+        pdf_urls: list[str] = []
+        office_urls: list[str] = []
+        # 图片附件**本轮有意不往产出传**，见下方注释；这里仍然接住，
+        # 为的是让「这个源上有几个图片附件」在源码里可见、可计数，而不是
+        # 静默丢弃——丢弃和「没有」在日志里长得一样。
+        image_attachments: list[str] = []
+        # **去重仍在这一层做**（2026-10-01 第三十五轮）。`sort_into` 只分拣、
+        # 不去重——它是 `gd_em` / `beijing_em` / 这里三处共用的，而那两处的
+        # 输入各自已去重，把去重塞进共享函数等于顺手替它们改了行为。上面
+        # `sc_em` 那条「同一个 PDF 挂两个链接」的理由，落点就是这几行。
+        #
+        # 改用集合而不是原先的 `if full not in pdf_urls`：旧写法只查得到
+        # PDF 那一列，加进 office / image 两列之后，只查 pdf 列表会让一篇
+        # 挂两次的 Word 附件重复登记。
+        _seen: set[str] = set()
+        for a_tag in soup.select(self.cfg.detail_pdf_selector):
+            full = _absolute(url, a_tag.get("href", ""))
+            if full in _seen:
+                continue
+            if sort_into(attachment_kind(full), full,
+                         pdf=pdf_urls, office=office_urls,
+                         image=image_attachments):
+                _seen.add(full)
+        if image_attachments:
+            # 与下面那个 `image_urls` 的语义冲突：那个键装的是
+            # `extract_page_images` 抽的**页面内容图**（正文就是那些扫描页），
+            # 而这里是**图片附件**（页面挂了一个 `.png` 文件）。两者在
+            # `executor._ASSET_KEYS` 里会同归 `asset_type='image'`，混在一个键
+            # 里就再也分不开。要么给图片附件单开一个键，要么在 images 那侧
+            # 加来源标注——**留到下一轮裁决**，本轮只保证它不再无声无息。
+            logger.debug(f"[{self.cfg.source_name}] {len(image_attachments)} 个"
+                         f"图片附件本轮未登记: {url}")
+
+        # 内容图（2026-10-01 第十八轮补）。在此之前 `_crawl_detail` **对图一个字
+        # 都不读**——这是缺陷 C 的直接成因：图片型报告（正文是扫描件）整条记录
+        # 到采集层就没有了图片这个维度，一张都不登记。
+        #
+        # 判据与抽取逻辑在 `construction_agent.collector.images`——`nmg_em` /
+        # `gd_em` 不是 TRS 系却同样有图片型报告，共用一份比各抄一份好
+        # （`pdf_text.py` 当年被抄成三份的教训）。那个模块的 docstring 记着这条
+        # 判据的前身（「同目录 + 编号连续」）是怎么被 `tj_em` 当场推翻的。
+        image_urls = extract_page_images(url, soup, max_n=self.cfg.detail_image_max)
+        if len(image_urls) >= self.cfg.detail_image_max > 0:
+            logger.debug(f"[{self.cfg.source_name}] 内容图到达上限 "
+                         f"{self.cfg.detail_image_max} 张: {url}")
+
+        # 正文
+        #
+        # **切成行，不取整块**（2026-10-01 第二十三轮改）。原先这里是
+        # `body.get_text()`——不带分隔符，相邻标签的文字直接粘成一整块，
+        # 「行」这个概念不存在，于是「跨页恒定行 = 模板文字」那条判据无从
+        # 落地（缺陷 G 的修法）。改法本身在 `collector/boilerplate.py`，
+        # 那里记着第十六/十七轮为什么「选容器」三条路全不通、改成「减模板」。
+        #
+        # **剥离不在这里做**：模板行是跨页统计出来的，单页视角看不见它。
+        # 这里只交出 `text_lines`，`collect()` 统一剥。
+        text_lines_: list[str] = []
+        if self.cfg.detail_text_selector in ("body", "article"):
+            body = soup.find(self.cfg.detail_text_selector)
+            if body:
+                text_lines_ = text_lines(body)
+
+        return {"title": title, "date": date,
+                "text": "\n".join(text_lines_), "text_lines": text_lines_,
+                "pdf_urls": pdf_urls, "office_urls": office_urls,
+                "image_urls": image_urls}
+
+    def _download_and_extract_pdf(
+        self, pdf_url: str, title: str, date: str
+    ) -> tuple[str, str]:
+        """下载 PDF 并提取全文。返回 `(正文, 本地路径)`，任一环节失败返回 `("", "")`。
+
+        **这里原先是一个 `except Exception: pass`。** 它把四种完全不同的失败
+        压成同一个返回值 `("", "")`，再没有任何痕迹：
+
+        | 情况 | 原表现 | 现在 |
+        |---|---|---|
+        | 网络异常 / 超时 | 静默 | `debug` 日志 |
+        | HTTP 404 / 403 | 静默 | `debug` 日志（带状态码）|
+        | 响应过短（不是 PDF）| 静默 | `debug` 日志（带字节数）|
+        | 磁盘写入失败 | 静默 | `warning` 日志 |
+
+        为什么值得专门拆开：`sh_em` 与 `sx_em` 实测是**全 PDF 型**站点——页面
+        HTML 正文 631 / 717 字，PDF 里 8,635 / 7,523 字，正文主体在附件中。
+        一旦这条路上出任何差错，正文会**悄无声息地掉到十分之一**，而采集日志
+        上「收录 5 条」与成功时一模一样。落盘失败用 `warning` 是因为它属于
+        环境问题（权限、磁盘满），不是数据本身的形态。
+        """
+        hash_suffix = hashlib.md5(pdf_url.encode()).hexdigest()[:12]
+        safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50]
+        local_path = self.data_dir / f"{date}_{safe_title}_{hash_suffix}.pdf"
+
+        if local_path.exists():
+            return extract_pdf_text(local_path), str(local_path)
+
+        try:
+            resp = self._client.get(pdf_url)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[{self.cfg.source_name}] PDF 下载异常: {pdf_url} — "
+                         f"{type(e).__name__}: {e}")
+            return "", ""
+
+        if resp.status_code != 200:
+            logger.debug(f"[{self.cfg.source_name}] PDF HTTP {resp.status_code}: "
+                         f"{pdf_url}")
+            return "", ""
+        if len(resp.content) < 100:
+            logger.debug(f"[{self.cfg.source_name}] PDF 响应过短"
+                         f"（{len(resp.content)} 字节）: {pdf_url}")
+            return "", ""
+
+        try:
+            local_path.write_bytes(resp.content)
+        except OSError as e:
+            logger.warning(f"[{self.cfg.source_name}] PDF 落盘失败: "
+                           f"{local_path} — {e}")
+            return "", ""
+
+        return extract_pdf_text(local_path), str(local_path)
+
+    def _fetch(self, url: str) -> Optional[str]:
+        """HTTP GET 带重试。
+
+        先查 `_page_cache`：`_discover_pages` 探测分页时已经 GET 过列表页，
+        这里直接取用（`pop` 掉，同一 URL 至多缓存一次）。
+        """
+        cached = self._page_cache.pop(url, None)
+        if cached is not None:
+            return cached
+
+        for attempt in range(self.cfg.max_retries):
+            try:
+                resp = self._client.get(url)
+                if resp.status_code == 200:
+                    return resp.text
+                elif resp.status_code in (404, 410):
+                    return None
+                logger.warning(f"HTTP {resp.status_code} (尝试 {attempt+1}): {url}")
+            except Exception as e:
+                logger.warning(f"请求失败 (尝试 {attempt+1}): {url} - {e}")
+            if attempt < self.cfg.max_retries - 1:
+                time.sleep(2 ** attempt)  # 指数退避
+        # 走到这一行只有「重试耗尽」一种情况——404/410 已经在上面提前
+        # `return None` 了。**这两种 `None` 必须分开**：前者是「这一页不存在」
+        # （正常结果），后者是「没连上」（故障）。混在一起数，判据就会两头都真。
+        self._fetch_failed += 1
+        return None
+
+    @staticmethod
+    def _parse_date_str(date_str: str) -> Optional[date]:
+        """把 `YYYY-MM-DD` 解析成 `date` 对象；格式不符或值非法时返回 `None`。
+
+        **返回类型是 `date`，不是 `str`。** 原先最后一行写的是
+        `return date_str`——名字叫 parse，做的却是「验一下格式，然后原样返回
+        那个字符串」。而 `RawAccidentText.extracted_date` 的注解是
+        `Optional[date]`，于是 12 个 TRS 源交出去的对象里这个字段实际是 `str`。
+
+        下游全都按 `date` 用它，两处当场崩：
+
+        - `base.py::generate_fingerprint()` → `.strftime("%Y-%m")`
+        - `executor._row_from_raw_item()`（通路 B）→ `.isoformat()`
+
+        第二条是致命的：executor 对 `collect()` 返回的每一个
+        `RawAccidentText` 都调它，异常一路冒泡到 `_run_source` 的 `except`，
+        **这个源本轮的结果全部作废**——连已经攒在 `sink.rows` 里的通路 A
+        记录一起丢，因为写库发生在 `feed()` 之后。
+
+        为什么长期没暴露：健康检查与各探针挂的是只计数的 `NullSink`，
+        从不做 `_row_from_raw_item` 这个转换，而装载后真实转换只发生在
+        executor 里。**计数一路正常，数据其实一条都没进库。** 与 `gd_em`
+        那次「健康检查看不见」是同一类问题。
+
+        校验放在构造 `date` 时兜：正则认的是形状，`2026-02-30` 这种形状对、
+        值不对的要在 `date()` 那里挡下来。
+        """
+        if not date_str:
+            return None
+        m = re.match(r"(\d{4})-(\d{2})-(\d{2})", date_str)
+        if not m:
+            return None
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+
+    def __del__(self):
+        try:
+            self._client.close()
+        except Exception:
+            pass

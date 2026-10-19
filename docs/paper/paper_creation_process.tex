@@ -1,0 +1,232 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fontspec}
+\newfontfamily\cjkfont{Noto Sans SC}[Scale=0.92]
+\title{CAIEMS 论文创建过程记录}
+\author{人机协作存档（academic-pipeline Stage 6）}
+\date{2026-08-31}
+\begin{document}
+\maketitle
+
+\maketitle
+\begin{quote}{\cjkfont 生成：}2026-08-31 {\cjkfont ｜} Stage 6 {\cjkfont ｜} {\cjkfont 语言：中文（如需英文版可另行生成）}\end{quote}
+
+\section{{\cjkfont 论文信息}}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{ll}
+\hline
+{\cjkfont 项} & {\cjkfont 内容} \\
+\hline
+{\cjkfont 标题} & CAIEMS: An LLM-Driven Pipeline for Construction Accident Information Extraction, Causal Coding, and Online Database Construction \\
+{\cjkfont 目标期刊} & Expert Systems with Applications{\cjkfont （一区）} \\
+{\cjkfont 作者} & {\cjkfont 孙天浩（南京工业大学，第一作者）；导师（通讯作者，姓名待填）} \\
+{\cjkfont 最终交付物} & EN {\cjkfont 主源} + ZH {\cjkfont 镜像} + {\cjkfont 编号引用版} + LaTeX/PDF/DOCX + {\cjkfont 投稿信} + 6 {\cjkfont 图} 9 {\cjkfont 表} \\
+{\cjkfont 篇幅} & 10,300 {\cjkfont 词正文，}27 {\cjkfont 条参考文献（全部核验）} \\
+\hline
+\end{tabular}
+\end{table}
+\section{{\cjkfont 分阶段过程记录}}
+\subsection{Stage 0{\cjkfont ：构思（}brainstorming{\cjkfont ）}}
+\textbf{{\cjkfont 用户初始指令}}{\cjkfont （}verbatim{\cjkfont ）：}
+
+\begin{quote}"{\cjkfont 帮我将之前过时的草稿文献删除，重新开始论文构思}"\end{quote}
+
+\begin{quote}"{\cjkfont 论文的目标期刊优先级为英文期刊一区，但是在写作过程中要同步生成对应的中文版本，方便我阅读。我们的目标是}A{\cjkfont 拓展到}C{\cjkfont ，先发出期刊，后续在完成毕业论文}"\end{quote}
+
+\textbf{{\cjkfont 关键决策}}{\cjkfont ：}
+
+\begin{itemize}
+\item {\cjkfont 故事线确定为}"A{\cjkfont （端到端系统）骨架} + B{\cjkfont （词汇门控效应）旗舰钩子}"
+\item {\cjkfont 期刊选定} ESWA{\cjkfont （与对标文献} Liu et al. 2025 {\cjkfont 同刊，对话闭环）}
+\item VLM {\cjkfont 定位为系统模块简要介绍}------{\cjkfont 用户给出领域理由：}"VLM{\cjkfont 现在不普及，且事故图片质量低，源头问题难以通过优化}VLM{\cjkfont 解决}"
+\item {\cjkfont 数据发表后公开}------{\cjkfont 用户理由：}"{\cjkfont 避免更多的研究人员重复干造轮子的工作}"
+\item {\cjkfont 实验编排采用方案甲（选型}$\rightarrow${\cjkfont 优化}$\rightarrow${\cjkfont 验证）}
+\end{itemize}
+\subsection{Stage 2{\cjkfont ：撰写}}
+\textbf{{\cjkfont 用户指令}}{\cjkfont （}verbatim{\cjkfont ）：}
+
+\begin{quote}"{\cjkfont 确认，执行你的工作}"\end{quote}
+
+{\cjkfont 产出：}EN 8,561 {\cjkfont 词初稿} + ZH {\cjkfont 镜像逐章同步、}27 {\cjkfont 条文献筛选矩阵、}6 {\cjkfont 图} 8 {\cjkfont 表、双语摘要、}7 {\cjkfont 项声明、附录} A {\cjkfont 六策略提示词。}
+
+\textbf{{\cjkfont 用户中途介入}}{\cjkfont ：确认导师共同署名、无基金号；指定} `article/articles.bib` {\cjkfont 为实际参考文献，选择方案} A{\cjkfont （补充下载文献）。会后补充下载} Wei 2022 CoT{\cjkfont 、}Devlin 2019 BERT{\cjkfont 、}Kojima 2022{\cjkfont 、}GPT-4 {\cjkfont 技术报告、}HFACS {\cjkfont 原始报告} 5 {\cjkfont 篇} PDF{\cjkfont 。}
+
+\subsection{Stage 2.5{\cjkfont ：完整性验证（第} 1 {\cjkfont 次）}}
+\begin{itemize}
+\item {\cjkfont 数据核验} 72/74 {\cjkfont 通过；发现并修复} 1 {\cjkfont 处真实错误（正文中位数} 1,200$\rightarrow$517 {\cjkfont 字符）}
+\item DOI {\cjkfont 核验} 26/26{\cjkfont （}CrossRef + arXiv + doi.org + {\cjkfont 期刊官网多通道）}
+\item 2 {\cjkfont 项非论文级数据问题如实上报（}imageV3 {\cjkfont 注册差} 15 {\cjkfont 条、省份字段} 17 {\cjkfont 条地址错值）}
+\end{itemize}
+\subsection{Stage 3{\cjkfont ：五审稿人模拟}}
+\textbf{{\cjkfont 用户指令}}{\cjkfont （}verbatim{\cjkfont ）：}
+
+\begin{quote}"{\cjkfont 立即执行} 5 {\cjkfont 份独立评审}"\end{quote}
+
+5 {\cjkfont 人评审团（}EIC + {\cjkfont 方法学者} + {\cjkfont 领域学者} + {\cjkfont 提示工程学者} + {\cjkfont 魔鬼代言人）产出} 17 {\cjkfont 项修订意见，决策} \textbf{Major Revision}{\cjkfont 。核心质疑（}4/5 {\cjkfont 共识）：两项旗舰论断（门控效应归因、排名反转）均建立在混淆比较上。}
+
+\subsection{Stage 4{\cjkfont ：修订（论文最重要阶段）}}
+\textbf{{\cjkfont 用户指令}}{\cjkfont （}verbatim{\cjkfont ）：}
+
+\begin{quote}"{\cjkfont 执行方案}A"{\cjkfont （先跑} 2$\times$2 {\cjkfont 消融实验再修订）}\end{quote}
+
+\textbf{P0-1 {\cjkfont 消融实验}}{\cjkfont （用户选择：}"{\cjkfont 跑分布消融}({\cjkfont 推荐})"------{\cjkfont 因专家} GT {\cjkfont 当时在磁盘上丢失）：}
+
+\begin{itemize}
+\item 4 {\cjkfont 单元} $\times$ 100 {\cjkfont 条新样本，}400 {\cjkfont 次} API {\cjkfont 调用，}5 {\cjkfont 次断点重启（}thinking {\cjkfont 块截断}$\rightarrow$max\_tokens 16384{\cjkfont 、}JSON {\cjkfont 提取器、}dict {\cjkfont 编码、}list {\cjkfont 输出归一化）}
+\item {\cjkfont 结果：措辞贡献} M1 {\cjkfont 恢复} 74\%{\cjkfont （发射级）}$\rightarrow$ {\cjkfont 门控效应初证}
+\end{itemize}
+\textbf{{\cjkfont 关键转折}------{\cjkfont 用户提供专家} GT}{\cjkfont ：}
+
+\begin{quote}"/home/suntianhao/TEM/expertA.json ... expertC.json {\cjkfont 这是不是你需要的专家} GT {\cjkfont 文件？}"\end{quote}
+
+{\cjkfont 三个} LabelStudio {\cjkfont 导出恢复} 100 {\cjkfont 条三专家多数投票} GT{\cjkfont （}Fleiss' $\kappa$ 0.859-1.000 {\cjkfont 直接核验）。发现}\textbf{{\cjkfont 方法论口径问题}}{\cjkfont ：原报告指标基于专家} A {\cjkfont 单独标注，与论文声称的}"{\cjkfont 多数投票}"{\cjkfont 不符。用户决策：}
+
+\begin{quote}"{\cjkfont 执行方案}A"{\cjkfont （全部指标改用多数投票} GT + {\cjkfont 原样本补跑} F1 {\cjkfont 级消融）}\end{quote}
+
+{\cjkfont 原样本补跑（}300 {\cjkfont 次调用）产出} F1 {\cjkfont 级} 2$\times$2 {\cjkfont 表：}v1 M1 {\cjkfont 召回} 0.141 {\cjkfont 完美复现原始} 0.143{\cjkfont ；措辞贡献} M1 {\cjkfont 恢复} 0.80/0.847{\cjkfont ；}S5 {\cjkfont 结论从}"{\cjkfont 低于零样本}"{\cjkfont 修正为}"{\cjkfont 无增益} 6 {\cjkfont 倍成本}"{\cjkfont 。表} 6 {\cjkfont 增加} bootstrap CI{\cjkfont 。}P1-P3 {\cjkfont 全部} 12 {\cjkfont 项写作修订（含银标准描述诚信修正）。}
+
+\subsection{Stage 3'{\cjkfont ：复审}}
+17 {\cjkfont 项意见} 16 {\cjkfont 项完全落实} + 1 {\cjkfont 项部分（}bootstrap CI{\cjkfont ，随后因} GT {\cjkfont 恢复而补完）。决策：}Minor $\rightarrow$ {\cjkfont 实质可接受。}
+
+\subsection{Stage 4.5{\cjkfont ：最终完整性验证（第} 2 {\cjkfont 次）}}
+{\cjkfont 从零独立核验：表} 7 {\cjkfont 消融} 28 {\cjkfont 项、表} 6 {\cjkfont 六策略、摘要} 19 {\cjkfont 项论断、}DB {\cjkfont 数字、}27 {\cjkfont 条引用双向、}7 {\cjkfont 项声明、中英对齐}------\textbf{0 {\cjkfont 失败}}{\cjkfont 。七模式} AI {\cjkfont 失效清单全部清除。}
+
+\subsection{Stage 5{\cjkfont ：格式化}}
+\textbf{{\cjkfont 用户指令}}{\cjkfont （}verbatim{\cjkfont ）：}
+
+\begin{quote}"{\cjkfont 确认执行} Stage 5 web{\cjkfont 截图我后补。真实姓名：孙天浩} {\cjkfont 单位：南京工业大学} {\cjkfont 邮箱}202461201086@njtech.edu.cn .{\cjkfont 起草投稿信}"\end{quote}
+
+{\cjkfont 产出：}ESWA {\cjkfont 编号引用版（}28 {\cjkfont 条} [n]{\cjkfont ，}88 {\cjkfont 处引用全转换）、}LaTeX {\cjkfont 源、}PDF{\cjkfont （}tectonic {\cjkfont 编译，修复} 4 {\cjkfont 类} LaTeX {\cjkfont 错误）、}DOCX{\cjkfont （}python-docx{\cjkfont ）、投稿信草稿（四段卖点论证）、}CRediT {\cjkfont 实名更新。}
+
+\section{{\cjkfont 迭代统计}}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{ll}
+\hline
+{\cjkfont 指标} & {\cjkfont 数值} \\
+\hline
+{\cjkfont 管道阶段} & 9{\cjkfont （构思}$\rightarrow${\cjkfont 设计}$\rightarrow${\cjkfont 撰写}$\rightarrow$2.5$\rightarrow$3$\rightarrow$4$\rightarrow$3'$\rightarrow$4.5$\rightarrow$5{\cjkfont ）} \\
+{\cjkfont 完整性验证} & 2 {\cjkfont 次（}Stage 2.5 + 4.5{\cjkfont ）} \\
+{\cjkfont 审稿轮次} & 2{\cjkfont （}5 {\cjkfont 人全量审} + {\cjkfont 复审）} \\
+{\cjkfont 修订意见} & 17 {\cjkfont 项} $\rightarrow$ 16 {\cjkfont 完全} + 1 {\cjkfont 部分（后补完）} \\
+{\cjkfont 消融实验} & 2 {\cjkfont 轮} 700 {\cjkfont 次} API {\cjkfont 调用} \\
+DOI/{\cjkfont 引用核验} & 26 {\cjkfont 条多通道核验} + 27 {\cjkfont 条双向核对} \\
+{\cjkfont 数据核验项} & 72+ {\cjkfont 项} $\times$ 2 {\cjkfont 次} \\
+{\cjkfont 断点重启} & 5 {\cjkfont 次（无数据损失）} \\
+git {\cjkfont 提交} & 20+ {\cjkfont 次} \\
+\hline
+\end{tabular}
+\end{table}
+\section{{\cjkfont 用户关键决策清单（时间序）}}
+\begin{enumerate}
+\item {\cjkfont 删除旧草稿，重新构思（方向重置）}
+\item {\cjkfont 目标：英文一区} + {\cjkfont 中文同步} + {\cjkfont 先期刊后学位论文（}A$\rightarrow$C {\cjkfont 路径）}
+\item {\cjkfont 采纳}"A {\cjkfont 骨架} + B {\cjkfont 钩子}"{\cjkfont 故事线}
+\item ESWA {\cjkfont 选刊（对标文献同刊）}
+\item VLM {\cjkfont 仅作系统模块（领域理由：}VLM {\cjkfont 不普及} + {\cjkfont 图片源头质量）}
+\item {\cjkfont 数据发表后公开（避免重复造轮子）}
+\item {\cjkfont 实验编排方案甲（选型}$\rightarrow${\cjkfont 优化}$\rightarrow${\cjkfont 验证）}
+\item DeepSeek {\cjkfont 统一命名不分档（}auto {\cjkfont 模式事实）}
+\item {\cjkfont 导师共同署名、无基金号；指定} articles.bib + {\cjkfont 方案} A {\cjkfont 文献补充}
+\item {\cjkfont 批准设计文档与大纲}
+\item {\cjkfont 批准} Stage 2.5/3/4.5 {\cjkfont 各强制闸门}
+\item {\cjkfont 消融受阻时选分布消融（务实降级）}
+\item API {\cjkfont 充值支持实验继续}
+\item \textbf{{\cjkfont 提供三专家} GT {\cjkfont 文件（决定性转折）}}
+\item {\cjkfont 选择方案} A{\cjkfont （多数投票} GT {\cjkfont 全面重算}------{\cjkfont 宁推倒重来不将就）}
+\item {\cjkfont 提供署名信息} + {\cjkfont 要求投稿信}
+\item {\cjkfont 要求项目交接文档（为多会话协作建立基础设施）}
+\end{enumerate}
+\section{{\cjkfont 关键教训（可复用）}}
+\begin{enumerate}
+\item \textbf{checkpoint {\cjkfont 纪律是批量实验的生命线}}{\cjkfont ：}5 {\cjkfont 次崩溃零损失，全部靠断点续传}
+\item \textbf{{\cjkfont 交叉核验改变结论}}{\cjkfont ：多数投票} GT {\cjkfont 重算把} S5 {\cjkfont 从}"{\cjkfont 有害}"{\cjkfont 修正为}"{\cjkfont 无增益}"------{\cjkfont 报告口径必须与声称方法论一致}
+\item \textbf{{\cjkfont 受控消融} > {\cjkfont 论证}}{\cjkfont ：审稿人最尖锐的质疑（混淆变量）最终由真实} 2$\times$2 {\cjkfont 实验闭环，而非文字辩护}
+\item \textbf{"{\cjkfont 按假说表述}"{\cjkfont 防过度声明}}{\cjkfont ：}"first/LLM-optimized"{\cjkfont 类措辞是审稿人重点打击对象}
+\item \textbf{{\cjkfont 领域知识在决策点无价}}{\cjkfont ：}VLM {\cjkfont 定位、命名策略、数据公开理由均由用户领域判断拍板，}AI {\cjkfont 仅提供选项}
+\item \textbf{{\cjkfont 诚信问题早修早好}}{\cjkfont ：银标准描述、文本长度、归因百分比三处错误均在投稿前被内部机制捕获}------{\cjkfont 这正是完整性闸门的价值}
+\end{enumerate}
+\section{{\cjkfont 协作质量评估}}
+\begin{verbatim}
++--------------------------------------------------+
+|  Collaboration Quality Score: 85/100              |
++--------------------------------------------------+
+|                                                   |
+|  Direction Setting          [██████████ ] 90     |
+|  Clarity, timing, scope definition                |
+|                                                   |
+|  Intellectual Contribution  [█████████  ] 88     |
+|  Insight depth, original questions, concept        |
+|  challenges                                       |
+|                                                   |
+|  Quality Gatekeeping        [████████   ] 84     |
+|  Visual inspection, formatting requirements,       |
+|  quality standards                                |
+|                                                   |
+|  Iteration Discipline       [████████   ] 83     |
+|  Timely direction correction, willingness to       |
+|  re-run pipeline, refusing to settle              |
+|                                                   |
+|  Delegation Efficiency      [█████████  ] 87     |
+|  When to intervene/when to let go, instruction     |
+|  precision, checkpoint efficiency                 |
+|                                                   |
+|  Meta-Learning              [███████    ] 75     |
+|  Feeding experience back to skills, requesting     |
+|  lesson recording, process improvement awareness  |
+|                                                   |
++--------------------------------------------------+
+\end{verbatim}
+\textbf{{\cjkfont 维度分析}}{\cjkfont ：}
+
+\begin{itemize}
+\item \textbf{Direction Setting 90}{\cjkfont ：目标始终清晰（一区期刊}$\rightarrow${\cjkfont 先发期刊后写论文），每次分叉点给出明确指令而非模糊偏好。开局直接推翻了旧草稿方向，省去数小时低价值修订。}
+\item \textbf{Intellectual Contribution 88}{\cjkfont ：最关键的智力贡献发生在} Stage 4------{\cjkfont 在} GT {\cjkfont 文件}"{\cjkfont 丢失}"{\cjkfont 时找到并提供了三份专家标注，使全部实验升级到方法论一致的口径；}VLM {\cjkfont 定位与命名策略的领域判断避免了两个潜在的审稿硬伤。}
+\item \textbf{Quality Gatekeeping 84}{\cjkfont ：强制闸门全部亲自确认；要求补} Web {\cjkfont 截图、实名信息。可提升处：隔夜} loop {\cjkfont 期间未设置中途检查点，若消融方向错误需次日才能发现。}
+\item \textbf{Iteration Discipline 83}{\cjkfont ：选择方案} A{\cjkfont （推倒旧口径重算全部指标）而非省事的方案} B{\cjkfont ，是本流程最重要的纪律性决策。扣分处：部分指标确认依赖} AI {\cjkfont 报告而未亲自核对原始数据。}
+\item \textbf{Delegation Efficiency 87}{\cjkfont ：审批粒度恰当（设计}/{\cjkfont 大纲}/{\cjkfont 闸门三级），}"{\cjkfont 默认执行，明天我来结果}"{\cjkfont 式授权让长任务夜间推进；}API {\cjkfont 充值响应及时。}
+\item \textbf{Meta-Learning 75}{\cjkfont ：要求交接文档、画布尺寸指南显示经验沉淀意识；尚未将经验反馈到项目技能库（如把消融管线固化为可复用脚本模板、把} check {\cjkfont 脚本纳入} CI{\cjkfont ）。}
+\end{itemize}
+\textbf{{\cjkfont 改进建议}}{\cjkfont ：}
+
+\begin{enumerate}
+\item {\cjkfont 长任务（}>1h{\cjkfont ）建议约定中间检查点，而非仅终点检查}
+\item {\cjkfont 关键指标（}F1/Kappa{\cjkfont ）建议亲自抽查原始} JSON 1-2 {\cjkfont 条，与} AI {\cjkfont 报告交叉验证}
+\item {\cjkfont 经验沉淀：将本流程的验证脚本（}stage25/stage45/check\_citations{\cjkfont ）固化为项目级工具，供学位论文阶段复用}
+\end{enumerate}
+\section{AI {\cjkfont 使用自省报告（}Claude {\cjkfont 自评）}}
+\textbf{{\cjkfont 七模式失效清单最终审计}}{\cjkfont ：}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lll}
+\hline
+{\cjkfont 模式} & {\cjkfont 是否触发} & {\cjkfont 处置} \\
+\hline
+M1 {\cjkfont 引用幻觉} & {\cjkfont 未触发} & 26 {\cjkfont 条} DOI/arXiv {\cjkfont 多通道核验通过} \\
+M2 {\cjkfont 实现缺陷致错误结果} & \textbf{{\cjkfont 触发} 5 {\cjkfont 次}} & {\cjkfont 消融脚本} 4 {\cjkfont 类} bug{\cjkfont （}thinking {\cjkfont 块截断}/JSON {\cjkfont 提取}/dict {\cjkfont 编码}/list {\cjkfont 输出）}+ {\cjkfont 引用转换脚本} 2 bug------{\cjkfont 全部靠} checkpoint {\cjkfont 与重算机制拦截，未污染论文数据} \\
+M3 {\cjkfont 幻觉结果} & \textbf{{\cjkfont 触发} 1 {\cjkfont 次}} & {\cjkfont 正文长度}"{\cjkfont 中位数} 1,200 {\cjkfont 字符}"{\cjkfont 无数据来源，}Stage 2.5 {\cjkfont 核验时修正为} 517 \\
+M4 {\cjkfont 捷径依赖} & {\cjkfont 未触发} & {\cjkfont 图表数据全部来自} DB/JSON {\cjkfont 文件} \\
+M5 bug {\cjkfont 当洞见} & \textbf{{\cjkfont 一度濒临}} & {\cjkfont 门控效应最初建立在混淆对比上，被审稿人}+{\cjkfont 消融实验双重检验后确认成立（幸为真发现）} \\
+M6 {\cjkfont 方法论虚构} & \textbf{{\cjkfont 触发} 1 {\cjkfont 次}} & {\cjkfont 银标准描述曾写}"{\cjkfont 人工验证}"{\cjkfont 与实际构建方式不符，}Stage 4 {\cjkfont 修订时修正} \\
+M7 {\cjkfont 框架锁定} & {\cjkfont 未触发} & {\cjkfont 五审稿人挑战} + {\cjkfont 用户领域判断两次打破框架} \\
+\hline
+\end{tabular}
+\end{table}
+\textbf{{\cjkfont 自我评价}}{\cjkfont ：}
+
+\begin{itemize}
+\item {\cjkfont 长处：核验纪律（两次完整性闸门捕获全部三类数据错误）、断点工程（}5 {\cjkfont 次崩溃零损失）、接受推翻结论（}S5 {\cjkfont 叙事、}GT {\cjkfont 口径）}
+\item {\cjkfont 短板：初稿存在过度声明倾向（}"first/LLM-optimized"{\cjkfont ），文本长度等细节凭记忆落笔而非查询数据源}------{\cjkfont 两次均被自身核验流程捕获，说明流程有效但初稿环节仍需加强}"{\cjkfont 数据即查}"{\cjkfont 纪律}
+\item {\cjkfont 最深刻的一课：审稿人发现的两个} CRITICAL {\cjkfont 质疑，最终都不是靠文字回应，而是靠} 700 {\cjkfont 次} API {\cjkfont 调用的真实实验闭环}------\textbf{{\cjkfont 证据优于修辞}}
+\end{itemize}
+*{\cjkfont 本记录由} academic-pipeline Stage 6 {\cjkfont 协议生成，作为人机协作史的存档。}*
+
+\end{document}

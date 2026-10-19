@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}暂存审核 · CAIEMS{% endblock %}
+
+{# 流水线阶段③：暂存区 → 人工审核 → 并入最终库。
+
+   这是全流程唯一会改动论文数据的地方，所以页面上每一次写入都必须先看得见
+   后果：单条改之前能看原文，批量通过只对零告警开放，并入必须先预演拿到令牌。
+   页面本身只有骨架，数据全走 /api/review/*。 #}
+
+{% block content %}
+<noscript>
+  <div class="notice">本页的数据由浏览器端脚本从 <code>/api/review/*</code>
+  拉取，请启用 JavaScript。</div>
+</noscript>
+
+<div class="notice notice-warn" id="dbNotice" hidden></div>
+
+{# ── ① 审核漏斗 ──────────────────────────────────────────── #}
+<section class="panel" id="funnelPanel">
+  <div class="panel-head">
+    <h2>审核漏斗</h2>
+    <div class="head-tools">
+      <span class="result-count" id="funnelMeta"></span>
+      <button type="button" class="btn btn-sm" id="histToggle">并入历史</button>
+    </div>
+  </div>
+  <div class="stats" id="funnelRow"></div>
+  <div class="chips" id="warnChips"></div>
+  <div id="histBox" hidden>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th class="col-date">时间</th>
+            <th class="col-num">并入条数</th>
+            <th class="col-num">编码行数</th>
+            <th>备份</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <div class="filters-actions">
+      <button type="button" class="btn btn-sm" id="rollbackBtn">回滚最近一次并入</button>
+      <span class="hint-inline" id="rollbackHint"></span>
+    </div>
+  </div>
+  <p class="panel-note">
+    「零告警」是批量通过的准入线：有告警的条目不会静默通过，会被列在结果里
+    并说明原因。并入前一律先预演，预演返回的令牌与本次选择集绑定——改了选择
+    再提交会作废重来。
+  </p>
+</section>
+
+{# ── ② 待审队列 ──────────────────────────────────────────── #}
+<section class="panel" id="queuePanel">
+  <div class="panel-head">
+    <h2>暂存队列</h2>
+    <div class="head-tools">
+      <span class="result-count" id="qCount"></span>
+      <button type="button" class="btn btn-sm" id="qAll">全选本页</button>
+      <button type="button" class="btn btn-sm" id="qNone">清空</button>
+      <button type="button" class="btn btn-sm" id="qRefresh">刷新</button>
+    </div>
+  </div>
+
+  <form class="filters" id="qFilters" autocomplete="off">
+    <div class="filters-row">
+      <label class="field">
+        <span>审核状态</span>
+        <select id="f_status">
+          <option value="pending" selected>待审核</option>
+          <option value="approved">已通过</option>
+          <option value="edited">已修改</option>
+          <option value="rejected">已退回</option>
+          <option value="all">全部</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>告警</span>
+        <select id="f_warn">
+          <option value="">全部</option>
+          <option value="any">仅看有告警</option>
+          <option value="none">仅看零告警</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>体裁</span>
+        <select id="f_text">
+          <option value="">全部</option>
+          <option value="single">单个事故</option>
+          <option value="multi">多事故</option>
+          <option value="regulatory">通报文件</option>
+          <option value="aggregate">统计汇总</option>
+          <option value="training">培训材料</option>
+          <option value="other">其它</option>
+        </select>
+      </label>
+      <label class="field field-grow">
+        <span>关键词</span>
+        <input type="search" id="f_q" placeholder="标题或摘要">
+      </label>
+      <label class="field">
+        <span>每页</span>
+        <select id="f_size">
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+    </div>
+    <div class="filters-actions">
+      <button type="submit" class="btn btn-primary">查询</button>
+      <button type="button" class="btn" id="qReset">重置</button>
+      <button type="button" class="btn" id="qClean">跳到零告警</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="col-pick"></th>
+          <th class="col-title">标题</th>
+          <th class="col-date">日期</th>
+          <th>类型</th>
+          <th class="col-num">死亡</th>
+          <th class="col-num">受伤</th>
+          <th class="col-num">编码</th>
+          <th>告警</th>
+          <th>状态</th>
+          <th class="col-act"></th>
+        </tr>
+      </thead>
+      <tbody id="qBody"></tbody>
+    </table>
+  </div>
+  <div class="pager" id="qPager"></div>
+</section>
+
+{# ── ③ 选择操作条 ────────────────────────────────────────── #}
+<div class="bulkbar" id="bulkBar" hidden>
+  <span class="bulk-count" id="bulkCount"></span>
+  <span class="hint-inline" id="bulkHint"></span>
+  <button type="button" class="btn btn-primary btn-sm" id="bulkApprove">批量通过</button>
+  <button type="button" class="btn btn-sm" id="bulkPromote">预演并入</button>
+  <button type="button" class="btn btn-sm" id="bulkClear">取消选择</button>
+</div>
+
+{# ── 抽屉：单条审核 ──────────────────────────────────────── #}
+<aside class="drawer" id="drawer" role="dialog" aria-modal="false"
+       aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-inner">
+    <div class="drawer-head">
+      <h3 id="drawerTitle">暂存记录</h3>
+      <div class="head-tools">
+        <button type="button" class="btn btn-sm" id="drawerClose">关闭</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </div>
+</aside>
+
+{# ── 并入预演弹层 ─────────────────────────────────────────
+   并入是全流程唯一改最终库的动作。这里做两段式：先预演看清单，拿到令牌
+   才能执行。 #}
+<div class="modal" id="promoteModal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="promoteTitle">
+  <div class="modal-box modal-wide">
+    <h3 id="promoteTitle">并入预演</h3>
+    <div id="promoteBody"></div>
+    <p class="task-error" id="promoteErr" hidden></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="promoteRun" disabled>确认并入最终库</button>
+      <button type="button" class="btn" id="promoteCancel">取消</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dom.js') }}"></script>
+<script src="{{ url_for('static', filename='review.js') }}"></script>
+{% endblock %}

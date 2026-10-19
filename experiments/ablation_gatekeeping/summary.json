@@ -1,0 +1,92 @@
+{
+ "model": "deepseek-v4-pro",
+ "temperature": 0.0,
+ "n_sample": 100,
+ "cells": {
+  "v1": {
+   "label": "v1 (条件检查+保守)",
+   "n": 100,
+   "avg_codes": 2.78,
+   "empty_rate": 0.21,
+   "parse_error_rate": 0.06,
+   "top_emission": {
+    "H1": 37,
+    "M1": 34,
+    "M3": 26,
+    "F2": 21,
+    "M2": 20,
+    "H3": 19,
+    "T2": 17,
+    "T1": 15
+   },
+   "m1_rate": 0.34,
+   "m3_rate": 0.26,
+   "h3_rate": 0.19,
+   "t2_rate": 0.17
+  },
+  "v2a": {
+   "label": "v2a (两步判断+保守)",
+   "n": 100,
+   "avg_codes": 6.06,
+   "empty_rate": 0.02,
+   "parse_error_rate": 0.0,
+   "top_emission": {
+    "M1": 96,
+    "M2": 79,
+    "H1": 60,
+    "H3": 56,
+    "M3": 46,
+    "T2": 43,
+    "F2": 38,
+    "H2": 32
+   },
+   "m1_rate": 0.96,
+   "m3_rate": 0.46,
+   "h3_rate": 0.56,
+   "t2_rate": 0.43
+  },
+  "v2b": {
+   "label": "v2b (条件检查+全覆盖)",
+   "n": 100,
+   "avg_codes": 4.97,
+   "empty_rate": 0.05,
+   "parse_error_rate": 0.0,
+   "top_emission": {
+    "M1": 56,
+    "H1": 54,
+    "H3": 49,
+    "M2": 47,
+    "F2": 41,
+    "M3": 38,
+    "T2": 32,
+    "M4": 29
+   },
+   "m1_rate": 0.56,
+   "m3_rate": 0.38,
+   "h3_rate": 0.49,
+   "t2_rate": 0.32
+  },
+  "v2": {
+   "label": "v2 (两步判断+全覆盖)",
+   "n": 100,
+   "avg_codes": 9.4,
+   "empty_rate": 0.02,
+   "parse_error_rate": 0.0,
+   "top_emission": {
+    "M1": 98,
+    "H3": 98,
+    "M2": 97,
+    "H1": 94,
+    "M3": 90,
+    "H2": 85,
+    "M4": 77,
+    "F4": 53
+   },
+   "m1_rate": 0.98,
+   "m3_rate": 0.9,
+   "h3_rate": 0.98,
+   "t2_rate": 0.52
+  }
+ },
+ "design": "phrasing(checks vs twostep) x policy(conservative vs coverage)"
+}

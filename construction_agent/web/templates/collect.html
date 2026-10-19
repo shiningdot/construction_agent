@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}在线采集 · CAIEMS{% endblock %}
+
+{% block content %}
+<noscript>
+  <div class="notice">本页的数据由浏览器端脚本从 <code>/api/collect/*</code>
+  拉取，请启用 JavaScript。</div>
+</noscript>
+
+{# 工作库没建的时候整页给一条可执行的提示，而不是让每个面板各自报错 #}
+<div class="notice notice-warn" id="dbNotice" hidden></div>
+
+{# ── ① 源清单 ────────────────────────────────────────────── #}
+<section class="panel" id="sourcesPanel">
+  <div class="panel-head">
+    <h2>采集源</h2>
+    <div class="head-tools">
+      <span class="result-count" id="srcCount"></span>
+      <button type="button" class="btn btn-sm" id="pickAll">全选已启用</button>
+      <button type="button" class="btn btn-sm" id="pickNone">清空选择</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="grid grid-src">
+      <thead>
+        <tr>
+          <th class="col-pick"></th>
+          <th>采集源</th>
+          <th>发布机构</th>
+          <th>上次运行</th>
+          <th class="col-num">累计入库</th>
+          <th class="col-num">待处理</th>
+          <th>状态</th>
+          <th class="col-act"></th>
+        </tr>
+      </thead>
+      <tbody id="srcBody"></tbody>
+    </table>
+  </div>
+  <p class="panel-note" id="srcNote"></p>
+</section>
+
+{# ── ② 新建任务 ──────────────────────────────────────────── #}
+<section class="panel" id="newTaskPanel">
+  <div class="panel-head">
+    <h2>新建采集任务</h2>
+    <span class="result-count" id="pickedCount"></span>
+  </div>
+
+  <form class="filters" id="taskForm" autocomplete="off">
+    <div class="filters-row">
+      <label class="field">
+        <span>起始日期</span>
+        <input type="date" id="t_since">
+      </label>
+      <label class="field">
+        <span>截止日期</span>
+        <input type="date" id="t_until">
+      </label>
+      <label class="field">
+        <span>每源上限</span>
+        <input type="number" id="t_limit" min="1" max="10000" placeholder="不限">
+      </label>
+      <label class="field field-grow">
+        <span>关键词（逗号分隔）</span>
+        <input id="t_keywords" placeholder="坍塌, 坠落, 触电">
+      </label>
+      <label class="field">
+        <span>并发源数</span>
+        <select id="t_concurrency">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="filters-actions">
+      <button type="submit" class="btn btn-primary" id="startBtn">开始采集</button>
+      <span class="hint-inline" id="taskHint"></span>
+    </div>
+  </form>
+
+  {# 这三个条件是在拿到记录之后才判的，网络请求数不会因此减少。
+     写在按钮附近而不是藏进 tooltip——用户最容易误解的就是这里 #}
+  <p class="panel-note">
+    日期与关键词为<strong>入库前筛选</strong>：24 个适配器都不接受这些条件，
+    采集器仍会抓完整个列表，符合的记录才落库。日期提不出来的记录一律保留。
+  </p>
+</section>
+
+{# ── ③ 任务队列 ──────────────────────────────────────────── #}
+<section class="panel" id="tasksPanel">
+  <div class="panel-head">
+    <h2>采集任务</h2>
+    <div class="head-tools">
+      <span class="result-count" id="taskCount"></span>
+      <button type="button" class="btn btn-sm" id="refreshTasks">刷新</button>
+    </div>
+  </div>
+  <div id="taskList"></div>
+</section>
+
+{# ── ④ 漏斗 ──────────────────────────────────────────────── #}
+<section class="panel" id="funnelPanel">
+  <div class="panel-head">
+    <h2>数据漏斗</h2>
+    <span class="result-count" id="funnelTotal"></span>
+  </div>
+  <div class="chart-area" id="funnelArea"><div class="skeleton-chart"></div></div>
+  <p class="panel-note" id="funnelNote"></p>
+</section>
+
+{# ── ⑤ 原始数据 ──────────────────────────────────────────── #}
+<section class="panel" id="rawPanel">
+  <div class="panel-head">
+    <h2>原始数据</h2>
+    <div class="result-count" id="rawCount"></div>
+  </div>
+
+  <form class="filters" id="rawFilters" autocomplete="off">
+    <div class="filters-row">
+      <label class="field">
+        <span>来源</span>
+        <select id="f_source"><option value="">全部</option></select>
+      </label>
+      <label class="field">
+        <span>状态</span>
+        <select id="f_status">
+          <option value="">全部</option>
+          <option value="new">未处理</option>
+          <option value="gated">已判定</option>
+          <option value="promoted">已送提取</option>
+          <option value="archived">已归档</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>闸门判定</span>
+        <select id="f_verdict">
+          <option value="">全部</option>
+          <option value="__none__">未判定</option>
+          <option value="confirmed">相关</option>
+          <option value="rejected">不相关</option>
+        </select>
+      </label>
+      <label class="field field-grow">
+        <span>关键词</span>
+        <input type="search" id="f_q" placeholder="标题或正文">
+      </label>
+      <label class="field">
+        <span>每页</span>
+        <select id="f_size">
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </label>
+    </div>
+    <div class="filters-actions">
+      <button type="submit" class="btn btn-primary">查询</button>
+      <button type="button" class="btn" id="rawReset">重置</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="grid" id="rawGrid">
+      <thead>
+        <tr>
+          <th class="col-pick"></th>
+          <th class="col-title">标题</th>
+          <th>来源</th>
+          <th class="col-date">发布日</th>
+          <th class="col-date">采集时间</th>
+          <th>状态</th>
+          <th>判定</th>
+          <th>理由</th>
+          <th class="col-act"></th>
+        </tr>
+      </thead>
+      <tbody id="rawBody"></tbody>
+    </table>
+  </div>
+
+  <div class="pager" id="rawPager"></div>
+</section>
+
+{# ── ⑥ 批量操作条 ────────────────────────────────────────── #}
+<div class="bulkbar" id="bulkBar" hidden>
+  <span class="bulk-count" id="bulkCount"></span>
+  <button type="button" class="btn btn-primary btn-sm" data-verdict="confirmed">标为相关</button>
+  <button type="button" class="btn btn-sm" data-verdict="rejected">标为不相关</button>
+  <button type="button" class="btn btn-sm" data-verdict="review">退回待判</button>
+  <button type="button" class="btn btn-sm" id="bulkClear">取消选择</button>
+</div>
+
+{# ── 抽屉：单条原始记录 ──────────────────────────────────── #}
+<aside class="drawer" id="drawer" role="dialog" aria-modal="false"
+       aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-inner">
+    <div class="drawer-head">
+      <h3 id="drawerTitle">原始记录</h3>
+      <button type="button" class="btn btn-sm" id="drawerClose">关闭</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dom.js') }}"></script>
+<script src="{{ url_for('static', filename='collect.js') }}"></script>
+{% endblock %}

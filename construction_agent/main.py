@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from construction_agent.config import settings
 
 console = Console()
 
-AGENT_LOGO = """
+AGENT_LOGO = r"""
 [bold cyan]
   ___ __ _ _ __   ___ _   _ _ __   ___  __ _ _ __   ___ _ __
  / __/ _` | '_ \ / __| | | | '_ \ / _ \/ _` | '_ \ / _ \ '__|
@@ -26,6 +27,46 @@ AGENT_LOGO = """
  \___\__,_|_| |_|\___|\__,_|_| |_|\___|\__,_|_| |_|\___|_|
 [/bold cyan]
 [bold yellow]   建筑施工事故信息自动化处理系统 v{}[/bold yellow]""".format(__version__)
+
+
+# 旧理论链路的命令。主库 2,623 条数据**全部**由 S1–S4 CAICS 链路产出
+# （实测 `pipeline_version` 恒为 `caics_v1.0`，编码前缀只有 C/F/H/M/T），
+# 下面这几条走的却是 V1 四维度 + HFACS-CS 6 层：字段对不上、编码体系换了一套，
+# 产出**无法并入主库**。留着出口只会让人以为它们等价——查 help 看到两个
+# "处理单条"的命令，没有理由知道该选哪个。
+#
+# 所以默认直接拦下，要跑得显式开 `CAIEMS_ALLOW_LEGACY=1`。不删除是沿用项目
+# 「先归档再移出生产路径、不做不可逆销毁」的约定（旧资产封存见任务 #34）。
+_LEGACY_COMMANDS: dict[str, str] = {
+    "process": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "batch": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "interactive": "ExtractionPipeline（V1 四维度 + HFACS-CS 6 层编码）",
+    "hfacs-encode": "HFACS-CS v2.5 编码器",
+    "dataset": "DatasetManager（JSON 快照 data/accidents.json，非主库 caiems_v2.db）",
+}
+
+
+def block_legacy(command: str) -> None:
+    """拦下走旧理论链路的命令，除非显式放行。
+
+    放行看环境变量而不是 `--legacy` 开关：这是个"确认知道自己要什么"的信号，
+    一次性配在环境里比每次敲一串参数更不容易顺手带上。
+    """
+    what = _LEGACY_COMMANDS.get(command)
+    if what is None or os.environ.get("CAIEMS_ALLOW_LEGACY") == "1":
+        return
+
+    console.print(Panel(
+        f"`{command}` 走的是[bold]旧理论链路[/]：[yellow]{what}[/]\n\n"
+        f"而主库里的 2,623 条数据全部由 [green]S1–S4 CAICS 链路[/]产出，"
+        f"两条链路的字段与编码体系都不同构，旧链路的产出[bold]无法并入主库[/]。\n\n"
+        f"[bold]生产链路请用：[/]\n"
+        f"  [green]python -m construction_agent.main extract \"<事故文本>\"[/]\n"
+        f"    → S1 三分类闸门 → S2 施工相关性 → S3 基础字段 → S4 CAICS 编码\n\n"
+        f"确实需要跑旧链路（如复核封存前的历史结果），加环境变量放行：\n"
+        f"  [dim]CAIEMS_ALLOW_LEGACY=1 python -m construction_agent.main {command} …[/]",
+        title="[bold red]⛔ 该命令已废弃", border_style="red"))
+    sys.exit(2)
 
 
 def setup_logging(level: str = None):
@@ -168,12 +209,143 @@ def cmd_interactive(args: argparse.Namespace):
             console.print("[bold red]❌ 提取失败，请重试[/]")
 
 
+def cmd_extract(args: argparse.Namespace):
+    """用 S1–S4 主管道处理单条事故信息（CAICS 链路）。
+
+    与 `process` 的分工：
+      `process`  走旧链路 `ExtractionPipeline`（V1 四维度 + HFACS 编码），
+                 服务于已封存的旧理论
+      `extract`  走 S1–S4 `CaicsPipeline`（CAICS 5 层 19 类），**与主库
+                 2,623 条数据同构**，是生产链路
+
+    默认不落库——单条文本没有对应的 `raw_accidents` 记录，而工作库对
+    raw_id 有外键约束。落库属于在线采集管道的场景（蓝图 02 阶段②）。
+    """
+    from construction_agent.extraction.caics_pipeline import CaicsPipeline
+
+    title = args.title or args.text[:50]
+    console.print(Panel(f"[bold]{title}[/]\n[dim]{args.text}[/]", title="📥 输入"))
+
+    try:
+        pipe = CaicsPipeline(enable_search_enhance=not args.no_search)
+    except Exception as exc:
+        console.print(f"[bold red]❌ 主管道初始化失败: {exc}[/]")
+        sys.exit(1)
+
+    # 提前把配置缺失摆到台面上。不检查的话，缺 key 时 S1 会把文本判为
+    # other、整条被"正常地"过滤，看不出是环境问题。
+    problems = pipe.preflight()
+    if problems:
+        console.print("[bold red]❌ 主管道无法执行：[/]")
+        for p in problems:
+            console.print(f"  [red]·[/] {p}")
+        console.print("\n[dim]请在 construction_agent/.env 配置 ANTHROPIC_API_KEY 后重试[/]")
+        sys.exit(1)
+
+    with console.status("[bold cyan]🔄 执行 S1→S2→S3→S4..."):
+        outcome = pipe.run_once(
+            title=title, text=args.text,
+            publish_date=args.publish_date or "",
+            source_name=args.source or "",
+        )
+
+    _show_stage_table(outcome)
+
+    # 终态分派
+    if outcome.status == "purged":
+        reason = {
+            "text_type": f"文本类型为 {outcome.text_type_value}，非事故报道",
+            "non_construction": "判定为非建筑施工事故",
+        }.get(outcome.purge_reason, outcome.purge_reason)
+        console.print(f"\n[yellow]⛔ 被闸门拦下: {reason}[/]")
+        console.print(f"[dim]S1 理由: {outcome.text_type.reason if outcome.text_type else '-'}[/]")
+        if outcome.classification:
+            console.print(f"[dim]S2 理由: {outcome.classification.reason}[/]")
+        return
+
+    if outcome.status != "completed":
+        console.print(f"\n[bold red]❌ 失败: {outcome.purge_reason}[/]")
+        sys.exit(1)
+
+    # 成功：展示提取结果与编码
+    console.print("\n[bold green]✅ 提取与编码完成[/]")
+    console.print(Panel(_json_dumps(outcome.basic.to_dict()),
+                        title="📋 基础字段 (S3)", border_style="green"))
+
+    if outcome.causes:
+        _show_causes_table(outcome.causes)
+    else:
+        console.print("[yellow]⚠ S4 未产出致因编码（该条仍视为完成，编码为空）[/]")
+
+    console.print(
+        f"[dim]文本类型 {outcome.text_type_value} | "
+        f"判定 {outcome.classification.verdict.value if outcome.classification else '-'} | "
+        f"编码 {len(outcome.caics_codes)} 条 | 总耗时 {outcome.total_ms} ms[/]"
+    )
+
+    if args.json:
+        Path(args.json).write_text(
+            _json_dumps(outcome.to_dict()), encoding="utf-8")
+        console.print(f"[green]✓ JSON 已导出: {args.json}[/]")
+
+
+def _json_dumps(data) -> str:
+    import json
+    return json.dumps(data, ensure_ascii=False, indent=2, default=str)
+
+
+def _show_stage_table(outcome):
+    """显示 S1–S4 的分段轨迹。"""
+    table = Table(title="主管道轨迹")
+    table.add_column("阶段", style="cyan", no_wrap=True)
+    table.add_column("结果", no_wrap=True)
+    table.add_column("耗时", justify="right", no_wrap=True)
+    table.add_column("说明")
+
+    labels = {
+        "S1": "S1 类型闸门", "S2": "S2 相关性闸门", "S3": "S3 字段提取",
+        "SEARCH": "搜索增强", "S4": "S4 致因编码",
+    }
+    for r in outcome.records:
+        mark = "[green]✓[/]" if r.ok else "[red]✗[/]"
+        note = r.error if r.error else r.detail
+        table.add_row(labels.get(r.stage, r.stage), mark, f"{r.ms} ms", note or "-")
+
+    console.print(table)
+
+
+def _show_causes_table(causes):
+    """显示 CAICS 致因编码。"""
+    table = Table(title=f"CAICS 致因编码 ({causes.cause_count} 条)")
+    table.add_column("编码", style="cyan", no_wrap=True)
+    table.add_column("类名")
+    table.add_column("证据")
+
+    for c in causes.causes:
+        table.add_row(c.code, c.name, (c.evidence or "-")[:60])
+
+    console.print(table)
+    if causes.primary_cause:
+        console.print(f"[dim]主因: {causes.primary_cause}[/]")
+    if causes.cause_chain:
+        console.print(f"[dim]致因链: {causes.cause_chain}[/]")
+
+
 def cmd_web(args: argparse.Namespace):
-    """启动 Web UI。"""
-    from construction_agent.web.app import app
+    """启动 Web UI。
+
+    入口是 `web.factory.create_app()`（新展示层，读主库 `caiems_v2.db`），
+    不是旧 `web.app` 的模块级单例。旧应用读的是 JSON 快照、重算 HFACS-CS，
+    实测 23 个端点返回空、2 个 500 崩溃；两张应用的路由没有交集可依赖，
+    换的是整个应用。
+    """
+    from construction_agent.web.factory import create_app
+
+    app = create_app()
 
     console.print("[bold green]🌐 启动 Web UI...[/]")
     console.print(f"[dim]地址: http://{settings.FLASK_HOST}:{settings.FLASK_PORT}[/]")
+    console.print("[dim]数据源: 主库 caiems_v2.db（CAICS 链路）[/]")
 
     app.run(
         host=settings.FLASK_HOST,
@@ -435,14 +607,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Construction Agent - 建筑施工事故信息自动化处理系统",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-使用示例:
-  python -m construction_agent.main process "某工地发生坍塌事故，造成3人死亡"
-  python -m construction_agent.main batch accidents.txt --json output.json --csv output.csv
-  python -m construction_agent.main interactive
+生产链路（与主库 caiems_v2.db 同构）:
+  python -m construction_agent.main extract "某工地发生坍塌事故，造成3人死亡"
+  python -m construction_agent.main extract "…" --publish-date 2024-03-16 --json out.json
   python -m construction_agent.main web
-  python -m construction_agent.main dataset stats
-  python -m construction_agent.main dataset search "坍塌"
-  python -m construction_agent.main dataset export --format csv data.csv
+
+已废弃的旧链路命令（V1 四维度 + HFACS-CS，产出无法并入主库）:
+  process · batch · interactive · hfacs-encode · dataset
+  默认被拦下；确需运行请加环境变量 CAIEMS_ALLOW_LEGACY=1
         """,
     )
     parser.add_argument("--version", action="version", version=f"v{__version__}")
@@ -451,25 +623,40 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # process: 处理单条
-    p_process = subparsers.add_parser("process", help="处理单条事故信息")
+    p_process = subparsers.add_parser(
+        "process", help="[已废弃] 旧链路处理单条（V1 四维度 + HFACS）")
     p_process.add_argument("text", help="事故描述文本")
     p_process.add_argument("--json", help="输出 JSON 文件路径")
     p_process.add_argument("--csv", help="输出 CSV 文件路径")
 
     # batch: 批量处理
-    p_batch = subparsers.add_parser("batch", help="批量处理事故信息（文件逐行读取）")
+    p_batch = subparsers.add_parser(
+        "batch", help="[已废弃] 旧链路批量处理（文件逐行读取）")
     p_batch.add_argument("file", help="事故信息文件路径（每行一条）")
     p_batch.add_argument("--json", help="输出 JSON 文件路径")
     p_batch.add_argument("--csv", help="输出 CSV 文件路径")
 
+    # extract: S1–S4 主管道处理单条（CAICS 链路）
+    p_extract = subparsers.add_parser(
+        "extract", help="S1–S4 主管道处理单条事故信息（CAICS 链路，与主库同构）")
+    p_extract.add_argument("text", help="事故描述文本")
+    p_extract.add_argument("--title", help="事故标题（默认取正文前 50 字）")
+    p_extract.add_argument("--publish-date", dest="publish_date",
+                           help="原文发布日期 YYYY-MM-DD（用于 S3 的日期推断）")
+    p_extract.add_argument("--source", help="来源名称（写入 S3 的 metadata）")
+    p_extract.add_argument("--no-search", action="store_true",
+                           help="跳过 S3 后的搜索增强（省一次网络往返，产出与新采集数据一致）")
+    p_extract.add_argument("--json", help="输出 JSON 文件路径")
+
     # interactive: 交互模式
-    subparsers.add_parser("interactive", help="交互式命令行模式")
+    subparsers.add_parser("interactive", help="[已废弃] 旧链路交互式命令行模式")
 
     # web: Web UI
     subparsers.add_parser("web", help="启动 Web UI")
 
     # dataset: 数据集管理
-    p_dataset = subparsers.add_parser("dataset", help="数据集管理")
+    p_dataset = subparsers.add_parser(
+        "dataset", help="[已废弃] JSON 快照数据集管理（非主库）")
     dataset_sub = p_dataset.add_subparsers(dest="action", help="数据集操作")
 
     p_stats = dataset_sub.add_parser("stats", help="数据集统计")
@@ -483,7 +670,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_clear.add_argument("--force", "-f", action="store_true", help="强制清空，不确认")
 
     # hfacs-encode: V2.5 HFACS 编码
-    p_hfacs = subparsers.add_parser("hfacs-encode", help="对数据集进行 HFACS-CS 编码")
+    p_hfacs = subparsers.add_parser(
+        "hfacs-encode", help="[已废弃] 对数据集进行 HFACS-CS 编码")
     p_hfacs.add_argument("--method", choices=["llm", "keyword"], default="llm",
                          help="编码方法：llm（API）或 keyword（零成本）")
     p_hfacs.add_argument("--input", default="data/accidents_merged.json", help="输入数据集")
@@ -504,9 +692,11 @@ def main(argv: list[str] | None = None):
     """入口函数。"""
     args = parse_args(argv)
     setup_logging(args.log_level)
+    block_legacy(args.command)
 
     commands = {
         "process": cmd_process,
+        "extract": cmd_extract,
         "batch": cmd_batch,
         "interactive": cmd_interactive,
         "web": cmd_web,

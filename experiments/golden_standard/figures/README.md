@@ -19,6 +19,10 @@
 | `table_caics_definitions_zh.docx` | 中文操作定义表（Word 表格，同层合并，可直接插入论文） |
 | `table_caics_definitions_zh.md` | 中文操作定义表（Markdown，四列：层 / 编码 / 定义 / 文本示例） |
 | `table_caics_definitions_zh.csv` | 中文操作定义表（UTF-8 BOM，Excel / Word 可直接打开） |
+| `table_model_strategy_avg_f1.docx` | 表 1：4 模型 × 6 策略的 Ave / Ave+ F1 三线表（Word） |
+| `table_model_strategy_avg_f1.{md,csv}` | 表 1 的 Markdown / CSV |
+| `table_flash_four_metrics.docx` | 表 2：DeepSeek V4 Flash 的 F1/召回/精度/准确性 × 6 策略 × 19 类三线表（Word，A4 横向） |
+| `table_flash_four_metrics.{md,csv}` | 表 2 的 Markdown / CSV |
 
 ## 复现
 
@@ -48,6 +52,10 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 # 4. 中文操作定义表（层 / 编码 / 定义 / 文本示例）
 /home/suntianhao/construction_agent/.venv/bin/python \
   scripts/golden_s1/make_definition_table_zh.py
+
+# 5. 模型/策略指标三线表
+/home/suntianhao/construction_agent/.venv/bin/python \
+  scripts/golden_s1/make_model_metric_tables.py
 ```
 
 只读快照也可作为数据源：
@@ -73,6 +81,7 @@ MPLBACKEND=Agg /home/suntianhao/construction_agent/.venv/bin/python \
 - **图 4** 使用专家 GT 的逐类正例数，按 CAICS 五层（M/F/T/H/C）分组，层内按频次降序；左侧只显示编码，图内底部英文图注说明「1 = contributing factor，0 = opposite」，每行总长固定为 300。
 - **三线表**的 `Frequency (%)` 分母是 300 条事故，各编码占比不能相加；19 类合计 2,355 个编码，平均 7.85 条/事故。表题号 `Table 1.` 为占位，论文排版时按实际编号替换。
 - **中文操作定义表**取自 `docs/paper_v2/eswa_paper_v2_zh.md` 表 2，四列（层、编码、定义、文本示例），不含频次与样本量；Word 版为三线表（顶线/表头下线/底线，无竖线与内部横线），同层单元格已合并，表题号为占位。
+- **表 1 / 表 2**：表 1 为模型 × 策略的 Ave / Ave+ F1；表 2 固定 DeepSeek V4 Flash，为 F1/召回/精度/准确性 × 策略 × 19 类 + Ave/Ave+。两表均每列最优加粗、次优加下划线；表 2 为 A4 横向。
 - **图 3** 的 y 轴为非零基线（a–d 60–100，e 0–30，f 90–100），图注需说明；误差棒是 4 个模型间的 SEM，不是重复运行的方差（每格只运行一次）。
 - **类别英文名**为初译，集中在 `scripts/golden_s1/build_figure_data.py` 的 `CLASS_DISPLAY`，审校后可直接替换并重绘。
 - **S4′/S5′ 的 C1 解读**：S4′ 的 C1 接近崩塌（7.3%），S5′ 恢复至 51.1%，不要将两者等同。

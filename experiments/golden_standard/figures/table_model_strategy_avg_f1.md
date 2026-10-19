@@ -1,0 +1,30 @@
+**表 1. 四个模型 × 六种策略的平均 F1 分数比较（%）**
+
+| 模型 | 策略 | Ave F1 | Ave+ F1 |
+|---|---|---|---|
+| GLM-5.2 | S0 零样本 | 79.43 | 78.29 |
+| GLM-5.2 | S1 少样本 | 82.33 | 81.35 |
+| GLM-5.2 | S2 逐层推理 | 81.90 | 80.90 |
+| GLM-5.2 | S3 计划与求解 | 81.03 | 79.98 |
+| GLM-5.2 | S4 CAICS-CoT | 78.74 | 77.55 |
+| GLM-5.2 | S5 CAICS-CoT+ | 78.29 | 77.08 |
+| DeepSeek V4 Flash | S0 零样本 | 80.74 | 80.79 |
+| DeepSeek V4 Flash | S1 少样本 | 87.25 | 87.34 |
+| DeepSeek V4 Flash | S2 逐层推理 | 84.55 | 84.80 |
+| DeepSeek V4 Flash | S3 计划与求解 | 85.08 | 84.87 |
+| DeepSeek V4 Flash | S4 CAICS-CoT | 73.05 | 74.50 |
+| DeepSeek V4 Flash | S5 CAICS-CoT+ | 78.39 | 77.98 |
+| Hunyuan hy3 | S0 零样本 | 75.21 | 74.62 |
+| Hunyuan hy3 | S1 少样本 | 76.45 | 75.14 |
+| Hunyuan hy3 | S2 逐层推理 | 75.89 | 75.35 |
+| Hunyuan hy3 | S3 计划与求解 | 77.83 | 77.40 |
+| Hunyuan hy3 | S4 CAICS-CoT | 77.12 | 76.64 |
+| Hunyuan hy3 | S5 CAICS-CoT+ | 73.68 | 75.55 |
+| DeepSeek V4 Pro | S0 零样本 | 81.22 | 80.97 |
+| DeepSeek V4 Pro | S1 少样本 | 85.17 | 85.14 |
+| DeepSeek V4 Pro | S2 逐层推理 | 83.66 | 83.55 |
+| DeepSeek V4 Pro | S3 计划与求解 | 84.49 | 84.25 |
+| DeepSeek V4 Pro | S4 CAICS-CoT | 78.15 | 76.93 |
+| DeepSeek V4 Pro | S5 CAICS-CoT+ | 77.89 | 78.52 |
+
+注：Ave 为 19 类未加权宏平均；Ave+ 为 GT 正例数 ≥5 的 18 类（排除 C2）。真值为专家 GT（N=300，平均 7.85 编码/条）。每列最优值加粗，次优值加下划线。

@@ -132,8 +132,8 @@ def _set_table_three_line_borders(table) -> None:
         borders.append(element)
 
 
-def _set_cell_bottom_border(cell) -> None:
-    """表头单元格下边框：0.75 pt。"""
+def _set_cell_bottom_border(cell, sz: int = 6) -> None:
+    """单元格下边框；默认 0.75 pt，组间分隔线可传 4（0.5 pt）。"""
     tc_pr = cell._tc.get_or_add_tcPr()
     tc_borders = tc_pr.first_child_found_in("w:tcBorders")
     if tc_borders is None:
@@ -141,7 +141,7 @@ def _set_cell_bottom_border(cell) -> None:
         tc_pr.append(tc_borders)
     bottom = OxmlElement("w:bottom")
     bottom.set(qn("w:val"), "single")
-    bottom.set(qn("w:sz"), "6")  # 0.75 pt
+    bottom.set(qn("w:sz"), str(sz))
     bottom.set(qn("w:color"), "000000")
     tc_borders.append(bottom)
 

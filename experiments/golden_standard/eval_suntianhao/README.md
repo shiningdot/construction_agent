@@ -26,6 +26,7 @@
 | `f1_per_code.csv` | 24 格 × 19 编码的 F1，附逐类 P/R 与 Micro-F1 |
 | `gt_code_distribution.csv` | 19 类的 GT 正例数与占比 |
 | `eval_report.md` | 数据口径、GT 分布、24 格 Ave+ 排名、逐编码最优结果 |
+| `layouts/` | 适合论文纵向版面的紧凑布局：正文 6 列小表、2×2 分面热图、附录 19×7 分模型表 |
 
 ## 主要结果（Ave+ F1）
 

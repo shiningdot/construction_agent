@@ -27,7 +27,7 @@
 | `gt_code_distribution.csv` | 19 类的 GT 正例数与占比 |
 | `eval_report.md` | 数据口径、GT 分布、24 格 Ave+ 排名、逐编码最优结果 |
 | `layouts/` | 备选紧凑布局：正文 6 列小表、2×2 分面热图、附录 19×7 分模型表 |
-| `paper/` | 论文最终 17 编码三线表（F1 + 召回率两张）：Letter 纵向 15.20 cm，删除 C 层，1 位小数，Ave(17) |
+| `paper/` | 论文最终三线表：F1、召回率两张（4 模型），以及 DeepSeek Flash 四指标表（F1/召回/精确/准确率）；Letter 15.20 cm，17 编码，Ave(17) |
 
 ## 主要结果（Ave+ F1）
 

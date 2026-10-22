@@ -35,6 +35,22 @@
   模型组之间加 0.25 pt 浅灰细线（可在 Word 中删除）。
 - 每列跨 24 行比较，最优加粗、次优下划线（并列全部标记）。
 
+### 2.1 DeepSeek-V4-Flash 四指标表
+
+以 DeepSeek-V4-Flash 为骨干模型，把 F1、召回率、精确率、准确率放在同一张表：
+
+| 项 | 设计 |
+|---|---|
+| 文件 | `flash_metrics_17codes.docx` |
+| 结构 | 20 列 × 26 行：`指标`、`策略`、17 编码、`Ave(17)` |
+| 行 | 4 个指标块（F1、召回率、精确率、准确率）× 6 策略（S0–S5） |
+| 指标列 | 纵向合并 6 行 |
+| 标记 | **每个指标块内**每列最优加粗、次优下划线 |
+| 准确率 | 逐编码 `(TP+TN)/300`；`Ave(17)` 为 17 类宏平均 |
+| 数值 | 1 位小数、7 pt；完整 2 位小数见 `flash_metrics_17codes.csv` |
+
+该表同样是 Letter 纵向、表宽 15.20 cm、删除 C1/C2、三线边框。
+
 ## 3. 列宽与字号
 
 | 列 | 数量 | 单列宽 | 小计 |
@@ -102,8 +118,12 @@ Ave(17)      = mean(指标[M1..M5], 指标[F1..F4], 指标[T1..T4], 指标[H1..H
 | `f1_three_line_portrait_preview.png` | F1 表 15.2 cm 预览 |
 | `recall_three_line_portrait.docx` | 召回率三线表（同版式） |
 | `recall_three_line_portrait_preview.png` | 召回率表 15.2 cm 预览 |
+| `flash_metrics_17codes.docx` | DeepSeek Flash 四指标表（F1/召回/精确/准确率） |
+| `flash_metrics_17codes_preview.png` | 四指标表 15.2 cm 预览 |
+| `flash_metrics_17codes.csv` | Flash 六策略 × 17 编码的四指标完整 2 位小数 |
 | `../f1_per_code.csv` | 24 格 × 19 编码的完整 2 位小数 F1/Recall/P，含 `Ave17` |
-| `../../../../scripts/golden_s1/make_portrait_f1_table.py` | 生成脚本（一次生成两张表） |
+| `../../../../scripts/golden_s1/make_portrait_f1_table.py` | 生成 F1/召回率两张表 |
+| `../../../../scripts/golden_s1/make_flash_metric_table.py` | 生成 Flash 四指标表 |
 
 ## 7. 复现与校验
 
@@ -123,3 +143,12 @@ cd /home/suntianhao/construction_agent
 - 表内不含 C1、C2；表注说明未列入原因；
 - 预览在 15.2 cm 物理宽度下，`100.0`、`88.7`、`S2 自动链式思维`、
   `DeepSeek-V4` 均不换行。
+
+Flash 四指标表另校验：
+
+- 26 行 × 20 列；4 个指标块各 6 行，指标列纵向合并；
+- 24 × 18 = 432 个数值与 `flash_metrics_17codes.csv` 按 1 位小数一致；
+- F1/P/R 与既有 `f1_per_code.csv` 的 Flash 行逐格一致（误差 ≤0.01）；
+- 准确率按 `(TP+TN)/300` 重算一致；
+- 每个指标块内最优加粗、次优下划线逐列校验通过；
+- `tblGrid` 合计 8626 twips = 15.214 cm。

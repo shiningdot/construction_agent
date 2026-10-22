@@ -71,19 +71,50 @@ DATA_ROW_HEIGHT_CM = 0.48
 HEADER_ROW_HEIGHT_CM = 0.42
 TABLE_WIDTH_CM = sum(COL_WIDTHS)
 TEXT_WIDTH_CM = 15.24
-# 删除 C 层后编码列增至 0.615 cm，2 位小数在 7pt 下约有 0.08 cm 间隙。
-DECIMALS = 2
+# 召回率存在大量 100.00，6 个字符在 0.615 cm 列内会重叠；
+# F1 与召回率统一保留 1 位小数，完整 2 位小数见 f1_per_code.csv。
+DECIMALS = 1
 BODY_FONT_PT = 7.0
 LABEL_FONT_PT = 7.0
 HEADER_FONT_PT = 6.5
 
-NOTE_TEXT = (
-    "注：数值为逐编码二分类 F1（%），在 300 条事故上计算。Ave(17) 为 "
-    "M1–M5、F1–F4、T1–T4、H1–H4 共 17 类的未加权宏平均；每列最优加粗、"
-    "次优加下划线。后果放大层 C1、C2 因 GT 正例数偏少或极少（C1=40、C2=2）、"
-    "F1 波动大，未列入本表。M 管理根基、F 防线失效、T 触发条件、"
-    "H 人的行为。DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。"
-)
+METRIC_SPECS = {
+    "F1": {
+        "label": "F1",
+        "caption": "F1（%）",
+        "stem": "f1",
+        "code_key": lambda code: code,
+        "ave": lambda row: float(row["Ave17"]),
+    },
+    "Recall": {
+        "label": "召回率",
+        "caption": "召回率（%）",
+        "stem": "recall",
+        "code_key": lambda code: f"{code}_R",
+        "ave": lambda row: sum(
+            float(row[f"{code}_R"]) for code in TABLE_CODES
+        ) / len(TABLE_CODES),
+    },
+}
+
+
+def note_text(label: str) -> str:
+    return (
+        f"注：数值为逐编码二分类{label}（%），保留 1 位小数，在 300 条事故上计算。Ave(17) 为 "
+        "M1–M5、F1–F4、T1–T4、H1–H4 共 17 类的未加权宏平均；每列最优加粗、"
+        "次优加下划线。后果放大层 C1、C2 因 GT 正例数偏少或极少（C1=40、C2=2）、"
+        f"{label}波动大，未列入本表。M 管理根基、F 防线失效、T 触发条件、"
+        "H 人的行为。DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。"
+    )
+
+
+def note_lines(label: str) -> list[str]:
+    return [
+        f"注：数值为逐编码二分类{label}（%），保留 1 位小数，在 300 条事故上计算。Ave(17) 为 M1–M5、",
+        "F1–F4、T1–T4、H1–H4 共 17 类的未加权宏平均；每列最优加粗、次优加下划线。后果放大层 C1、C2",
+        f"因 GT 正例数偏少或极少（C1=40、C2=2）、{label}波动大，未列入本表。M 管理根基、F 防线失效、",
+        "T 触发条件、H 人的行为。DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。",
+    ]
 
 
 def load_rows() -> list[dict]:
@@ -102,14 +133,15 @@ def get_row(rows: list[dict], model: str, strategy: str) -> dict:
     raise KeyError((model, strategy))
 
 
-def matrix_values(rows: list[dict]) -> list[list[float]]:
+def matrix_values(rows: list[dict], metric: str) -> list[list[float]]:
     """24 行 × 18 数值列（17 编码 + Ave17），按模型块、S0–S5 顺序。"""
+    spec = METRIC_SPECS[metric]
     out = []
     for model, _lines in MODEL_ORDER:
         for strategy in STRATEGIES:
             row = get_row(rows, model, strategy)
-            values = [float(row[code]) for code in TABLE_CODES]
-            values.append(float(row["Ave17"]))
+            values = [float(row[spec["code_key"](code)]) for code in TABLE_CODES]
+            values.append(spec["ave"](row))
             out.append(values)
     return out
 
@@ -266,11 +298,13 @@ def docx_helpers():
     }
 
 
-def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
+def write_docx(rows: list[dict], values: list[list[float]], path: Path,
+               metric: str) -> None:
     from docx import Document
     from docx.enum.section import WD_ORIENT
     from docx.enum.table import WD_TABLE_ALIGNMENT
 
+    spec = METRIC_SPECS[metric]
     h = docx_helpers()
     Cm = h["Cm"]
     Pt = h["Pt"]
@@ -302,7 +336,7 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
     caption.paragraph_format.keep_with_next = True
     set_run_font(
         caption.add_run(
-            "表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 F1（%）"
+            f"表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 {spec['caption']}"
         ),
         10.5,
         True,
@@ -401,7 +435,7 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
     note = doc.add_paragraph()
     note.paragraph_format.space_before = Pt(4)
     note.paragraph_format.line_spacing = 1.0
-    set_run_font(note.add_run(NOTE_TEXT), 7.0, False)
+    set_run_font(note.add_run(note_text(spec["label"])), 7.0, False)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(path)
@@ -409,7 +443,9 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
 
 # ---------------------------------------------------------------- 预览图
 
-def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> None:
+def write_preview(rows: list[dict], values: list[list[float]], path: Path,
+                  metric: str) -> None:
+    spec = METRIC_SPECS[metric]
     import matplotlib
 
     matplotlib.use("Agg")
@@ -451,7 +487,7 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
     # 标题
     ax.text(
         TABLE_WIDTH_CM / 2, top_margin + 0.35,
-        "表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 F1（%）",
+        f"表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 {spec['caption']}",
         ha="center", va="center", fontsize=10.5, fontweight="bold",
     )
 
@@ -551,13 +587,7 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
                 )
 
     # 表注（手动分行，宽度按 15.2 cm 估算）
-    note_lines = [
-        "注：数值为逐编码二分类 F1（%），在 300 条事故上计算。Ave(17) 为 M1–M5、F1–F4、T1–T4、H1–H4",
-        "共 17 类的未加权宏平均；每列最优加粗、次优加下划线。后果放大层 C1、C2 因 GT 正例数偏少",
-        "或极少（C1=40、C2=2）、F1 波动大，未列入本表。M 管理根基、F 防线失效、T 触发条件、H 人的行为。",
-        "DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。",
-    ]
-    for index, line in enumerate(note_lines):
+    for index, line in enumerate(note_lines(spec["label"])):
         ax.text(
             0.1, y_bottom + 0.45 + index * 0.36, line,
             ha="left", va="center", fontsize=6.8,
@@ -569,31 +599,46 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
 
 # ---------------------------------------------------------------- 校验
 
-def validate(rows: list[dict], values: list[list[float]]) -> None:
+def validate(rows: list[dict], values: list[list[float]], metric: str) -> None:
     assert len(values) == 24
     for data_index, row_values in enumerate(values):
-        # Ave17 由未四舍五入的 F1 计算，和表中 2 位小数的重新平均允许 ±0.02
+        mean17 = sum(row_values[:17]) / 17
         csv_row = rows[data_index]
-        if abs(float(csv_row["Ave17"]) - sum(row_values[:17]) / 17) > 0.02:
+        # F1 的 Ave17 由未四舍五入的 F1 计算，和表中 2 位小数的重新平均允许 ±0.02
+        if abs(row_values[-1] - mean17) > 0.02:
             raise AssertionError(
-                f"Ave17 不一致：{csv_row['model']}/{csv_row['strategy']}"
+                f"{metric} Ave17 不一致：{csv_row['model']}/{csv_row['strategy']}"
+            )
+        if metric == "F1" and abs(float(csv_row["Ave17"]) - row_values[-1]) > 1e-9:
+            raise AssertionError(
+                f"F1 Ave17 与 CSV 不一致：{csv_row['model']}/{csv_row['strategy']}"
             )
     assert abs(sum(COL_WIDTHS) - 15.205) < 1e-9
 
 
 def main() -> None:
     rows_in_file = load_rows()
-    values = matrix_values(rows_in_file)
     # 按模型块、S0–S5 重新排列 CSV 行，保持与 values 对齐
     ordered_rows = []
     for model, _lines in MODEL_ORDER:
         for strategy in STRATEGIES:
             ordered_rows.append(get_row(rows_in_file, model, strategy))
-    validate(ordered_rows, values)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    write_docx(ordered_rows, values, OUT_DIR / "f1_three_line_portrait.docx")
-    write_preview(ordered_rows, values, OUT_DIR / "f1_three_line_portrait_preview.png")
-    print(f"已写入：{OUT_DIR}")
+    for metric in ("F1", "Recall"):
+        spec = METRIC_SPECS[metric]
+        values = matrix_values(ordered_rows, metric)
+        validate(ordered_rows, values, metric)
+        stem = spec["stem"]
+        write_docx(
+            ordered_rows, values,
+            OUT_DIR / f"{stem}_three_line_portrait.docx", metric,
+        )
+        write_preview(
+            ordered_rows, values,
+            OUT_DIR / f"{stem}_three_line_portrait_preview.png", metric,
+        )
+        print(f"已写入 {spec['label']} 表")
+    print(f"输出目录：{OUT_DIR}")
 
 
 if __name__ == "__main__":

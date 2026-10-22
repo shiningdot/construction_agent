@@ -1,13 +1,15 @@
-"""生成 Letter 纵向、15.20 cm 宽的 4 模型 × 6 策略 × 19 编码 F1 三线表（Word）。
+"""生成 Letter 纵向、15.20 cm 宽的 4 模型 × 6 策略 × 17 编码 F1 三线表（Word）。
 
 论文稿 ``paper/eswa_paper_10.22`` 为 Letter 纸、左右页边距 3.17 cm，
 正文宽 15.24 cm；本表按 15.20 cm 设计，留 0.04 cm 余量。
 
 设计要点：
-- 22 列（模型、提示、19 编码、Ave(17)）× 26 行（2 行表头 + 24 行数据）；
-- 总宽严格 15.20 cm，编码列各 0.55 cm，单元格左右边距为 0；
-- 双层表头：M/F/T/H/C 五个层组跨列，C1/C2 加 †；
-- Ave(17) = 排除 C1、C2 后的 17 类宏平均；
+- 删除后果放大层（C1、C2），只保留 M/F/T/H 四层 17 个编码；
+- 20 列（模型、提示、17 编码、Ave(17)）× 26 行（2 行表头 + 24 行数据）；
+- 总宽严格 15.20 cm，编码列各 0.615 cm，单元格左右边距为 0；
+- 删除 C 层后横向空间增加，F1 恢复为 2 位小数（7pt）；
+- 双层表头：M/F/T/H 四个层组跨列；
+- Ave(17) = 17 类宏平均（C 层不列入，表注说明）；
 - 每列最优加粗、次优下划线；模型名纵向合并 6 行；
 - 三线边框，模型组之间可选 0.25pt 浅灰细线。
 
@@ -33,6 +35,8 @@ ALL_CODES = [f"M{i}" for i in range(1, 6)] + [f"F{i}" for i in range(1, 5)] + [
     f"T{i}" for i in range(1, 5)
 ] + [f"H{i}" for i in range(1, 5)] + ["C1", "C2"]
 AVE_CODES_17 = [code for code in ALL_CODES if code not in {"C1", "C2"}]
+# 论文表删除后果放大层（C1、C2），只展示 17 个编码。
+TABLE_CODES = AVE_CODES_17
 STRATEGIES = ["S0", "S1", "S2", "S3", "S4", "S5"]
 STRATEGY_LABELS = {
     "S0": "S0 零样本",
@@ -53,13 +57,12 @@ LAYERS = [
     ("防线 F", ["F1", "F2", "F3", "F4"]),
     ("触发 T", ["T1", "T2", "T3", "T4"]),
     ("行为 H", ["H1", "H2", "H3", "H4"]),
-    ("后果 C", ["C1", "C2"]),
 ]
 
-# 22 列：模型、提示、19 编码、Ave(17)
-# 论文实际为 Letter 纸、左右 3.17 cm 页边距 → 正文宽 15.24 cm；表宽留 0.04 cm 余量。
-COL_WIDTHS = [1.55, 2.12] + [0.55] * 19 + [1.08]
-assert abs(sum(COL_WIDTHS) - 15.20) < 1e-9, sum(COL_WIDTHS)
+# 20 列：模型、提示、17 编码、Ave(17)
+# 论文实际为 Letter 纸、左右 3.17 cm 页边距 → 正文宽 15.24 cm；表宽留 0.03 cm 余量。
+COL_WIDTHS = [1.55, 2.12] + [0.615] * 17 + [1.08]
+assert abs(sum(COL_WIDTHS) - 15.205) < 1e-9, sum(COL_WIDTHS)
 
 HEADER_ROWS = 2
 DATA_ROWS = 24
@@ -68,20 +71,18 @@ DATA_ROW_HEIGHT_CM = 0.48
 HEADER_ROW_HEIGHT_CM = 0.42
 TABLE_WIDTH_CM = sum(COL_WIDTHS)
 TEXT_WIDTH_CM = 15.24
-# 15.24 cm 内放 19 个编码列时，2 位小数只剩约 0.05 cm 间隙；
-# 表内保留 1 位小数、7pt，完整 2 位小数见 f1_per_code.csv。
-DECIMALS = 1
+# 删除 C 层后编码列增至 0.615 cm，2 位小数在 7pt 下约有 0.08 cm 间隙。
+DECIMALS = 2
 BODY_FONT_PT = 7.0
 LABEL_FONT_PT = 7.0
 HEADER_FONT_PT = 6.5
 
 NOTE_TEXT = (
-    "注：数值为逐编码二分类 F1（%），保留 1 位小数，在 300 条事故上计算。"
-    "Ave(17) 为 M1–M5、F1–F4、T1–T4、H1–H4 共 17 类的未加权宏平均；"
-    "每列最优加粗、次优加下划线。† C1、C2 的 GT 正例数分别为 40 和 2，"
-    "样本极少、F1 波动大，仅作参考，不参与 Ave(17) 计算。M 管理根基、"
-    "F 防线失效、T 触发条件、H 人的行为、C 后果放大。"
-    "DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。"
+    "注：数值为逐编码二分类 F1（%），在 300 条事故上计算。Ave(17) 为 "
+    "M1–M5、F1–F4、T1–T4、H1–H4 共 17 类的未加权宏平均；每列最优加粗、"
+    "次优加下划线。后果放大层 C1、C2 因 GT 正例数偏少或极少（C1=40、C2=2）、"
+    "F1 波动大，未列入本表。M 管理根基、F 防线失效、T 触发条件、"
+    "H 人的行为。DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。"
 )
 
 
@@ -102,12 +103,12 @@ def get_row(rows: list[dict], model: str, strategy: str) -> dict:
 
 
 def matrix_values(rows: list[dict]) -> list[list[float]]:
-    """24 行 × 21 数值列（19 编码 + Ave17），按模型块、S0–S5 顺序。"""
+    """24 行 × 18 数值列（17 编码 + Ave17），按模型块、S0–S5 顺序。"""
     out = []
     for model, _lines in MODEL_ORDER:
         for strategy in STRATEGIES:
             row = get_row(rows, model, strategy)
-            values = [float(row[code]) for code in ALL_CODES]
+            values = [float(row[code]) for code in TABLE_CODES]
             values.append(float(row["Ave17"]))
             out.append(values)
     return out
@@ -301,7 +302,7 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
     caption.paragraph_format.keep_with_next = True
     set_run_font(
         caption.add_run(
-            "表 X　四种模型 × 六种提示策略在 19 类 CAICS 致因编码上的 F1（%）"
+            "表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 F1（%）"
         ),
         10.5,
         True,
@@ -320,7 +321,7 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
     # 表头合并
     table.cell(0, 0).merge(table.cell(1, 0))  # 模型
     table.cell(0, 1).merge(table.cell(1, 1))  # 提示
-    table.cell(0, 21).merge(table.cell(1, 21))  # Ave(17)
+    table.cell(0, 19).merge(table.cell(1, 19))  # Ave(17)
     start = 2
     for label, codes in LAYERS:
         end = start + len(codes) - 1
@@ -340,10 +341,9 @@ def write_docx(rows: list[dict], values: list[list[float]], path: Path) -> None:
     for label, codes in LAYERS:
         set_cell_text(table.cell(0, start), label, 6.0, True)
         start += len(codes)
-    set_cell_text(table.cell(0, 21), "Ave(17)", HEADER_FONT_PT, True)
-    for index, code in enumerate(ALL_CODES):
-        header = f"{code}†" if code in {"C1", "C2"} else code
-        set_cell_text(table.cell(1, 2 + index), header, HEADER_FONT_PT, True)
+    set_cell_text(table.cell(0, 19), "Ave(17)", HEADER_FONT_PT, True)
+    for index, code in enumerate(TABLE_CODES):
+        set_cell_text(table.cell(1, 2 + index), code, HEADER_FONT_PT, True)
 
     # 数据
     for block, (model, model_lines) in enumerate(MODEL_ORDER):
@@ -451,7 +451,7 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
     # 标题
     ax.text(
         TABLE_WIDTH_CM / 2, top_margin + 0.35,
-        "表 X　四种模型 × 六种提示策略在 19 类 CAICS 致因编码上的 F1（%）",
+        "表 X　四种模型 × 六种提示策略在 17 类 CAICS 致因编码上的 F1（%）",
         ha="center", va="center", fontsize=10.5, fontweight="bold",
     )
 
@@ -485,16 +485,15 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
         )
         start = end
     ax.text(
-        (x_edges[21] + x_edges[22]) / 2,
+        (x_edges[19] + x_edges[20]) / 2,
         y_top + header_total / 2,
         "Ave(17)", ha="center", va="center", fontsize=6.5, fontweight="bold",
     )
-    for index, code in enumerate(ALL_CODES):
-        header = f"{code}†" if code in {"C1", "C2"} else code
+    for index, code in enumerate(TABLE_CODES):
         ax.text(
             (x_edges[2 + index] + x_edges[3 + index]) / 2,
             y_header_mid + HEADER_ROW_HEIGHT_CM / 2,
-            header, ha="center", va="center", fontsize=6.5, fontweight="bold",
+            code, ha="center", va="center", fontsize=6.5, fontweight="bold",
         )
 
     # 数据
@@ -524,7 +523,7 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
                 )
 
     # 最优加粗 / 次优下划线
-    for col_index in range(2, 22):
+    for col_index in range(2, len(COL_WIDTHS)):
         column_values = [round(row[col_index - 2], DECIMALS) for row in values]
         unique = sorted(set(column_values), reverse=True)
         best = unique[0]
@@ -553,10 +552,10 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
 
     # 表注（手动分行，宽度按 15.2 cm 估算）
     note_lines = [
-        "注：数值为逐编码二分类 F1（%），保留 1 位小数。Ave(17) 为 M1–M5、F1–F4、T1–T4、H1–H4",
-        "共 17 类的未加权宏平均；每列最优加粗、次优加下划线。† C1、C2 的 GT 正例数分别为 40 和 2，",
-        "样本极少、F1 波动大，仅作参考，不参与 Ave(17) 计算。M 管理根基、F 防线失效、T 触发条件、",
-        "H 人的行为、C 后果放大。DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。",
+        "注：数值为逐编码二分类 F1（%），在 300 条事故上计算。Ave(17) 为 M1–M5、F1–F4、T1–T4、H1–H4",
+        "共 17 类的未加权宏平均；每列最优加粗、次优加下划线。后果放大层 C1、C2 因 GT 正例数偏少",
+        "或极少（C1=40、C2=2）、F1 波动大，未列入本表。M 管理根基、F 防线失效、T 触发条件、H 人的行为。",
+        "DeepSeek-V4 Flash/Pro 即 DeepSeek-V4-Flash/Pro。",
     ]
     for index, line in enumerate(note_lines):
         ax.text(
@@ -573,14 +572,13 @@ def write_preview(rows: list[dict], values: list[list[float]], path: Path) -> No
 def validate(rows: list[dict], values: list[list[float]]) -> None:
     assert len(values) == 24
     for data_index, row_values in enumerate(values):
-        expected = sum(row_values[:19]) / 19  # noqa: F841  (仅提示，不参与断言)
         # Ave17 由未四舍五入的 F1 计算，和表中 2 位小数的重新平均允许 ±0.02
         csv_row = rows[data_index]
         if abs(float(csv_row["Ave17"]) - sum(row_values[:17]) / 17) > 0.02:
             raise AssertionError(
                 f"Ave17 不一致：{csv_row['model']}/{csv_row['strategy']}"
             )
-    assert abs(sum(COL_WIDTHS) - 15.20) < 1e-9
+    assert abs(sum(COL_WIDTHS) - 15.205) < 1e-9
 
 
 def main() -> None:

@@ -3,7 +3,8 @@
 口径与 ``scripts/golden_s1/eval_matrix.py`` 一致：
 - 预测按 id 去重，同一 id 取最后一条成功行（跳过 error / parse_error / schema_errors）；
 - 每个编码在 300 条事故上做二分类，F1 = 2TP / (2TP + FP + FN)；
-- Ave = 19 类宏平均；Ave+ = GT 中正例数 ≥ 5 的类做宏平均。
+- Ave = 19 类宏平均；Ave+ = GT 中正例数 ≥ 5 的类做宏平均；
+  Ave17 = 排除 C1、C2 后的 17 类宏平均（论文纵向表使用）。
 
 输出（默认 ``experiments/golden_standard/eval_suntianhao/``）：
 - ``f1_per_code.csv``：24 格 × 19 编码的 F1 / P / R 与 Ave、Ave+、Micro-F1；
@@ -28,6 +29,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ALL_CODES = [f"M{i}" for i in range(1, 6)] + [f"F{i}" for i in range(1, 5)] + [
     f"T{i}" for i in range(1, 5)
 ] + [f"H{i}" for i in range(1, 5)] + ["C1", "C2"]
+# C1 / C2 正例极少且 F1 波动大，论文表不纳入平均；Ave17 为其余 17 类宏平均。
+AVE_CODES_17 = [code for code in ALL_CODES if code not in {"C1", "C2"}]
 LABELS = ["glm5.2", "flash", "hy3", "pro"]
 STRATEGIES = ["S0", "S1", "S2", "S3", "S4", "S5"]
 
@@ -170,6 +173,7 @@ def evaluate(gt: dict[str, set[str]], pred_root: Path, strategies: list[str],
                 "ave_R": summary["ave_R"],
                 "ave_F1": summary["ave_F1"],
                 "ave_plus_F1": summary["ave_plus_F1"],
+                "ave17": sum(pc[code]["F1"] for code in AVE_CODES_17) / len(AVE_CODES_17),
                 "micro_F1": micro_f1(g, p)[2],
                 "n_gt": {code: sum(1 for row in g if code in row) for code in ALL_CODES},
                 "n_pred": {code: sum(1 for row in p if code in row) for code in ALL_CODES},
@@ -225,7 +229,7 @@ def _best_two(rows: list[list[str]], col: int) -> tuple[float | None, float | No
 
 def write_csv(results: dict, n_gt: dict[str, int], path: Path,
               models: list[str], strategies: list[str]) -> None:
-    fields = ["model", "strategy", "n", *ALL_CODES, "Ave", "Ave+"]
+    fields = ["model", "strategy", "n", *ALL_CODES, "Ave", "Ave+", "Ave17"]
     for code in ALL_CODES:
         fields += [f"{code}_P", f"{code}_R"]
     fields.append("Micro_F1")
@@ -243,6 +247,7 @@ def write_csv(results: dict, n_gt: dict[str, int], path: Path,
                     **{code: round(cell["per_class"][code]["F1"] * 100, 2) for code in ALL_CODES},
                     "Ave": round(cell["ave_F1"] * 100, 2),
                     "Ave+": round(cell["ave_plus_F1"] * 100, 2),
+                    "Ave17": round(cell["ave17"] * 100, 2),
                     "Micro_F1": round(cell["micro_F1"] * 100, 2),
                 }
                 for code in ALL_CODES:
@@ -597,17 +602,20 @@ def write_report(results: dict, n_gt: dict[str, int], path: Path, gt_name: str,
         "- 指标：逐编码二分类 F1 = 2TP / (2TP + FP + FN)，在 300 条上汇总。",
         "- Ave：19 类宏平均；Ave+：GT 正例数 ≥5 的 "
         f"{len(plus)} 类宏平均（排除 {', '.join(excluded) if excluded else '无'}）。",
+        "- Ave17：排除 C1、C2 后的 17 类宏平均（M1–M5、F1–F4、T1–T4、H1–H4），"
+        "论文纵向表（Letter，15.24 cm 正文宽）使用该口径。",
         "- 每列最优加粗、次优加下划线（DOCX/PNG 中体现）。",
         "",
         "## 2. GT 编码分布",
         "",
-        "| 编码 | 正例数 | 占比 | 计入 Ave+ |",
-        "|---|---:|---:|:--:|",
+        "| 编码 | 正例数 | 占比 | 计入 Ave+ | 计入 Ave17 |",
+        "|---|---:|---:|:--:|:--:|",
     ]
     for code in ALL_CODES:
         lines.append(
             f"| {code} | {n_gt[code]} | {n_gt[code] / 300 * 100:.2f}% | "
-            f"{'是' if code in plus else '否'} |"
+            f"{'是' if code in plus else '否'} | "
+            f"{'是' if code in AVE_CODES_17 else '否'} |"
         )
 
     lines += [
@@ -632,6 +640,22 @@ def write_report(results: dict, n_gt: dict[str, int], path: Path, gt_name: str,
         )
 
     lines += [
+        "",
+        "若按论文纵向表使用的 Ave17（排除 C1/C2）排序：",
+        "",
+        "| 模型 | 最佳策略 | Ave17 |",
+        "|---|---|---:|",
+    ]
+    for model in models:
+        best = max(strategies, key=lambda s: results[(s, model)]["ave17"])
+        lines.append(
+            f"| {MODEL_DISPLAY[model]} | {STRATEGY_DISPLAY[best]} "
+            f"| {results[(best, model)]['ave17'] * 100:.2f} |"
+        )
+    lines += [
+        "",
+        "注意：排除 C1/C2 后，混元 hy3 由 Ave+ 口径下的 S4 > S5 变为 S5 > S4"
+        "（77.48 vs 76.10），正文需说明该口径差异。",
         "",
         "## 4. 24 格按 Ave+ F1 排名",
         "",
